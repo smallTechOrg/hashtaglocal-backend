@@ -1,0 +1,23 @@
+spring:
+  application:
+    name: backend-boilerplate-java
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/hashtaglocal
+    username: sai
+    password: ""
+    driver-class-name: org.postgresql.Driver
+
+management:
+  health:
+    diskspace:
+      enabled: false
+    db:
+      enabled: true
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: always
