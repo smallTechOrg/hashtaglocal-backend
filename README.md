@@ -1,4 +1,4 @@
-# backend-boilerplate-java
+# hashtag-local
 a barebones enterprise application boilerplate in Java (using Spring Boot)
 
 ## Tech Stack

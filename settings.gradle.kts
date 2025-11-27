@@ -1,1 +1,1 @@
-rootProject.name = "backend-boilerplate-java"
+rootProject.name = "hashtaglocal-backend"

@@ -8,7 +8,7 @@ plugins {
 
 group = "org.smalltech"
 version = "0.0.1-SNAPSHOT"
-description = "a barebones enterprise application boilerplate in Java (using Spring Boot)"
+description = "hashtag local backend"
 
 java {
 	toolchain {
