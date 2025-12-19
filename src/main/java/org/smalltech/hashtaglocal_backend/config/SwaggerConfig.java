@@ -10,13 +10,12 @@ import io.swagger.v3.oas.models.media.MediaType;
 import io.swagger.v3.oas.models.responses.ApiResponse;
 import io.swagger.v3.oas.models.responses.ApiResponses;
 import io.swagger.v3.oas.models.tags.Tag;
+import java.util.List;
+import java.util.Map;
 import org.springdoc.core.customizers.OperationCustomizer;
 import org.springdoc.core.models.GroupedOpenApi;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-
-import java.util.List;
-import java.util.Map;
 
 @Configuration
 public class SwaggerConfig {
@@ -24,36 +23,24 @@ public class SwaggerConfig {
 	@Bean
 	public OpenAPI customOpenAPI() {
 		return new OpenAPI()
-				.info(new Info()
-						.title("Hashtag Local Backend API")
-						.version("0.0.1-SNAPSHOT")
+				.info(new Info().title("Hashtag Local Backend API").version("0.0.1-SNAPSHOT")
 						.description("API documentation for Hashtag Local Backend")
-						.contact(new Contact()
-								.name("Hashtag Local")
-								.email("contact@smalltech.in"))
-						.license(new License()
-								.name("Apache 2.0")
+						.contact(new Contact().name("Hashtag Local").email("contact@smalltech.in"))
+						.license(new License().name("Apache 2.0")
 								.url("https://www.apache.org/licenses/LICENSE-2.0.html")))
-				.tags(List.of(
-						new Tag().name("Actuator").description("Spring Boot Actuator endpoints")));
+				.tags(List.of(new Tag().name("Actuator").description("Spring Boot Actuator endpoints")));
 	}
 
 	@Bean
 	public GroupedOpenApi actuatorApi() {
-		return GroupedOpenApi.builder()
-				.group("actuator")
-				.pathsToMatch("/actuator/**")
-				.addOperationCustomizer(actuatorOperationCustomizer())
-				.build();
+		return GroupedOpenApi.builder().group("actuator").pathsToMatch("/actuator/**")
+				.addOperationCustomizer(actuatorOperationCustomizer()).build();
 	}
 
 	@Bean
 	public GroupedOpenApi publicApi() {
-		return GroupedOpenApi.builder()
-				.group("public-api")
-				.pathsToExclude("/actuator/**")
-				.addOperationCustomizer(publicApiOperationCustomizer())
-				.build();
+		return GroupedOpenApi.builder().group("public-api").pathsToExclude("/actuator/**")
+				.addOperationCustomizer(publicApiOperationCustomizer()).build();
 	}
 
 	@Bean
@@ -133,4 +120,3 @@ public class SwaggerConfig {
 		// but we can add custom examples here if needed
 	}
 }
-

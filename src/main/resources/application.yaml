@@ -4,8 +4,8 @@ spring:
 
   datasource:
     url: jdbc:postgresql://localhost:5432/hashtaglocal
-    username: sai
-    password: ""
+    username: username
+    password: password
     driver-class-name: org.postgresql.Driver
 
 management:
@@ -24,9 +24,9 @@ management:
 
 springdoc:
   api-docs:
-    path: /api-docs
+    path: /v1/api-docs
   swagger-ui:
-    path: /swagger-ui.html
+    path: /v1/swagger-ui.html
     enabled: true
     try-it-out-enabled: true
     display-request-duration: true
