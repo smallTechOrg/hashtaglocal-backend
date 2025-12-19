@@ -34,9 +34,13 @@ You can do this via the GUI or via this command:
 ## Running the Application
 You can run the app via GUI or via this command
 ```declarative
-./gradlew bootRun
+./gradlew bootRun --args='--spring.profiles.active=local'
 ```
 Verify if the app is up on http://localhost:8080/actuator/health
+You can also check the OpenAPI docs on http://localhost:8080/v1/swagger-ui/index.html
+
+## Configuring Local
+You can override the `src/main/resources/application.yaml` by creating a `src/main/resources/application-local.yaml` and override the values you need starting with DB.
 
 ## Linting
 We are using [spotless](https://github.com/diffplug/spotless) to do linting checks.
