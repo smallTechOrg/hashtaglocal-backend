@@ -14,12 +14,12 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/issue")
+@RequestMapping("/api/v1/issue")
 @Tag(name = "Issue", description = "issue API")
 
 public class IssueController {
 
-    @GetMapping("/mock")
+    @GetMapping("/1")
     @Operation(
         summary = "Get mock issue",
         description = "Returns a mock issue response with user, location, locality and viewer context."
