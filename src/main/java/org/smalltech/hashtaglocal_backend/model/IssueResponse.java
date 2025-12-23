@@ -346,21 +346,21 @@ public class IssueResponse {
     }
 
     public static class ViewerContext {
-        private boolean ab;
+        private boolean upvote;
 
         public ViewerContext() {
         }
 
-        public ViewerContext(boolean ab) {
-            this.ab = ab;
+        public ViewerContext(boolean upvote) {
+            this.upvote = upvote;
         }
 
-        public boolean isAb() {
-            return ab;
+        public boolean isUpvote() {
+            return upvote;
         }
 
-        public void setAb(boolean ab) {
-            this.ab = ab;
+        public void setUpvote(boolean upvote) {
+            this.upvote = upvote;
         }
     }
 }
