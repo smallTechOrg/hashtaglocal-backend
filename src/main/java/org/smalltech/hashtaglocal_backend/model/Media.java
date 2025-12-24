@@ -1,24 +1,24 @@
 package org.smalltech.hashtaglocal_backend.model;
 
 public class Media {
-	private MediaLocation location;
+	private Location location;
 	private String type;
 	private String url;
 
 	public Media() {
 	}
 
-	public Media(MediaLocation location, String type, String url) {
+	public Media(Location location, String type, String url) {
 		this.location = location;
 		this.type = type;
 		this.url = url;
 	}
 
-	public MediaLocation getLocation() {
+	public Location getLocation() {
 		return location;
 	}
 
-	public void setLocation(MediaLocation location) {
+	public void setLocation(Location location) {
 		this.location = location;
 	}
 

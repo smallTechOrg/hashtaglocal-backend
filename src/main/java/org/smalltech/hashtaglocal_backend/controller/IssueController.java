@@ -12,7 +12,6 @@ import org.smalltech.hashtaglocal_backend.model.Issue;
 import org.smalltech.hashtaglocal_backend.model.Locality;
 import org.smalltech.hashtaglocal_backend.model.Location;
 import org.smalltech.hashtaglocal_backend.model.Media;
-import org.smalltech.hashtaglocal_backend.model.MediaLocation;
 import org.smalltech.hashtaglocal_backend.model.ResponseData;
 import org.smalltech.hashtaglocal_backend.model.User;
 import org.smalltech.hashtaglocal_backend.model.ViewerContext;
@@ -35,28 +34,13 @@ public class IssueController {
 	}
 
 	private APIResponse getMockResponse() {
-
-		MediaLocation mediaLocation = new MediaLocation("12.34", "56.78");
-
-		Media media = new Media(mediaLocation, "photo", "https://example.com/image.jpg");
-
-		// ---- User ----
 		User user = new User("john_doe", "https://example.com/profile.jpg");
-
-		// ---- Locality ----
 		Locality locality = new Locality(List.of("#Jaipur"));
-
-		// ---- Location ----
 		Location location = new Location("12.34", "56.78", locality, "Main Street", "Near City Mall");
-
-		// ---- Issue ----
+                Media media = new Media(location, "photo", "https://example.com/image.jpg");
 		Issue issue = new Issue(user, location, "road", "Large pothole causing traffic issues", LocalDateTime.now(),
 				List.of(media), 42, 10, "OPEN", 1);
-
-		// ---- Viewer Context ----
 		ViewerContext viewerContext = new ViewerContext(true);
-
-		// ---- Data ----
 		ResponseData data = new ResponseData(issue, viewerContext);
 
 		return new APIResponse(data);
