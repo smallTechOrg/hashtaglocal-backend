@@ -53,3 +53,9 @@ To fix any linting issues, run this:
 ```declarative
 ./gradlew :spotlessApply
 ```
+
+## Testing
+To run all the test cases, use this command:
+```declarative
+./gradlew test
+```

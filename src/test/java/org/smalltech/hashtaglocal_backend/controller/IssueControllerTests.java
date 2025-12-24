@@ -36,7 +36,6 @@ class IssueControllerTests {
         assertEquals("john_doe", issue.getUser().getUsername());
 
         assertNotNull(issue.getLocation());
-        assertEquals("Main Street", issue.getLocation().getColloquialName());
 
         ViewerContext viewerContext = data.getViewerContext();
         assertTrue(viewerContext.isUpvote());

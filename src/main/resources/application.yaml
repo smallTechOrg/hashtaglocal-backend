@@ -3,7 +3,7 @@ spring:
     name: hashtaglocal-backend
 
   datasource:
-    url: jdbc:postgresql://localhost:5432/chatdb
+    url: jdbc:postgresql://localhost:5432/hashtaglocal
     username: username
     password: password
     driver-class-name: org.postgresql.Driver
