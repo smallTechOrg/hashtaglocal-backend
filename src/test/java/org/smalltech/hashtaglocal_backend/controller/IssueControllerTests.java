@@ -1,45 +1,44 @@
-//Unit test for IssueResponse
 package org.smalltech.hashtaglocal_backend.controller;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import org.junit.jupiter.api.Test;
-import org.smalltech.hashtaglocal_backend.model.IssueResponse;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.http.MediaType;
-import org.springframework.test.web.servlet.MockMvc;
+import org.smalltech.hashtaglocal_backend.model.APIResponse;
+import org.smalltech.hashtaglocal_backend.model.Issue;
+import org.smalltech.hashtaglocal_backend.model.ResponseData;
+import org.smalltech.hashtaglocal_backend.model.ViewerContext;
 
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
-
-@WebMvcTest(IssueController.class)
-class IssueControllerTest {
-
-    @Autowired
-    private MockMvc mockMvc;
+class IssueControllerTests {
 
     @Test
-    void getMockIssue_returnsExpectedJson() throws Exception {
-        mockMvc.perform(get("/api/v1/issue/1")
-                        .accept(MediaType.APPLICATION_JSON))
-                .andExpect(status().isOk())
-                // top-level
-                .andExpect(jsonPath("$.data").exists())
-                // issue
-                .andExpect(jsonPath("$.data.issue").exists())
-                .andExpect(jsonPath("$.data.issue.user.username").isNotEmpty())
-                .andExpect(jsonPath("$.data.issue.user.profileUrl").isNotEmpty())
-                .andExpect(jsonPath("$.data.issue.location.lat").isNotEmpty())
-                .andExpect(jsonPath("$.data.issue.location.lng").isNotEmpty())
-                .andExpect(jsonPath("$.data.issue.location.locality.hashtags").isArray())
-                .andExpect(jsonPath("$.data.issue.type").isNotEmpty())
-                .andExpect(jsonPath("$.data.issue.description").isNotEmpty())
-                .andExpect(jsonPath("$.data.issue.mediaUrls").isArray())
-                .andExpect(jsonPath("$.data.issue.voteCount").isNotEmpty())
-                .andExpect(jsonPath("$.data.issue.status").isNotEmpty())
-                .andExpect(jsonPath("$.data.issue.verifyCount").isNotEmpty())
-                .andExpect(jsonPath("$.data.issue.rank").isNotEmpty())
-                // viewer_context
-                .andExpect(jsonPath("$.data.viewerContext").exists())
-                .andExpect(jsonPath("$.data.viewerContext.upvote").isNotEmpty());
+    void getIssue_shouldReturnValidApiResponse() {
+        // Arrange
+        IssueController controller = new IssueController();
+
+        // Act
+        APIResponse response = controller.getIssue();
+
+        // Assert
+        assertNotNull(response);
+
+        ResponseData data = response.getData();
+        assertNotNull(data);
+
+        Issue issue = data.getIssue();
+        assertNotNull(issue);
+
+        assertEquals("road", issue.getType());
+        assertEquals("OPEN", issue.getStatus());
+        assertEquals(42, issue.getVoteCount());
+        assertEquals(10, issue.getVerifyCount());
+
+        assertNotNull(issue.getUser());
+        assertEquals("john_doe", issue.getUser().getUsername());
+
+        assertNotNull(issue.getLocation());
+        assertEquals("Main Street", issue.getLocation().getColloquialName());
+
+        ViewerContext viewerContext = data.getViewerContext();
+        assertTrue(viewerContext.isUpvote());
     }
 }
