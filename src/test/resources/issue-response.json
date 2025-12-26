@@ -3,7 +3,7 @@
     "issue": {
       "user": {
         "username": "john_doe",
-        "profile_url": "https://example.com/profile.jpg"
+        "profile_photo": "https://example.com/profile.jpg"
       },
       "location": {
         "lat": "12.34",
@@ -13,10 +13,10 @@
             "#Jaipur"
           ]
         },
-        "address": "Main Street",
-        "colloquial_name": "Near City Mall"
+        "address": "Sector 3, Jawahar Nagar",
+        "colloquial_name": "Near Patrika Gate"
       },
-      "type": "road",
+      "type": "pothole",
       "description": "Large pothole causing traffic issues",
       "status": "OPEN",
       "rank": 1,
@@ -31,14 +31,29 @@
                 "#Jaipur"
               ]
             },
-            "address": "Main Street",
-            "colloquial_name": "Near City Mall"
+            "address": "Sector 3, Jawahar Nagar",
+            "colloquial_name": "Near Patrika Gate"
           },
           "type": "photo",
-          "url": "https://example.com/image.jpg"
+          "url": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSlsVKu0BbJsA4pP5cl-3p2iNcCejvGUsRePw&s"
+        },
+        {
+          "location": {
+            "lat": "12.34",
+            "lng": "56.78",
+            "locality": {
+              "hashtags": [
+                "#Jaipur"
+              ]
+            },
+            "address": "Sector 3, Jawahar Nagar",
+            "colloquial_name": "Near Patrika Gate"
+          },
+          "type": "photo",
+          "url": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcScjZgL3uUv4TgE2gWW_xwJhi-hQbiF8HKRBQ&s"
         }
       ],
-      "vote_ount": 42,
+      "vote_count": 42,
       "verify_count": 10
     },
     "viewer_context": {

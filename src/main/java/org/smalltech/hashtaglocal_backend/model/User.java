@@ -12,6 +12,6 @@ import lombok.NoArgsConstructor;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class User {
 	private String username;
-	@JsonProperty("profile_url")
-	private String profileUrl;
+	@JsonProperty("profile_photo")
+	private String profilePhoto;
 }

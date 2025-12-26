@@ -23,7 +23,7 @@ public class Issue {
 	@JsonProperty("media_urls")
 	private List<Media> mediaUrls;
 
-	@JsonProperty("vote_ount")
+	@JsonProperty("vote_count")
 	private int voteCount;
 
 	@JsonProperty("verify_count")
