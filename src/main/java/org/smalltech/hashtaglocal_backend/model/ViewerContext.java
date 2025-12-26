@@ -1,20 +1,12 @@
 package org.smalltech.hashtaglocal_backend.model;
 
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
 public class ViewerContext {
 	private boolean upvote;
-
-	public ViewerContext() {
-	}
-
-	public ViewerContext(boolean upvote) {
-		this.upvote = upvote;
-	}
-
-	public boolean isUpvote() {
-		return upvote;
-	}
-
-	public void setUpvote(boolean upvote) {
-		this.upvote = upvote;
-	}
 }

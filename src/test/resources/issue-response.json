@@ -1,0 +1,48 @@
+{
+  "data": {
+    "issue": {
+      "user": {
+        "username": "john_doe",
+        "profileUrl": "https://example.com/profile.jpg"
+      },
+      "location": {
+        "lat": "12.34",
+        "lng": "56.78",
+        "locality": {
+          "hashtags": [
+            "#Jaipur"
+          ]
+        },
+        "address": "Main Street",
+        "colloquialName": "Near City Mall"
+      },
+      "type": "road",
+      "description": "Large pothole causing traffic issues",
+      "createdAt": "2025-12-26T18:00:00",
+      "mediaUrls": [
+        {
+          "location": {
+            "lat": "12.34",
+            "lng": "56.78",
+            "locality": {
+              "hashtags": [
+                "#Jaipur"
+              ]
+            },
+            "address": "Main Street",
+            "colloquialName": "Near City Mall"
+          },
+          "type": "photo",
+          "url": "https://example.com/image.jpg"
+        }
+      ],
+      "voteCount": 42,
+      "verifyCount": 10,
+      "status": "OPEN",
+      "rank": 1
+    },
+    "viewerContext": {
+      "upvote": true
+    }
+  }
+}

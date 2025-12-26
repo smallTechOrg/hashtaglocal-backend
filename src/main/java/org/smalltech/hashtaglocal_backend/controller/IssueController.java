@@ -5,7 +5,6 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import java.time.LocalDateTime;
 import java.util.List;
 import org.smalltech.hashtaglocal_backend.model.APIResponse;
 import org.smalltech.hashtaglocal_backend.model.Issue;
@@ -37,8 +36,8 @@ public class IssueController {
 		User user = new User("john_doe", "https://example.com/profile.jpg");
 		Locality locality = new Locality(List.of("#Jaipur"));
 		Location location = new Location("12.34", "56.78", locality, "Main Street", "Near City Mall");
-                Media media = new Media(location, "photo", "https://example.com/image.jpg");
-		Issue issue = new Issue(user, location, "road", "Large pothole causing traffic issues", LocalDateTime.now(),
+		Media media = new Media(location, "photo", "https://example.com/image.jpg");
+		Issue issue = new Issue(user, location, "road", "Large pothole causing traffic issues", "2025-12-26T18:00:00",
 				List.of(media), 42, 10, "OPEN", 1);
 		ViewerContext viewerContext = new ViewerContext(true);
 		ResponseData data = new ResponseData(issue, viewerContext);
