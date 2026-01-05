@@ -14,7 +14,6 @@ import org.smalltech.hashtaglocal_backend.model.User;
 import org.smalltech.hashtaglocal_backend.model.ViewerContext;
 
 class IssueControllerTests {
-
 	@Test
 	void getIssue_shouldReturnValidApiResponse() {
 		// Arrange

@@ -19,9 +19,7 @@ class IssueIntegrationTests {
 	@BeforeEach
 	public void setUpFixture() throws Exception {
 		InputStream fixtureStream = getClass().getClassLoader().getResourceAsStream(ISSUE_RESPONSE_FIXTURE);
-
 		expectedJson = objectMapper.readTree(fixtureStream);
-
 	}
 
 	@Autowired

@@ -23,13 +23,11 @@ import org.springframework.web.bind.annotation.RestController;
 @Tag(name = "Issue", description = "issue API")
 
 public class IssueController {
-
 	@GetMapping("/{issueId}")
 	@Operation(summary = "Get issue", description = "Returns a issue response with user, location, locality and viewer context.")
 	@ApiResponse(responseCode = "200", description = "Successful issue response", content = @Content(mediaType = "application/json", schema = @Schema(implementation = APIResponse.class)))
 	public APIResponse getIssue() {
 		return getMockResponse();
-
 	}
 
 	private APIResponse getMockResponse() {
