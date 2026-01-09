@@ -1,0 +1,40 @@
+package org.smalltech.hashtaglocal_backend.entity;
+
+import jakarta.persistence.*;
+import lombok.*;
+
+@Entity
+@Table(name = "issue")
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class Issue {
+
+	@Id
+	@GeneratedValue(strategy = GenerationType.IDENTITY)
+	private Long id;
+
+	// Human-readable issue key (optional)
+	@Column(unique = true, length = 50)
+	private String key;
+
+	@Column(name = "created_by", nullable = false, length = 100)
+	private String user;
+
+	@Column(nullable = false, length = 50000)
+	private String description;
+
+	@Column(nullable = false, length = 100)
+	private String type;
+
+	@Column(nullable = false, length = 100)
+	private String status;
+
+	@Column(name = "created_at", nullable = false, updatable = false)
+	private String createdAt;
+
+	@Column(name = "updated_at", nullable = false)
+	private String updatedAt;
+}

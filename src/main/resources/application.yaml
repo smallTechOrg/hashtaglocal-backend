@@ -4,13 +4,21 @@ spring:
   jackson:
     property-naming-strategy: SNAKE_CASE
 
-
   datasource:
     url: jdbc:postgresql://localhost:5432/hashtaglocal
     username: username
     password: password
     driver-class-name: org.postgresql.Driver
 
+  jpa:
+    hibernate:
+      ddl-auto: create
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        
 management:
   health:
     diskspace:
