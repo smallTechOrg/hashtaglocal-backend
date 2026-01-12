@@ -14,11 +14,16 @@ spring:
     hibernate:
       ddl-auto: create
     show-sql: true
+    defer-datasource-initialization: true
     properties:
       hibernate:
         format_sql: true
         dialect: org.hibernate.dialect.PostgreSQLDialect
-        
+  
+  sql:
+    init:
+      mode: always
+
 management:
   health:
     diskspace:

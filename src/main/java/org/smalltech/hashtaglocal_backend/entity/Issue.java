@@ -20,9 +20,6 @@ public class Issue {
 	@Column(unique = true, length = 50)
 	private String key;
 
-	@Column(name = "created_by", nullable = false, length = 100)
-	private String user;
-
 	@Column(nullable = false, length = 50000)
 	private String description;
 
