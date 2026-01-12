@@ -29,7 +29,10 @@ dependencies {
 	testImplementation("org.springframework.boot:spring-boot-starter-test")
 	testImplementation("org.springframework.boot:spring-boot-starter-webflux")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+<<<<<<< HEAD
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
+=======
+>>>>>>> staging
 }
 
 dependencies {
