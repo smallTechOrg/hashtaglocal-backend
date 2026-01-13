@@ -1,5 +1,5 @@
 INSERT INTO issues (
-    issue_key,
+    "key",
     description,
     type,
     status,

@@ -5,8 +5,7 @@ import lombok.*;
 
 @Entity
 @Table(name = "issues")
-@Getter
-@Setter
+@Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
@@ -17,7 +16,7 @@ public class IssueEntity {
 	private Long id;
 
 	// Human-readable issue key (optional)
-	@Column(unique = true, length = 50, name = "issue_key")
+	@Column(unique = true, length = 50, name = "\"key\"")
 	private String key;
 
 	@Column(nullable = false, length = 50000)
@@ -29,9 +28,9 @@ public class IssueEntity {
 	@Column(nullable = false, length = 100)
 	private String status;
 
-	@Column(name = "created_at", nullable = false, updatable = false)
+	@Column(nullable = false, updatable = false)
 	private String createdAt;
 
-	@Column(name = "updated_at", nullable = false)
+	@Column(nullable = false)
 	private String updatedAt;
 }
