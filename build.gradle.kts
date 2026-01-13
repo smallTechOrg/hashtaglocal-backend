@@ -30,10 +30,7 @@ dependencies {
 	testImplementation("org.springframework.boot:spring-boot-starter-webflux")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
-<<<<<<< HEAD
     testImplementation("com.h2database:h2")
-=======
->>>>>>> staging
 }
 
 dependencies {
