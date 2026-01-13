@@ -11,8 +11,3 @@ spring:
     defer-datasource-initialization: true
     show-sql: false
     database-platform: org.hibernate.dialect.H2Dialect
-
-  sql:
-    init:
-      mode: always
-      data-locations: classpath:issuedata.sql
