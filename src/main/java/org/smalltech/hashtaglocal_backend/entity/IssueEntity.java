@@ -4,7 +4,7 @@ import jakarta.persistence.*;
 import lombok.*;
 
 @Entity
-@Table(name = "issue")
+@Table(name = "issues")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -17,7 +17,7 @@ public class IssueEntity {
 	private Long id;
 
 	// Human-readable issue key (optional)
-	@Column(unique = true, length = 50)
+	@Column(unique = true, length = 50, name = "issue_key")
 	private String key;
 
 	@Column(nullable = false, length = 50000)
