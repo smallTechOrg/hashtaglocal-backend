@@ -46,17 +46,29 @@ public class IssueController {
 
 	private APIResponse mapToAPIResponse(org.smalltech.hashtaglocal_backend.entity.IssueEntity entity) {
 
-		User user = new User("john_doe", "https://example.com/profile.jpg");
-		Locality locality = new Locality(List.of("#Jaipur"));
-		Location location = new Location("12.34", "56.78", locality, "Sector 3, Jawahar Nagar", "Near Patrika Gate");
-		Media media1 = new Media(location, "photo",
-				"https://sripath.com/wp-content/uploads/2025/01/iStock-174662203.jpg");
-		Media media2 = new Media(location, "photo", "https://nub.news/api/image/526263/article.png");
-		ViewerContext viewerContext = new ViewerContext(true);
-		Issue issue = new Issue(user, location, entity.getType(), entity.getDescription(), entity.getCreatedAt(),
-				List.of(media1, media2), 42, 10, entity.getStatus(), 1, viewerContext);
-		ResponseData data = new ResponseData(issue);
+		User user = User.builder().username("john_doe").profilePhoto("https://example.com/profile.jpg").build();
 
-		return new APIResponse(data);
+		Locality locality = Locality.builder().hashtags(List.of("#Jaipur")).build();
+
+		Location location = Location.builder().lat("12.34").lng("56.78").locality(locality)
+				.address("Sector 3, Jawahar Nagar").colloquialName("Near Patrika Gate").build();
+
+		Media media1 = Media.builder().location(location).type("photo")
+				.url("https://sripath.com/wp-content/uploads/2025/01/iStock-174662203.jpg").build();
+
+		Media media2 = Media.builder().location(location).type("photo")
+				.url("https://nub.news/api/image/526263/article.png").build();
+
+		ViewerContext viewerContext = ViewerContext.builder().upvote(true).build();
+
+		Issue issue = Issue.builder().user(user).location(location).type(entity.getType())
+				.description(entity.getDescription()).createdAt(entity.getCreatedAt())
+				.mediaUrls(List.of(media1, media2)).voteCount(42).verifyCount(10).status(entity.getStatus()).rank(1)
+				.viewerContext(viewerContext).build();
+
+		ResponseData data = ResponseData.builder().issue(issue).build();
+
+		return APIResponse.builder().data(data).build();
 	}
+
 }
