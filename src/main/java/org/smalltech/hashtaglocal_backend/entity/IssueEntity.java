@@ -4,20 +4,19 @@ import jakarta.persistence.*;
 import lombok.*;
 
 @Entity
-@Table(name = "issue")
-@Getter
-@Setter
+@Table(name = "issues")
+@Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class Issue {
+public class IssueEntity {
 
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	private Long id;
 
 	// Human-readable issue key (optional)
-	@Column(unique = true, length = 50)
+	@Column(unique = true, length = 50, name = "\"key\"")
 	private String key;
 
 	@Column(nullable = false, length = 50000)
@@ -29,9 +28,9 @@ public class Issue {
 	@Column(nullable = false, length = 100)
 	private String status;
 
-	@Column(name = "created_at", nullable = false, updatable = false)
+	@Column(nullable = false, updatable = false)
 	private String createdAt;
 
-	@Column(name = "updated_at", nullable = false)
+	@Column(nullable = false)
 	private String updatedAt;
 }
