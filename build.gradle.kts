@@ -28,6 +28,7 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.6.0")
     implementation("org.locationtech.jts:jts-core:1.19.0")
+    implementation("com.vladmihalcea:hibernate-types-60:2.21.1")
 	testImplementation("org.springframework.boot:spring-boot-starter-test")
 	testImplementation("org.springframework.boot:spring-boot-starter-webflux")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")

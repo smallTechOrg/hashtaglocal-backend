@@ -1,10 +1,13 @@
 package org.smalltech.hashtaglocal_backend.entity;
 
+import com.vladmihalcea.hibernate.type.json.JsonType;
 import jakarta.persistence.*;
+import java.util.Map;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.Type;
 
 @Entity
 @Table(name = "locations")
@@ -30,6 +33,7 @@ public class Location {
 	@Column(nullable = false)
 	private String name;
 
-	@Column(columnDefinition = "TEXT")
-	private String metaData;
+	@Type(JsonType.class)
+	@Column(columnDefinition = "jsonb")
+	private Map<String, Object> metaData;
 }
