@@ -10,6 +10,5 @@ import lombok.*;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class ResponseData {
 	private Issue issue;
-	private String signedUrl;
-	private String path;
+	private SignedUrlResponse mediaUrl;
 }

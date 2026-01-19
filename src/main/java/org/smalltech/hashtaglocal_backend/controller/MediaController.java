@@ -17,6 +17,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.concurrent.TimeUnit;
 import org.smalltech.hashtaglocal_backend.model.APIResponse;
 import org.smalltech.hashtaglocal_backend.model.ResponseData;
+import org.smalltech.hashtaglocal_backend.model.SignedUrlResponse;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -31,7 +32,7 @@ public class MediaController {
 
 	private final Storage storage = StorageOptions.getDefaultInstance().getService();
 
-	@GetMapping("/signed-url")
+	@GetMapping("/upload-url")
 	@Operation(summary = "Generate signed upload URL", description = "Generates a V4 signed URL for uploading media files directly to Google Cloud Storage using HTTP PUT.")
 	@ApiResponse(responseCode = "200", description = "Signed URL generated successfully", content = @Content(mediaType = "application/json", schema = @Schema(implementation = APIResponse.class)))
 
@@ -50,14 +51,12 @@ public class MediaController {
 				Storage.SignUrlOption.httpMethod(HttpMethod.PUT), Storage.SignUrlOption.withV4Signature());
 
 		// 4. Build response
-		ResponseData data = new ResponseData();
-		data.setSignedUrl(signedUrl.toString());
-		data.setPath("gs://" + BUCKET_NAME + "/" + objectPath);
+		SignedUrlResponse mediaUrl = SignedUrlResponse.builder().signedUrl(signedUrl.toString())
+				.path("gs://" + BUCKET_NAME + "/" + objectPath).build();
 
-		APIResponse response = new APIResponse();
-		response.setData(data);
+		ResponseData data = ResponseData.builder().mediaUrl(mediaUrl).build();
 
-		return response;
+		return APIResponse.builder().data(data).build();
 	}
 
 	private String generateTimeBasedPath(String extension) {
