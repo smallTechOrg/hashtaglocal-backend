@@ -22,11 +22,14 @@ repositories {
 
 dependencies {
     implementation("org.postgresql:postgresql:42.7.7")
+    implementation("org.hibernate.orm:hibernate-spatial:6.4.4.Final")
     implementation("org.springframework.boot:spring-boot-starter-jdbc")
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.6.0")
     implementation("com.google.cloud:google-cloud-storage:2.55.0")
+    implementation("org.locationtech.jts:jts-core:1.19.0")
+    implementation("com.vladmihalcea:hibernate-types-60:2.21.1")
 	testImplementation("org.springframework.boot:spring-boot-starter-test")
 	testImplementation("org.springframework.boot:spring-boot-starter-webflux")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")

@@ -1,20 +1,7 @@
 # hashtag-local
-a barebones enterprise application boilerplate in Java (using Spring Boot)
-
-## Tech Stack
-
-- [Gradle](https://gradle.org/) - Flexible build system 
-- [SpringBoot](https://www.typescriptlang.org/) – Multi-purpose Framework
-
-## Features
-- Built on top of the [Spring Initializer](https://start.spring.io/) setup
-- Fast, easy startup for any new service
+the backend for #local, a location based community platform
 
 ## Prerequisites
-
-### Setup IntelliJ IDE
-We are not only going to use IntelliJ's IDE as a code editor,
-but we will also be using to install and maintain different Java runtimes.
 
 ### Install Java
 Install Java using the IntelliJ console.
@@ -41,6 +28,10 @@ You can also check the OpenAPI docs on http://localhost:8080/v1/swagger-ui/index
 
 ## Configuring Local
 You can override the `src/main/resources/application.yaml` by creating a `src/main/resources/application-local.yaml` and override the values you need starting with DB.
+You will have to do the same for running the tests: `src/test/resources/application-test.yaml`.
+
+Also, make sure to create the necessary DBs as well on your local:
+"hashtaglocal" and "hashtaglocaltest".
 
 ## Linting
 We are using [spotless](https://github.com/diffplug/spotless) to do linting checks.
