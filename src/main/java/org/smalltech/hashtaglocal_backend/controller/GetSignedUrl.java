@@ -1,22 +1,20 @@
 package org.smalltech.hashtaglocal_backend.controller;
 
-import com.google.auth.oauth2.GoogleCredentials;
 import com.google.cloud.storage.BlobInfo;
 import com.google.cloud.storage.HttpMethod;
 import com.google.cloud.storage.Storage;
 import com.google.cloud.storage.StorageOptions;
-
 import java.net.URL;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
-import java.util.UUID;
+import java.time.format.DateTimeFormatter;
 import java.util.concurrent.TimeUnit;
-
 import org.smalltech.hashtaglocal_backend.model.APIResponse;
 import org.smalltech.hashtaglocal_backend.model.ResponseData;
-import org.springframework.web.bind.annotation.*;
-
-import jakarta.annotation.PostConstruct;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/v1/media")
@@ -25,12 +23,6 @@ public class GetSignedUrl {
 	private static final String BUCKET_NAME = "hashtaglocalbucket";
 
 	private final Storage storage = StorageOptions.getDefaultInstance().getService();
-	// ✅ ADD IT HERE
-    @PostConstruct
-    public void checkCreds() throws Exception {
-        GoogleCredentials creds = GoogleCredentials.getApplicationDefault();
-        System.out.println("GCP credentials class = " + creds.getClass().getName());
-    }
 
 	@GetMapping("/signed-url")
 	public APIResponse getSignedUrl(@RequestParam("content_type") String contentType) {
@@ -57,13 +49,10 @@ public class GetSignedUrl {
 		return response;
 	}
 
-	// ---------- helpers ----------
-
 	private String generateTimeBasedPath(String extension) {
-		LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
-
-		return String.format("posts/%04d/%02d/%02d/%02d/%s.%s", now.getYear(), now.getMonthValue(), now.getDayOfMonth(),
-				now.getHour(), UUID.randomUUID(), extension);
+		String timestamp = LocalDateTime.now(ZoneOffset.UTC)
+				.format(DateTimeFormatter.ofPattern("yyyy/MM/dd/HH-mm-ss-SSS"));
+		return String.format("%s.%s", timestamp, extension);
 	}
 
 	private String extractExtension(String contentType) {
