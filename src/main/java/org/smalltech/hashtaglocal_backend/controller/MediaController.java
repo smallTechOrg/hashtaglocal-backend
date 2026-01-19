@@ -4,6 +4,12 @@ import com.google.cloud.storage.BlobInfo;
 import com.google.cloud.storage.HttpMethod;
 import com.google.cloud.storage.Storage;
 import com.google.cloud.storage.StorageOptions;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import java.net.URL;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -18,14 +24,19 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/v1/media")
-public class GetSignedUrl {
+@Tag(name = "Media", description = "Media upload and signed URL APIs")
+public class MediaController {
 
 	private static final String BUCKET_NAME = "hashtaglocalbucket";
 
 	private final Storage storage = StorageOptions.getDefaultInstance().getService();
 
 	@GetMapping("/signed-url")
-	public APIResponse getSignedUrl(@RequestParam("content_type") String contentType) {
+	@Operation(summary = "Generate signed upload URL", description = "Generates a V4 signed URL for uploading media files directly to Google Cloud Storage using HTTP PUT.")
+	@ApiResponse(responseCode = "200", description = "Signed URL generated successfully", content = @Content(mediaType = "application/json", schema = @Schema(implementation = APIResponse.class)))
+
+	public APIResponse getSignedUrl(
+			@Parameter(description = "MIME type of the file to be uploaded (e.g. image/jpeg, image/png)", required = true, example = "image/jpeg") @RequestParam("content_type") String contentType) {
 
 		// 1. Generate time-based path
 		String extension = extractExtension(contentType);
@@ -51,7 +62,7 @@ public class GetSignedUrl {
 
 	private String generateTimeBasedPath(String extension) {
 		String timestamp = LocalDateTime.now(ZoneOffset.UTC)
-				.format(DateTimeFormatter.ofPattern("yyyy/MM/dd/HH-mm-ss-SSS"));
+				.format(DateTimeFormatter.ofPattern("yyyy-MM-dd-HH-mm-ss-SSS"));
 		return String.format("%s.%s", timestamp, extension);
 	}
 
