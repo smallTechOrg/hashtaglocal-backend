@@ -7,7 +7,6 @@ import static org.mockito.Mockito.when;
 
 import com.google.cloud.storage.BlobInfo;
 import com.google.cloud.storage.Storage;
-import java.lang.reflect.Field;
 import java.net.URL;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
@@ -22,18 +21,13 @@ class MediaControllerTests {
 	void getSignedUrl_shouldReturnValidApiResponse() throws Exception {
 
 		// Arrange
-		MediaController controller = new MediaController();
-
 		Storage mockStorage = Mockito.mock(Storage.class);
+		MediaController controller = new MediaController(mockStorage);
+
 		URL fakeSignedUrl = new URL("https://storage.googleapis.com/fake-upload-url");
 
 		when(mockStorage.signUrl(any(BlobInfo.class), Mockito.eq(15L), Mockito.eq(TimeUnit.MINUTES),
 				any(Storage.SignUrlOption.class), any(Storage.SignUrlOption.class))).thenReturn(fakeSignedUrl);
-
-		// Replace private final storage field using reflection
-		Field storageField = MediaController.class.getDeclaredField("storage");
-		storageField.setAccessible(true);
-		storageField.set(controller, mockStorage);
 
 		// Act
 		APIResponse response = controller.getSignedUrl("image/jpeg");

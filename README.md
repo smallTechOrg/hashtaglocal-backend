@@ -21,8 +21,11 @@ You can do this via the GUI or via this command:
 ### Connect with GCS buckey
 Once you have downloaded the SA key in your local, you can set your credential using this command:
 ```declarative
-$env:GOOGLE_APPLICATION_CREDENTIALS="C:\GCS-key.json" (path of the downloaded json file)
+$env:GOOGLE_APPLICATION_CREDENTIALS="C:\GCS-key.json"
 ```
+
+Or simply add "gcs-key.json" to the repo.
+
 If Gradle is running, stop it using:
 ```declarative
 ./gradlew --stop

@@ -3,7 +3,6 @@ package org.smalltech.hashtaglocal_backend.controller;
 import com.google.cloud.storage.BlobInfo;
 import com.google.cloud.storage.HttpMethod;
 import com.google.cloud.storage.Storage;
-import com.google.cloud.storage.StorageOptions;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -30,7 +29,11 @@ public class MediaController {
 
 	private static final String BUCKET_NAME = "hashtaglocalbucket";
 
-	private final Storage storage = StorageOptions.getDefaultInstance().getService();
+	private final Storage storage;
+
+	public MediaController(Storage storage) {
+		this.storage = storage;
+	}
 
 	@GetMapping("/upload-url")
 	@Operation(summary = "Generate signed upload URL", description = "Generates a V4 signed URL for uploading media files directly to Google Cloud Storage using HTTP PUT.")
