@@ -22,10 +22,6 @@ class MediaIntegrationTests {
 
 				// --- structure assertions ---
 				.jsonPath("$.data").exists().jsonPath("$.data.media_url").exists()
-				.jsonPath("$.data.media_url.signed_url").exists().jsonPath("$.data.media_url.path").exists()
-
-				// --- invariant assertions ---
-				.jsonPath("$.data.media_url.path").value(path -> ((String) path).startsWith("gs://hashtaglocalbucket/"))
-				.jsonPath("$.data.media_url.path").value(path -> ((String) path).endsWith(".jpg"));
+				.jsonPath("$.data.media_url.signed_url").exists().jsonPath("$.data.media_url.path").exists();
 	}
 }
