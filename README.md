@@ -18,6 +18,17 @@ You can do this via the GUI or via this command:
 ./gradlew build
 ```
 
+### Connect with GCS buckey
+Once you have downloaded the SA key in your local, you can set your credential using this command:
+```declarative
+$env:GOOGLE_APPLICATION_CREDENTIALS="C:\GCS-key.json" (path of the downloaded json file)
+```
+If Gradle was already running, stop it using:
+```declarative
+./gradlew --stop
+```
+Run command to set your credential and then run build command.
+
 ## Running the Application
 You can run the app via GUI or via this command
 ```declarative
