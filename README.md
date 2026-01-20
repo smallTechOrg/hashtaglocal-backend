@@ -23,11 +23,11 @@ Once you have downloaded the SA key in your local, you can set your credential u
 ```declarative
 $env:GOOGLE_APPLICATION_CREDENTIALS="C:\GCS-key.json" (path of the downloaded json file)
 ```
-If Gradle was already running, stop it using:
+If Gradle is running, stop it using:
 ```declarative
 ./gradlew --stop
 ```
-Run command to set your credential and then run build command.
+After setting the credentials, run your Gradle build command as usual.
 
 ## Running the Application
 You can run the app via GUI or via this command
