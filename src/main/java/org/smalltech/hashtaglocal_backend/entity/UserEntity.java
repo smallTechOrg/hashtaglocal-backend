@@ -1,0 +1,48 @@
+package org.smalltech.hashtaglocal_backend.entity;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Entity
+@Table(name = "users")
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class UserEntity {
+
+	@Id
+	@GeneratedValue(strategy = GenerationType.IDENTITY)
+	private Long id;
+
+	// Human-readable issue key (optional)
+	@Column(unique = true, length = 100)
+	private String username;
+
+	private String profilePicture;
+
+	@Column(nullable = false, length = 100)
+	private String locale;
+
+	@Column(nullable = false, updatable = false)
+	private String createdAt;
+
+	@Column(nullable = false)
+	private String updatedAt;
+
+	// Primary location of the user
+	@ManyToOne(fetch = FetchType.LAZY)
+	@JoinColumn(name = "location_id")
+	private Location location;
+}

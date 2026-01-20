@@ -20,9 +20,6 @@ public class MediaEntity {
 	@JoinColumn(name = "issue_id", nullable = false)
 	private IssueEntity issue;
 
-	/**
-	 * PHOTO or VIDEO
-	 */
 	@Enumerated(EnumType.STRING)
 	@Column(nullable = false, length = 20)
 	private MediaTypeEntity type;

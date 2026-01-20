@@ -81,8 +81,8 @@ class IssueControllerTests {
 
 		Issue issue = Issue.builder().user(user).location(location).type(entity.getType())
 				.description(entity.getDescription()).createdAt(entity.getCreatedAt())
-				.mediaUrls(List.of(media1, media2)).voteCount(42).verifyCount(10).status(entity.getStatus().name()).rank(1)
-				.viewerContext(viewerContext).build();
+				.mediaUrls(List.of(media1, media2)).voteCount(42).verifyCount(10).status(entity.getStatus().name())
+				.rank(1).viewerContext(viewerContext).build();
 
 		ResponseData data = ResponseData.builder().issue(issue).build();
 
