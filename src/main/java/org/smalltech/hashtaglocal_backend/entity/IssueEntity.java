@@ -19,14 +19,14 @@ public class IssueEntity {
 	@Column(unique = true, length = 50, name = "\"key\"")
 	private String key;
 
-	@Column(nullable = false, length = 50000)
+	@Column(nullable = false, length = 1000)
 	private String description;
 
 	@Column(nullable = false, length = 100)
 	private String type;
 
 	@Column(nullable = false, length = 100)
-	private String status;
+	private StatusEntity status;
 
 	@Column(nullable = false, updatable = false)
 	private String createdAt;

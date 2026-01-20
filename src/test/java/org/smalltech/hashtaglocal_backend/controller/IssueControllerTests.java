@@ -9,6 +9,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.smalltech.hashtaglocal_backend.entity.IssueEntity;
+import org.smalltech.hashtaglocal_backend.entity.StatusEntity;
 import org.smalltech.hashtaglocal_backend.model.APIResponse;
 import org.smalltech.hashtaglocal_backend.model.Issue;
 import org.smalltech.hashtaglocal_backend.model.Locality;
@@ -40,7 +41,7 @@ class IssueControllerTests {
 		entity.setId(issueId);
 		entity.setType("pothole");
 		entity.setDescription("Large pothole causing traffic issues");
-		entity.setStatus("OPEN");
+		entity.setStatus(StatusEntity.OPEN);
 		entity.setCreatedAt("2025-12-26T18:00:00");
 
 		when(issueRepository.findById(issueId)).thenReturn(Optional.of(entity));
@@ -49,7 +50,7 @@ class IssueControllerTests {
 		fallbackEntity.setId(1L);
 		fallbackEntity.setType("default");
 		fallbackEntity.setDescription("Fallback issue");
-		fallbackEntity.setStatus("OPEN");
+		fallbackEntity.setStatus(StatusEntity.OPEN);
 		fallbackEntity.setCreatedAt("2025-12-26T18:00:00");
 
 		when(issueRepository.findById(1L)).thenReturn(Optional.of(fallbackEntity));
@@ -80,7 +81,7 @@ class IssueControllerTests {
 
 		Issue issue = Issue.builder().user(user).location(location).type(entity.getType())
 				.description(entity.getDescription()).createdAt(entity.getCreatedAt())
-				.mediaUrls(List.of(media1, media2)).voteCount(42).verifyCount(10).status(entity.getStatus()).rank(1)
+				.mediaUrls(List.of(media1, media2)).voteCount(42).verifyCount(10).status(entity.getStatus().name()).rank(1)
 				.viewerContext(viewerContext).build();
 
 		ResponseData data = ResponseData.builder().issue(issue).build();
