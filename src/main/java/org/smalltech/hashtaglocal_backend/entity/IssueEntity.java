@@ -1,7 +1,10 @@
 package org.smalltech.hashtaglocal_backend.entity;
 
 import jakarta.persistence.*;
+import java.time.LocalDateTime;
 import lombok.*;
+import org.smalltech.hashtaglocal_backend.model.IssueStatusModel;
+import org.smalltech.hashtaglocal_backend.model.IssueTypeModel;
 
 @Entity
 @Table(name = "issues")
@@ -27,17 +30,17 @@ public class IssueEntity {
 	private String description;
 
 	@Column(nullable = false, length = 100)
-	private String type;
+	private IssueTypeModel type;
 
 	@Enumerated(EnumType.STRING)
 	@Column(nullable = false, length = 100)
-	private StatusEntity status;
+	private IssueStatusModel status;
 
 	@Column(nullable = false, updatable = false)
-	private String createdAt;
+	private LocalDateTime createdAt;
 
 	@Column(nullable = false)
-	private String updatedAt;
+	private LocalDateTime updatedAt;
 
 	// Primary location of the issue
 	@ManyToOne(fetch = FetchType.LAZY)

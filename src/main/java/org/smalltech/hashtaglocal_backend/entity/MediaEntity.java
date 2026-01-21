@@ -2,6 +2,7 @@ package org.smalltech.hashtaglocal_backend.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.smalltech.hashtaglocal_backend.model.MediaTypeModel;
 
 @Entity
 @Table(name = "media")
@@ -22,7 +23,7 @@ public class MediaEntity {
 
 	@Enumerated(EnumType.STRING)
 	@Column(nullable = false, length = 20)
-	private MediaTypeEntity type;
+	private MediaTypeModel type;
 
 	@Column(nullable = false, length = 5000)
 	private String url;
