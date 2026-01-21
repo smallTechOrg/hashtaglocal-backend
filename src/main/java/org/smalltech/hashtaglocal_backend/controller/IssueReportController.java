@@ -16,13 +16,13 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/v1/issue")
-public class IssueWriteController {
+public class IssueReportController {
 
 	private final IssueRepository issueRepository;
 	private final LocationRepository locationRepository;
 	private final MediaRepository mediaRepository;
 
-	public IssueWriteController(IssueRepository issueRepository, LocationRepository locationRepository,
+	public IssueReportController(IssueRepository issueRepository, LocationRepository locationRepository,
 			MediaRepository mediaRepository) {
 		this.issueRepository = issueRepository;
 		this.locationRepository = locationRepository;
