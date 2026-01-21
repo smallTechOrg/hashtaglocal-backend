@@ -3,6 +3,7 @@ package org.smalltech.hashtaglocal_backend.controller;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.when;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -11,6 +12,8 @@ import org.mockito.Mockito;
 import org.smalltech.hashtaglocal_backend.entity.IssueEntity;
 import org.smalltech.hashtaglocal_backend.model.APIResponse;
 import org.smalltech.hashtaglocal_backend.model.Issue;
+import org.smalltech.hashtaglocal_backend.model.IssueStatusModel;
+import org.smalltech.hashtaglocal_backend.model.IssueTypeModel;
 import org.smalltech.hashtaglocal_backend.model.Locality;
 import org.smalltech.hashtaglocal_backend.model.Location;
 import org.smalltech.hashtaglocal_backend.model.Media;
@@ -38,19 +41,19 @@ class IssueControllerTests {
 		// Mocked entity returned by repository
 		IssueEntity entity = new IssueEntity();
 		entity.setId(issueId);
-		entity.setType("pothole");
+		entity.setType(IssueTypeModel.Pothole);
 		entity.setDescription("Large pothole causing traffic issues");
-		entity.setStatus("OPEN");
-		entity.setCreatedAt("2025-12-26T18:00:00");
+		entity.setStatus(IssueStatusModel.OPEN);
+		entity.setCreatedAt(LocalDateTime.parse("2025-12-26T18:00:00"));
 
 		when(issueRepository.findById(issueId)).thenReturn(Optional.of(entity));
 		// Also mock fallback issue if needed
 		IssueEntity fallbackEntity = new IssueEntity();
 		fallbackEntity.setId(1L);
-		fallbackEntity.setType("default");
+		fallbackEntity.setType(IssueTypeModel.Pothole);
 		fallbackEntity.setDescription("Fallback issue");
-		fallbackEntity.setStatus("OPEN");
-		fallbackEntity.setCreatedAt("2025-12-26T18:00:00");
+		fallbackEntity.setStatus(IssueStatusModel.OPEN);
+		fallbackEntity.setCreatedAt(LocalDateTime.parse("2025-12-26T18:00:00"));
 
 		when(issueRepository.findById(1L)).thenReturn(Optional.of(fallbackEntity));
 
@@ -78,10 +81,10 @@ class IssueControllerTests {
 
 		ViewerContext viewerContext = ViewerContext.builder().upvote(true).build();
 
-		Issue issue = Issue.builder().user(user).location(location).type(entity.getType())
+		Issue issue = Issue.builder().user(user).location(location).type(entity.getType().name())
 				.description(entity.getDescription()).createdAt(entity.getCreatedAt())
-				.mediaUrls(List.of(media1, media2)).voteCount(42).verifyCount(10).status(entity.getStatus()).rank(1)
-				.viewerContext(viewerContext).build();
+				.mediaUrls(List.of(media1, media2)).voteCount(42).verifyCount(10).status(entity.getStatus().name())
+				.rank(1).viewerContext(viewerContext).build();
 
 		ResponseData data = ResponseData.builder().issue(issue).build();
 
