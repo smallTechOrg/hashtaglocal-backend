@@ -72,7 +72,7 @@ public class IndianCityImportJob implements CommandLineRunner {
 
 				importCityWithTracking(cityName, job);
 
-				// Respect rate limiting (Nominatim requires max 1 request/second)
+				// Respect rate limiting (Google Maps API - 10 requests per second)
 				polygonService.respectRateLimit();
 			}
 
@@ -132,7 +132,7 @@ public class IndianCityImportJob implements CommandLineRunner {
 				log.warn("No polygon data found for city: {}", cityName);
 				cityStatus.setStatus(CityImportStatus.CityImportResult.NO_DATA_FOUND);
 				cityStatus.setCompletedAt(LocalDateTime.now());
-				cityStatus.setErrorMessage("No polygon data returned from Nominatim API");
+				cityStatus.setErrorMessage("No polygon data returned from Google Maps API");
 				job.setFailureCount(job.getFailureCount() + 1);
 			}
 

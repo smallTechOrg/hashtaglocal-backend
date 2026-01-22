@@ -8,6 +8,7 @@ import java.util.Arrays;
 import java.util.List;
 import lombok.extern.slf4j.Slf4j;
 import org.locationtech.jts.geom.*;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -19,8 +20,11 @@ import org.springframework.web.client.RestTemplate;
 @Service
 public class IndianCityPolygonService {
 
-	private static final String NOMINATIM_URL = "https://nominatim.openstreetmap.org";
-	private static final String OVERPASS_URL = "https://overpass-api.de/api/interpreter";
+	private static final String GOOGLE_MAPS_GEOCODING_URL = "https://maps.googleapis.com/maps/api/geocode/json";
+
+	@Value("${google.maps.api-key:}")
+	private String googleMapsApiKey;
+
 	private final ObjectMapper objectMapper = new ObjectMapper();
 	private final GeometryFactory geometryFactory = new GeometryFactory(new PrecisionModel(), 4326);
 	private final RestTemplate restTemplate = new RestTemplate();
@@ -59,51 +63,24 @@ public class IndianCityPolygonService {
 	}
 
 	/**
-	 * Fetches polygon boundary for a city using Nominatim API
+	 * Fetches polygon boundary for a city using Google Maps Geocoding API
 	 */
 	public Polygon fetchCityPolygon(String cityName) {
 		try {
 			log.info("Fetching boundary for city: {}", cityName);
 
-			// Search for the city in India
-			String searchQuery = cityName + ", India";
-			String encodedQuery = URLEncoder.encode(searchQuery, StandardCharsets.UTF_8);
-
-			// First, get the OSM relation ID
-			String searchUrl = String.format("%s/search?q=%s&format=json&polygon_geojson=1&limit=1", NOMINATIM_URL,
-					encodedQuery);
-
-			JsonNode response = makeGetRequest(searchUrl);
-
-			if (response == null || !response.isArray() || response.size() == 0) {
-				log.warn("No results found for city: {}", cityName);
+			if (googleMapsApiKey == null || googleMapsApiKey.isEmpty()) {
+				log.error("Google Maps API key not configured. Please set GOOGLE_MAPS_API_KEY environment variable.");
 				return null;
 			}
 
-			JsonNode cityData = response.get(0);
-			JsonNode geoJson = cityData.get("geojson");
-
-			if (geoJson == null || !geoJson.has("type")) {
-				log.warn("No geojson data found for city: {}", cityName);
-				return null;
-			}
-
-			String geometryType = geoJson.get("type").asText();
-
-			// Handle different geometry types
-			Polygon polygon = null;
-			if ("Polygon".equals(geometryType)) {
-				polygon = parsePolygon(geoJson.get("coordinates"));
-			} else if ("MultiPolygon".equals(geometryType)) {
-				// For MultiPolygon, take the largest polygon
-				polygon = parseLargestPolygonFromMultiPolygon(geoJson.get("coordinates"));
-			}
-
+			Polygon polygon = fetchFromGoogleMaps(cityName);
 			if (polygon != null) {
-				log.info("Successfully fetched boundary for: {}", cityName);
+				return polygon;
 			}
 
-			return polygon;
+			log.warn("Failed to fetch boundary for city: {}", cityName);
+			return null;
 
 		} catch (Exception e) {
 			log.error("Error fetching boundary for city: {}", cityName, e);
@@ -112,82 +89,126 @@ public class IndianCityPolygonService {
 	}
 
 	/**
-	 * Makes a GET request and returns JSON response
+	 * Fetch city boundary from Google Maps Geocoding API - reliable for Indian
+	 * cities
 	 */
-	private JsonNode makeGetRequest(String url) throws Exception {
-		HttpHeaders headers = new HttpHeaders();
-		headers.set("User-Agent", "HashtagLocal/1.0");
-		headers.set("Accept", "application/json");
-
-		HttpEntity<String> entity = new HttpEntity<>(headers);
-		ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, entity, String.class);
-
-		return objectMapper.readTree(response.getBody());
-	}
-
-	/**
-	 * Parses coordinates from GeoJSON Polygon format
-	 */
-	private Polygon parsePolygon(JsonNode coordinatesNode) {
+	private Polygon fetchFromGoogleMaps(String cityName) {
 		try {
-			// GeoJSON Polygon format: [ [[lon, lat], [lon, lat], ...] ]
-			// First array is outer ring, rest are holes
-			JsonNode outerRing = coordinatesNode.get(0);
-			Coordinate[] coords = new Coordinate[outerRing.size()];
+			String address = cityName + ", India";
+			String encodedAddress = URLEncoder.encode(address, StandardCharsets.UTF_8);
 
-			for (int i = 0; i < outerRing.size(); i++) {
-				JsonNode point = outerRing.get(i);
-				double lon = point.get(0).asDouble();
-				double lat = point.get(1).asDouble();
-				coords[i] = new Coordinate(lon, lat);
+			String url = String.format("%s?address=%s&key=%s&components=country:IN", GOOGLE_MAPS_GEOCODING_URL,
+					encodedAddress, googleMapsApiKey);
+
+			log.debug("Querying Google Maps for: {}", cityName);
+
+			HttpHeaders headers = new HttpHeaders();
+			headers.set("User-Agent", "HashtagLocal/1.0");
+			HttpEntity<String> entity = new HttpEntity<>(headers);
+
+			ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, entity, String.class);
+			JsonNode jsonResponse = objectMapper.readTree(response.getBody());
+
+			String status = jsonResponse.get("status").asText();
+			if (!"OK".equals(status)) {
+				log.debug("Google Maps returned status: {} for {}", status, cityName);
+				return null;
 			}
 
-			LinearRing shell = geometryFactory.createLinearRing(coords);
+			JsonNode results = jsonResponse.get("results");
+			if (results == null || results.size() == 0) {
+				log.debug("No Google Maps results for: {}", cityName);
+				return null;
+			}
 
-			// Handle holes if present
-			LinearRing[] holes = null;
-			if (coordinatesNode.size() > 1) {
-				holes = new LinearRing[coordinatesNode.size() - 1];
-				for (int i = 1; i < coordinatesNode.size(); i++) {
-					JsonNode holeRing = coordinatesNode.get(i);
-					Coordinate[] holeCoords = new Coordinate[holeRing.size()];
-					for (int j = 0; j < holeRing.size(); j++) {
-						JsonNode point = holeRing.get(j);
-						holeCoords[j] = new Coordinate(point.get(0).asDouble(), point.get(1).asDouble());
+			// Find the best result - prefer "locality" or "administrative_area" types
+			JsonNode bestResult = null;
+			for (JsonNode result : results) {
+				JsonNode types = result.get("types");
+				if (types != null) {
+					for (JsonNode type : types) {
+						String typeStr = type.asText();
+						if (typeStr.equals("locality") || typeStr.equals("administrative_area_level_2")
+								|| typeStr.equals("administrative_area_level_3")) {
+							bestResult = result;
+							break;
+						}
 					}
-					holes[i - 1] = geometryFactory.createLinearRing(holeCoords);
+				}
+				if (bestResult == null) {
+					bestResult = result; // fallback to first result
 				}
 			}
 
-			return geometryFactory.createPolygon(shell, holes);
-		} catch (Exception e) {
-			log.error("Error parsing polygon", e);
+			if (bestResult == null) {
+				return null;
+			}
+
+			JsonNode geometry = bestResult.get("geometry");
+			if (geometry == null) {
+				return null;
+			}
+
+			// Get viewport bounds (this gives us the approximate city boundary)
+			JsonNode viewport = geometry.get("viewport");
+			if (viewport != null) {
+				JsonNode northeast = viewport.get("northeast");
+				JsonNode southwest = viewport.get("southwest");
+
+				if (northeast != null && southwest != null) {
+					double neLat = northeast.get("lat").asDouble();
+					double neLng = northeast.get("lng").asDouble();
+					double swLat = southwest.get("lat").asDouble();
+					double swLng = southwest.get("lng").asDouble();
+
+					// Create a bounding box polygon
+					Coordinate[] coords = new Coordinate[5];
+					coords[0] = new Coordinate(swLng, swLat); // SW
+					coords[1] = new Coordinate(neLng, swLat); // SE
+					coords[2] = new Coordinate(neLng, neLat); // NE
+					coords[3] = new Coordinate(swLng, neLat); // NW
+					coords[4] = new Coordinate(swLng, swLat); // Close ring
+
+					LinearRing shell = geometryFactory.createLinearRing(coords);
+					Polygon polygon = geometryFactory.createPolygon(shell);
+
+					log.info("Successfully fetched boundary for {} from Google Maps", cityName);
+					return polygon;
+				}
+			}
+
+			// Fallback: use bounds if viewport not available
+			JsonNode bounds = geometry.get("bounds");
+			if (bounds != null) {
+				JsonNode northeast = bounds.get("northeast");
+				JsonNode southwest = bounds.get("southwest");
+
+				if (northeast != null && southwest != null) {
+					double neLat = northeast.get("lat").asDouble();
+					double neLng = northeast.get("lng").asDouble();
+					double swLat = southwest.get("lat").asDouble();
+					double swLng = southwest.get("lng").asDouble();
+
+					Coordinate[] coords = new Coordinate[5];
+					coords[0] = new Coordinate(swLng, swLat);
+					coords[1] = new Coordinate(neLng, swLat);
+					coords[2] = new Coordinate(neLng, neLat);
+					coords[3] = new Coordinate(swLng, neLat);
+					coords[4] = new Coordinate(swLng, swLat);
+
+					LinearRing shell = geometryFactory.createLinearRing(coords);
+					Polygon polygon = geometryFactory.createPolygon(shell);
+
+					log.info("Successfully fetched bounds for {} from Google Maps", cityName);
+					return polygon;
+				}
+			}
+
+			log.debug("No viewport/bounds data in Google Maps response for: {}", cityName);
 			return null;
-		}
-	}
 
-	/**
-	 * Parses MultiPolygon and returns the largest polygon
-	 */
-	private Polygon parseLargestPolygonFromMultiPolygon(JsonNode coordinatesNode) {
-		try {
-			Polygon largestPolygon = null;
-			double maxArea = 0;
-
-			for (int i = 0; i < coordinatesNode.size(); i++) {
-				Polygon polygon = parsePolygon(coordinatesNode.get(i));
-				if (polygon != null) {
-					double area = polygon.getArea();
-					if (area > maxArea) {
-						maxArea = area;
-						largestPolygon = polygon;
-					}
-				}
-			}
-
-			return largestPolygon;
 		} catch (Exception e) {
-			log.error("Error parsing MultiPolygon", e);
+			log.debug("Google Maps API failed for {}: {}", cityName, e.getMessage());
 			return null;
 		}
 	}
@@ -202,11 +223,12 @@ public class IndianCityPolygonService {
 	}
 
 	/**
-	 * Sleeps to respect rate limiting (Nominatim requires 1 request per second)
+	 * Sleeps to respect rate limiting (Google Maps allows 50 requests per second on
+	 * free tier) Using conservative delay to avoid hitting limits
 	 */
 	public void respectRateLimit() {
 		try {
-			Thread.sleep(1100); // 1.1 seconds to be safe
+			Thread.sleep(100); // 0.1 seconds - 10 requests per second
 		} catch (InterruptedException e) {
 			Thread.currentThread().interrupt();
 		}
