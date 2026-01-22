@@ -50,7 +50,7 @@ public class IssueController {
 
 		Locality locality = Locality.builder().hashtags(List.of("#Jaipur")).build();
 
-		Location location = Location.builder().lat("12.34").lng("56.78").locality(locality)
+		Location location = Location.builder().lat(12.34).lng(56.78).locality(locality)
 				.address("Sector 3, Jawahar Nagar").colloquialName("Near Patrika Gate").build();
 
 		Media media1 = Media.builder().location(location).type("photo")

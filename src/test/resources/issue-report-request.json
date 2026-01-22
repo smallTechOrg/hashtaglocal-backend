@@ -12,8 +12,8 @@
         "type": "PHOTO",
         "url": "https://example.com/test-photo.jpg",
         "location": {
-          "lat": "28.7041",
-          "lng": "77.1025",
+          "lat": 28.7041,
+          "lng": 77.1025,
           "meta_data": {"city": "Delhi"}
         }
       }

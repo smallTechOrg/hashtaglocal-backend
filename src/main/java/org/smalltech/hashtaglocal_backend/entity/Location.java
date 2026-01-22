@@ -8,6 +8,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.Type;
+import org.locationtech.jts.geom.Point;
 
 @Entity
 @Table(name = "locations")
@@ -20,11 +21,8 @@ public class Location {
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	private Long id;
 
-	@Column(nullable = false)
-	private String lat;
-
-	@Column(nullable = false)
-	private String lng;
+	@Column(nullable = false, columnDefinition = "geometry(Point,4326)")
+	private Point point;
 
 	@ManyToOne(fetch = FetchType.LAZY)
 	@JoinColumn(name = "locality_id")

@@ -10,6 +10,7 @@ import org.smalltech.hashtaglocal_backend.entity.MediaEntity;
 import org.smalltech.hashtaglocal_backend.repository.IssueRepository;
 import org.smalltech.hashtaglocal_backend.repository.LocationRepository;
 import org.smalltech.hashtaglocal_backend.repository.MediaRepository;
+import org.smalltech.hashtaglocal_backend.util.LocationUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
@@ -52,8 +53,8 @@ class IssueReportIntegrationTests {
 		assert issue.getStatus().name().equals("OPEN");
 		assert issue.getLocation() != null;
 		Location issueLocation = locationRepository.findById(issue.getLocation().getId()).orElseThrow();
-		assert issueLocation.getLat().equals("28.7041");
-		assert issueLocation.getLng().equals("77.1025");
+		assert LocationUtil.getLatitude(issueLocation.getPoint()).equals(28.7041);
+		assert LocationUtil.getLongitude(issueLocation.getPoint()).equals(77.1025);
 		assert issueLocation.getMetaData() != null && issueLocation.getMetaData().toString().contains("Delhi");
 
 		List<MediaEntity> mediaList = mediaRepository.findAll();
@@ -63,8 +64,8 @@ class IssueReportIntegrationTests {
 		assert media.getUrl().equals("https://example.com/test-photo.jpg");
 		assert media.getLocation() != null;
 		Location mediaLocation = locationRepository.findById(media.getLocation().getId()).orElseThrow();
-		assert mediaLocation.getLat().equals("28.7041");
-		assert mediaLocation.getLng().equals("77.1025");
+		assert LocationUtil.getLatitude(mediaLocation.getPoint()).equals(28.7041);
+		assert LocationUtil.getLongitude(mediaLocation.getPoint()).equals(77.1025);
 		assert mediaLocation.getMetaData() != null && mediaLocation.getMetaData().toString().contains("Delhi");
 	}
 }
