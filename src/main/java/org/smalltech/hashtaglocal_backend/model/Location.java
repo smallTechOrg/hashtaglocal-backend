@@ -5,10 +5,10 @@ import lombok.*;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
+@Builder(toBuilder = true)
 public class Location {
-	private String lat;
-	private String lng;
+	private Double lat;
+	private Double lng;
 	private Locality locality;
 	private String address;
 	private String colloquialName;

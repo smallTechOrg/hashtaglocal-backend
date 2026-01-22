@@ -9,6 +9,7 @@ import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.Polygon;
 import org.smalltech.hashtaglocal_backend.entity.Locality;
 import org.smalltech.hashtaglocal_backend.entity.Location;
+import org.smalltech.hashtaglocal_backend.util.LocationUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
@@ -35,8 +36,7 @@ public class LocationRepositoryTest {
 		localityRepository.save(locality);
 
 		Location location = new Location();
-		location.setLat("12.34");
-		location.setLng("56.78");
+		location.setPoint(LocationUtil.createPoint(12.34, 56.78));
 		location.setName("Test Location");
 		Map<String, Object> metaData = new HashMap<>();
 		metaData.put("foo", "bar");

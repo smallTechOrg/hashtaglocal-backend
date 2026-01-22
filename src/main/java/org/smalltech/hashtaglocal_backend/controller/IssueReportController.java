@@ -14,6 +14,7 @@ import org.smalltech.hashtaglocal_backend.model.request.MediaRequest;
 import org.smalltech.hashtaglocal_backend.repository.IssueRepository;
 import org.smalltech.hashtaglocal_backend.repository.LocationRepository;
 import org.smalltech.hashtaglocal_backend.repository.MediaRepository;
+import org.smalltech.hashtaglocal_backend.util.LocationUtil;
 import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -43,9 +44,9 @@ public class IssueReportController {
 		var issueReq = request.getIssue();
 
 		// Save issue location
-		Location issueLocation = Location.builder().lat(issueReq.getLocation().getLat())
-				.lng(issueReq.getLocation().getLng()).name("India").metaData(issueReq.getLocation().getMetaData())
-				.build();
+		Location issueLocation = Location.builder()
+				.point(LocationUtil.createPoint(issueReq.getLocation().getLat(), issueReq.getLocation().getLng()))
+				.name("India").metaData(issueReq.getLocation().getMetaData()).build();
 
 		issueLocation = locationRepository.save(issueLocation);
 
@@ -61,8 +62,10 @@ public class IssueReportController {
 			for (MediaRequest mediaReq : issueReq.getMediaUrls()) {
 
 				// Save Media Location
-				Location mediaLocation = Location.builder().lat(mediaReq.getLocation().getLat())
-						.lng(mediaReq.getLocation().getLng()).name("India") // Replace with actual logic if needed
+				Location mediaLocation = Location.builder()
+						.point(LocationUtil.createPoint(mediaReq.getLocation().getLat(),
+								mediaReq.getLocation().getLng()))
+						.name("India") // Replace with actual logic if needed
 						.metaData(mediaReq.getLocation().getMetaData()).build();
 
 				mediaLocation = locationRepository.save(mediaLocation);
