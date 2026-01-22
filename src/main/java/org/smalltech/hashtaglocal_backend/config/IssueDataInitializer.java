@@ -24,7 +24,7 @@ public class IssueDataInitializer implements CommandLineRunner {
 		if (issueRepository.count() == 0) {
 
 			IssueEntity issue;
-			issue = IssueEntity.builder().key("JPR-001").type(IssueTypeModel.Pothole).status(IssueStatusModel.OPEN)
+			issue = IssueEntity.builder().key("JPR-001").type(IssueTypeModel.POTHOLE).status(IssueStatusModel.OPEN)
 					.description("Large pothole causing traffic issues")
 					.createdAt(LocalDateTime.parse("2025-12-26T18:00:00"))
 					.updatedAt(LocalDateTime.parse("2025-12-26T18:00:00")).build();
