@@ -1,0 +1,22 @@
+{
+  "issue": {
+    "type": "POTHOLE",
+    "description": "Test pothole issue integration",
+    "location": {
+      "lat": "28.7041",
+      "lng": "77.1025",
+      "meta_data": {"city": "Delhi"}
+    },
+    "media_urls": [
+      {
+        "type": "PHOTO",
+        "url": "https://example.com/test-photo.jpg",
+        "location": {
+          "lat": "28.7041",
+          "lng": "77.1025",
+          "meta_data": {"city": "Delhi"}
+        }
+      }
+    ]
+  }
+}
