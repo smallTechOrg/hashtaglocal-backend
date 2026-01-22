@@ -41,38 +41,43 @@ public class IssueReportController {
 
 		var issueReq = request.getIssue();
 
-		/* 1️⃣ Save issue location */
+		// Save issue location
 		Location issueLocation = Location.builder().lat(issueReq.getLocation().getLat())
 				.lng(issueReq.getLocation().getLng()).name("India").metaData(issueReq.getLocation().getMetaData()).build();
 
 		issueLocation = locationRepository.save(issueLocation);
 
-		/* 2️⃣ Create issue */
+		// Create issue
 		IssueEntity issue = IssueEntity.builder().type(IssueTypeModel.valueOf(issueReq.getType()))
 				.description(issueReq.getDescription()).status(IssueStatusModel.OPEN).createdAt(LocalDateTime.now())
 				.updatedAt(LocalDateTime.now()).location(issueLocation).build();
 
 		issue = issueRepository.save(issue);
 
-		// 3️⃣ Save media items (assuming list is always present)
-        for (MediaRequest mediaReq : issueReq.getMediaUrls()) {
-            Location mediaLocation = Location.builder()
-                    .lat(mediaReq.getLocation().getLat())
-                    .lng(mediaReq.getLocation().getLng())
-                    .name("India")
-                    .metaData(mediaReq.getLocation().getMetaData())
-                    .build();
+		//Save Media (if provided)
+        if (issueReq.getMediaUrls() != null && !issueReq.getMediaUrls().isEmpty()) {
+            for (MediaRequest mediaReq : issueReq.getMediaUrls()) {
 
-            mediaLocation = locationRepository.save(mediaLocation);
+                // Save Media Location
+                Location mediaLocation = Location.builder()
+                        .lat(mediaReq.getLocation().getLat())
+                        .lng(mediaReq.getLocation().getLng())
+                        .name("India") // Replace with actual logic if needed
+                        .metaData(mediaReq.getLocation().getMetaData())
+                        .build();
 
-            MediaEntity media = MediaEntity.builder()
-                    .issue(issue)
-                    .type(MediaTypeModel.valueOf(mediaReq.getType().toUpperCase()))
-                    .url(mediaReq.getUrl())
-                    .location(mediaLocation)
-                    .build();
+                mediaLocation = locationRepository.save(mediaLocation);
 
-            mediaRepository.save(media);
+                // Save Media
+                MediaEntity media = MediaEntity.builder()
+                        .issue(issue)
+                        .type(MediaTypeModel.valueOf(mediaReq.getType()))
+                        .url(mediaReq.getUrl())
+                        .location(mediaLocation)
+                        .build();
+
+                mediaRepository.save(media);
+            }
         }
 
 		return ResponseEntity.ok().build();
