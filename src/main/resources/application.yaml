@@ -68,4 +68,4 @@ gcs:
 
 
 geonames:
-  username: ${GEONAMES_USERNAME:demo} 
+  username: ${GEONAMES_USERNAME:mmk1} 
