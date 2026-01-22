@@ -4,9 +4,11 @@ import java.time.LocalDateTime;
 import org.smalltech.hashtaglocal_backend.entity.IssueEntity;
 import org.smalltech.hashtaglocal_backend.entity.Location;
 import org.smalltech.hashtaglocal_backend.entity.MediaEntity;
+import org.smalltech.hashtaglocal_backend.model.APIResponse;
 import org.smalltech.hashtaglocal_backend.model.IssueStatusModel;
 import org.smalltech.hashtaglocal_backend.model.IssueTypeModel;
 import org.smalltech.hashtaglocal_backend.model.MediaTypeModel;
+import org.smalltech.hashtaglocal_backend.model.ResponseData;
 import org.smalltech.hashtaglocal_backend.model.request.IssueReportRequest;
 import org.smalltech.hashtaglocal_backend.model.request.MediaRequest;
 import org.smalltech.hashtaglocal_backend.repository.IssueRepository;
@@ -36,7 +38,7 @@ public class IssueReportController {
 
 	@PostMapping
 	@Transactional
-	public ResponseEntity<Void> createIssue(@RequestBody IssueReportRequest request) {
+	public ResponseEntity<APIResponse> createIssue(@RequestBody IssueReportRequest request) {
 
 		var issueReq = request.getIssue();
 
@@ -73,6 +75,10 @@ public class IssueReportController {
 			}
 		}
 
-		return ResponseEntity.ok().build();
+		ResponseData responseData = ResponseData.builder().issueId(issue.getId()).build();
+
+		APIResponse response = APIResponse.builder().data(responseData).build();
+
+		return ResponseEntity.ok(response);
 	}
 }

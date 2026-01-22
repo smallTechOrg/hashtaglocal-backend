@@ -1,7 +1,7 @@
 package org.smalltech.hashtaglocal_backend.model.request;
 
-import java.util.Map;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.Map;
 import lombok.Data;
 
 @Data
