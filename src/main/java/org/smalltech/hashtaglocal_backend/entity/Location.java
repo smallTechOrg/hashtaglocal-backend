@@ -27,7 +27,7 @@ public class Location {
 	private String lng;
 
 	@ManyToOne(fetch = FetchType.LAZY)
-	@JoinColumn(name = "locality_id", nullable = false)
+	@JoinColumn(name = "locality_id")
 	private Locality locality;
 
 	@Column(nullable = false)

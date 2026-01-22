@@ -1,0 +1,84 @@
+package org.smalltech.hashtaglocal_backend.controller;
+
+import java.time.LocalDateTime;
+import org.smalltech.hashtaglocal_backend.entity.IssueEntity;
+import org.smalltech.hashtaglocal_backend.entity.Location;
+import org.smalltech.hashtaglocal_backend.entity.MediaEntity;
+import org.smalltech.hashtaglocal_backend.model.APIResponse;
+import org.smalltech.hashtaglocal_backend.model.IssueStatusModel;
+import org.smalltech.hashtaglocal_backend.model.IssueTypeModel;
+import org.smalltech.hashtaglocal_backend.model.MediaTypeModel;
+import org.smalltech.hashtaglocal_backend.model.ResponseData;
+import org.smalltech.hashtaglocal_backend.model.request.IssueReportRequest;
+import org.smalltech.hashtaglocal_backend.model.request.MediaRequest;
+import org.smalltech.hashtaglocal_backend.repository.IssueRepository;
+import org.smalltech.hashtaglocal_backend.repository.LocationRepository;
+import org.smalltech.hashtaglocal_backend.repository.MediaRepository;
+import org.springframework.http.ResponseEntity;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping("/api/v1/issue")
+public class IssueReportController {
+
+	private final IssueRepository issueRepository;
+	private final LocationRepository locationRepository;
+	private final MediaRepository mediaRepository;
+
+	public IssueReportController(IssueRepository issueRepository, LocationRepository locationRepository,
+			MediaRepository mediaRepository) {
+		this.issueRepository = issueRepository;
+		this.locationRepository = locationRepository;
+		this.mediaRepository = mediaRepository;
+	}
+
+	@PostMapping
+	@Transactional
+	public ResponseEntity<APIResponse> createIssue(@RequestBody IssueReportRequest request) {
+
+		var issueReq = request.getIssue();
+
+		// Save issue location
+		Location issueLocation = Location.builder().lat(issueReq.getLocation().getLat())
+				.lng(issueReq.getLocation().getLng()).name("India").metaData(issueReq.getLocation().getMetaData())
+				.build();
+
+		issueLocation = locationRepository.save(issueLocation);
+
+		// Create issue
+		IssueEntity issue = IssueEntity.builder().type(IssueTypeModel.valueOf(issueReq.getType()))
+				.description(issueReq.getDescription()).status(IssueStatusModel.OPEN).createdAt(LocalDateTime.now())
+				.updatedAt(LocalDateTime.now()).location(issueLocation).build();
+
+		issue = issueRepository.save(issue);
+
+		// Save Media (if provided)
+		if (issueReq.getMediaUrls() != null && !issueReq.getMediaUrls().isEmpty()) {
+			for (MediaRequest mediaReq : issueReq.getMediaUrls()) {
+
+				// Save Media Location
+				Location mediaLocation = Location.builder().lat(mediaReq.getLocation().getLat())
+						.lng(mediaReq.getLocation().getLng()).name("India") // Replace with actual logic if needed
+						.metaData(mediaReq.getLocation().getMetaData()).build();
+
+				mediaLocation = locationRepository.save(mediaLocation);
+
+				// Save Media
+				MediaEntity media = MediaEntity.builder().issue(issue).type(MediaTypeModel.valueOf(mediaReq.getType()))
+						.url(mediaReq.getUrl()).location(mediaLocation).build();
+
+				mediaRepository.save(media);
+			}
+		}
+
+		ResponseData responseData = ResponseData.builder().issueId(issue.getId()).build();
+
+		APIResponse response = APIResponse.builder().data(responseData).build();
+
+		return ResponseEntity.ok(response);
+	}
+}

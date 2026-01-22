@@ -41,7 +41,7 @@ class IssueControllerTests {
 		// Mocked entity returned by repository
 		IssueEntity entity = new IssueEntity();
 		entity.setId(issueId);
-		entity.setType(IssueTypeModel.Pothole);
+		entity.setType(IssueTypeModel.POTHOLE);
 		entity.setDescription("Large pothole causing traffic issues");
 		entity.setStatus(IssueStatusModel.OPEN);
 		entity.setCreatedAt(LocalDateTime.parse("2025-12-26T18:00:00"));
@@ -50,7 +50,7 @@ class IssueControllerTests {
 		// Also mock fallback issue if needed
 		IssueEntity fallbackEntity = new IssueEntity();
 		fallbackEntity.setId(1L);
-		fallbackEntity.setType(IssueTypeModel.Pothole);
+		fallbackEntity.setType(IssueTypeModel.POTHOLE);
 		fallbackEntity.setDescription("Fallback issue");
 		fallbackEntity.setStatus(IssueStatusModel.OPEN);
 		fallbackEntity.setCreatedAt(LocalDateTime.parse("2025-12-26T18:00:00"));

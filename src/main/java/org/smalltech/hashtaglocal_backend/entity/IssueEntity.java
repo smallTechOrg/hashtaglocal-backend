@@ -26,7 +26,7 @@ public class IssueEntity {
 	@JoinColumn(name = "user_id")
 	private UserEntity userEntity;
 
-	@Column(nullable = false, length = 1000)
+	@Column(length = 1000)
 	private String description;
 
 	@Column(nullable = false, length = 100)
