@@ -7,16 +7,33 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+/**
+ * Tracks each locality discovery run, recording all raw discoveries across
+ * multiple sources before deduplication.
+ */
 @Entity
-@Table(name = "import_jobs")
+@Table(name = "locality_discovery_runs")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class ImportJob {
+public class LocalityDiscoveryRun {
+
+	public enum DiscoveryStatus {
+		IN_PROGRESS, COMPLETED, FAILED, CANCELLED
+	}
+
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	private Long id;
+
+	@Column(nullable = false, length = 10)
+	private String countryCode;
+
+	@Enumerated(EnumType.STRING)
+	@Column(nullable = false)
+	@Builder.Default
+	private DiscoveryStatus status = DiscoveryStatus.IN_PROGRESS;
 
 	@Column(nullable = false)
 	private LocalDateTime startedAt;
@@ -24,29 +41,21 @@ public class ImportJob {
 	private LocalDateTime completedAt;
 
 	@Column(nullable = false)
-	private Integer totalLocalities;
+	@Builder.Default
+	private Integer totalRawDiscoveries = 0;
 
 	@Column(nullable = false)
 	@Builder.Default
-	private Integer successCount = 0;
+	private Integer geonamesCount = 0;
 
 	@Column(nullable = false)
 	@Builder.Default
-	private Integer failureCount = 0;
+	private Integer osmCount = 0;
 
 	@Column(nullable = false)
 	@Builder.Default
-	private Integer skippedCount = 0;
-
-	@Enumerated(EnumType.STRING)
-	@Column(nullable = false)
-	@Builder.Default
-	private ImportJobStatus status = ImportJobStatus.RUNNING;
+	private Integer indiaPostCount = 0;
 
 	@Column(length = 1000)
 	private String errorMessage;
-
-	public enum ImportJobStatus {
-		RUNNING, COMPLETED, FAILED, CANCELLED
-	}
 }

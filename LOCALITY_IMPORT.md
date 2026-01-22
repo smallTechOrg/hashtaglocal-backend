@@ -1,335 +1,360 @@
-# Indian City Polygon Import
+# Locality Discovery & Import System
 
-This feature allows you to import polygon boundaries for all major Indian cities into the Localities table using Google Maps Geocoding API. **All imports are tracked in the database with detailed status and retry capabilities.**
+Two-phase system for discovering and importing Indian cities, towns, and districts from multiple data sources with full traceability and controlled imports.
 
-## Features
+## ✅ Implementation Status
 
-- Import 100+ major Indian cities with their geographic boundaries
-- **Track all import jobs in the database** with detailed status
-- **Track individual city import attempts** with error messages
-- **Automatic retry for failed cities** with one command
-- Uses Google Maps Geocoding API for reliable, high-quality data for Indian cities
-- Automatically creates hashtags for each city (e.g., `#Mumbai`, `#Delhi`)
-- Creates bounding box polygons from city viewport/bounds data
-- Fast rate limiting (10 requests per second)
-- Checks for existing cities to avoid duplicates
-- Can import all cities at once or individual cities
-- View import history and detailed failure reasons
+**COMPLETED:**
+- ✅ Database schema (4 entities, 5 repositories)
+- ✅ Phase 1: Discovery services (GeoNames, OSM)
+- ✅ Phase 1: Deduplication orchestrator
+- ✅ Phase 2: Google Maps validation and import
+- ✅ Admin REST API endpoints
+- ✅ Consolidated integration tests
+- ✅ All tests passing
 
-## Components
+**Services Implemented:**
+1. `GeoNamesDiscoveryService` - Query GeoNames API for PPLA, PPLA2, ADM2
+2. `OSMDiscoveryService` - Query OpenStreetMap Overpass API for admin boundaries
+3. `LocalityDiscoveryOrchestrator` - Orchestrate multi-source discovery and deduplication
+4. `LocalityImportService` - Google Maps validation with retry logic
+5. `LocalityAdminController` - REST endpoints for discovery/import workflows
 
-### 1. Database Tables
-- **import_jobs** - Tracks each import job run with status, counts, and timestamps
-- **city_import_status** - Tracks individual city import attempts with errors and retry counts
+## Architecture
 
-### 2. IndianCityPolygonService
-- Fetches city polygon boundaries from Google Maps Geocoding API
-- Creates bounding box polygons from viewport/bounds data
-- Contains list of 100+ major Indian cities
-- Handles rate limiting (10 requests per second)
+### Phase 1: Discovery (Automated, Heavily Logged)
+1. Query GeoNames API (PPLA, PPLA2, PPLA3, ADM2 feature codes)
+2. Query OpenStreetMap Overpass API (admin levels 5-8, place tags)
+3. Query India Post (optional, graceful failure)
+4. Save ALL raw discoveries to `raw_locality_discoveries` (unprocessed)
+5. Deduplicate by normalized(name) + state → `discovered_localities`
+6. Filter: Keep only CITY, TOWN, DISTRICT types
+7. Confidence score = number of sources that found it
+8. Full audit trail preserved in database
 
-### 3. IndianCityImportJob
-- CommandLineRunner that can be triggered with `--import-cities=true` flag
-- Imports all cities sequentially with database tracking
-- Provides detailed logging and summary
-- Supports retrying failed imports
+### Phase 2: Import (Manual, Controlled)
+1. Select discovered localities by type (CITY/TOWN/DISTRICT)
+2. Validate with Google Maps Geocoding API
+3. Extract polygon from viewport/bounds
+4. Save to `localities` table
+5. Track import status with error handling
+6. Supports resume and retry
 
-### 4. LocalityImportController
-- REST API endpoints for manual import and monitoring
-- `/api/admin/localities/import-all-cities` - Import all cities
-- `/api/admin/localities/import-city?cityName=Mumbai` - Import single city
-- `/api/admin/localities/retry-failed-cities` - Retry all failed cities
-- `/api/admin/localities/import-jobs` - View all import jobs
-- `/api/admin/localities/import-jobs/{id}` - View detailed job status
+## Database Schema
 
-## Prerequisites
+### locality_discovery_runs
+Tracks each discovery run across all sources.
 
-### Google Maps API Key
+| Field | Type | Notes |
+|-------|------|-------|
+| id | BIGINT | PK |
+| country_code | VARCHAR(10) | ISO code (e.g., "IN") |
+| status | VARCHAR(20) | IN_PROGRESS, COMPLETED, FAILED, CANCELLED |
+| started_at | TIMESTAMP | NOT NULL |
+| completed_at | TIMESTAMP | NULL until done |
+| total_raw_discoveries | INT | Across all sources |
+| geonames_count | INT | Count from GeoNames |
+| osm_count | INT | Count from OSM |
+| indiapost_count | INT | Count from India Post |
+| error_message | VARCHAR(1000) | If FAILED |
 
-1. Go to [Google Cloud Console](https://console.cloud.google.com/)
-2. Create a new project or select an existing one
-3. Enable the **Geocoding API**
-4. Create credentials (API Key)
-5. Set the API key as an environment variable:
-   ```bash
-   export GOOGLE_MAPS_API_KEY="your-api-key-here"
-   ```
+### raw_locality_discoveries
+Raw data from each source before deduplication. One row per discovery per source.
 
-### API Pricing
-- Google Maps Geocoding API: First 40,000 requests/month free, then $5 per 1,000 requests
-- Importing 100 cities = 100 requests (well within free tier)
-- For production: Consider setting up billing and usage limits
+| Field | Type | Notes |
+|-------|------|-------|
+| id | BIGINT | PK |
+| discovery_run_id | BIGINT | FK to locality_discovery_runs |
+| source | VARCHAR(20) | GEONAMES, OSM, INDIAPOST |
+| name | VARCHAR(255) | As returned by source |
+| state | VARCHAR(255) | NOT NULL |
+| country_code | VARCHAR(10) | NOT NULL |
+| locality_type | VARCHAR(20) | CITY, TOWN, DISTRICT, UNKNOWN |
+| source_metadata | TEXT (JSON) | Source-specific data |
+| created_at | TIMESTAMP | When discovered |
 
-## Usage
+### discovered_localities
+Deduplicated results with alternate names and confidence scores.
 
-### Method 1: Command Line (Recommended for initial bulk import)
+| Field | Type | Notes |
+|-------|------|-------|
+| id | BIGINT | PK |
+| discovery_run_id | BIGINT | FK |
+| official_name | VARCHAR(255) | Canonical name (first source) |
+| alternate_names | JSON | Array of name variations |
+| state | VARCHAR(255) | NOT NULL |
+| country_code | VARCHAR(10) | NOT NULL |
+| locality_type | VARCHAR(20) | CITY, TOWN, or DISTRICT only |
+| sources | JSON | Array: ["geonames", "osm", "indiapost"] |
+| confidence_score | INT | Number of sources (1-3) |
+| created_at | TIMESTAMP | When deduplicated |
 
-1. Set your Google Maps API key:
+### import_jobs
+Tracks each import job run for controlled imports.
+
+| Field | Type | Notes |
+|-------|------|-------|
+| id | BIGINT | PK |
+| discovery_run_id | BIGINT | FK |
+| country_code | VARCHAR(10) | NOT NULL |
+| status | VARCHAR(20) | IN_PROGRESS, COMPLETED, FAILED |
+| started_at | TIMESTAMP | NOT NULL |
+| completed_at | TIMESTAMP | NULL until done |
+| total_localities | INT | To import |
+| success_count | INT | Successfully imported |
+| failure_count | INT | Failed attempts |
+| skipped_count | INT | Already exist |
+| filter_type | VARCHAR(20) | CITY, TOWN, DISTRICT, or ALL |
+
+### locality_import_status
+One row per locality import attempt with Google Maps validation.
+
+| Field | Type | Notes |
+|-------|------|-------|
+| id | BIGINT | PK |
+| import_job_id | BIGINT | FK |
+| discovered_locality_id | BIGINT | FK |
+| locality_name | VARCHAR(255) | NOT NULL |
+| locality_type | VARCHAR(20) | CITY, TOWN, DISTRICT |
+| state | VARCHAR(255) | NOT NULL |
+| status | VARCHAR(20) | SUCCESS, FAILED, SKIPPED, NO_DATA_FOUND |
+| error_message | TEXT | If status != SUCCESS |
+| admin_level | INT | From Google Maps |
+| google_maps_place_type | VARCHAR(100) | From Google Maps |
+| attempt_count | INT | Number of retries |
+| created_at | TIMESTAMP | NOT NULL |
+| updated_at | TIMESTAMP | On retry |
+
+## Entities
+
+### LocalityDiscoveryRun
+Metadata for discovery run. Status: IN_PROGRESS → COMPLETED (or FAILED/CANCELLED).
+Tracks counts from each source for audit and debugging.
+
+### RawLocalityDiscovery
+Raw discovery from single source. Preserves source_metadata as JSON for traceability.
+Enables seeing exactly what each source returned before deduplication.
+
+### DiscoveredLocality
+Deduplicated locality with:
+- `official_name`: First source's name (priority: GeoNames > OSM > IndiaPost)
+- `alternate_names`: All other variations found
+- `confidence_score`: Number of sources (1-3)
+- `sources`: Which sources found it
+- Only CITY/TOWN/DISTRICT types; others filtered out
+
+### ImportJob
+Tracks controlled import run with counts and filter type.
+Can be filtered by type (import cities first, then towns, then districts).
+
+### LocalityImportStatus
+Per-locality import attempt with:
+- Google Maps validation results (admin_level, place_type)
+- Error tracking with messages
+- Retry support via attempt_count
+- Status: SUCCESS/FAILED/SKIPPED/NO_DATA_FOUND
+
+## REST API Endpoints
+
+### Discovery Endpoints
+
+**POST /admin/discovery/start**
+- Start discovery run for a country
+- Parameters: `countryCode` (e.g., "IN")
+- Response: `LocalityDiscoveryRun` with IN_PROGRESS status
+
 ```bash
-export GOOGLE_MAPS_API_KEY="your-api-key-here"
+curl -X POST "http://localhost:8080/admin/discovery/start?countryCode=IN"
 ```
 
-2. Run the import job using Gradle:
+Response:
+```json
+{
+  "id": 1,
+  "countryCode": "IN",
+  "status": "IN_PROGRESS",
+  "startedAt": "2025-01-15T10:30:00Z",
+  "geonamesCount": 0,
+  "osmCount": 0,
+  "indiapostCount": 0,
+  "totalRawDiscoveries": 0
+}
+```
+
+**GET /admin/discovery/status/{id}**
+- Get discovery run status and progress
+- Response: `LocalityDiscoveryRun` with current counts
+
 ```bash
-./gradlew bootRun --args='--import-cities=true'
+curl "http://localhost:8080/admin/discovery/status/1"
 ```
 
-This will:
-- Fetch polygon boundaries for all 100+ cities from Google Maps
-- Save them to the Localities table
-- Respect rate limits (takes ~20 seconds total)
-- Show progress and summary
+Response:
+```json
+{
+  "id": 1,
+  "countryCode": "IN",
+  "status": "COMPLETED",
+  "startedAt": "2025-01-15T10:30:00Z",
+  "completedAt": "2025-01-15T10:45:00Z",
+  "geonamesCount": 150,
+  "osmCount": 100,
+  "indiapostCount": 52,
+  "totalRawDiscoveries": 302
+}
+```
 
-### Method 2: REST API (For individual cities or manual triggers)
+### Import Endpoints
 
-#### Import all cities:
+**POST /admin/import/start**
+- Start import job for discovered localities
+- Parameters: `discoveryRunId`, `localityType` (CITY/TOWN/DISTRICT)
+- Response: `ImportJob` with IN_PROGRESS status
+
 ```bash
-curl -X POST http://localhost:8080/api/admin/localities/import-all-cities
+curl -X POST "http://localhost:8080/admin/import/start?discoveryRunId=1&localityType=CITY"
 ```
 
-#### Import a single city:
+Response:
+```json
+{
+  "id": 1,
+  "discoveryRunId": 1,
+  "countryCode": "IN",
+  "filterType": "CITY",
+  "status": "IN_PROGRESS",
+  "startedAt": "2025-01-15T10:46:00Z",
+  "totalLocalities": 550,
+  "successCount": 0,
+  "failureCount": 0
+}
+```
+
+**GET /admin/import/status/{id}**
+- Get import job status and progress
+- Response: `ImportJob` with success/failure counts
+
 ```bash
-curl -X POST "http://localhost:8080/api/admin/localities/import-city?cityName=Mumbai"
+curl "http://localhost:8080/admin/import/status/1"
 ```
 
-### Method 3: Programmatically
-
-Inject `IndianCityImportJob` and call:
-```java
-@Autowired
-private IndianCityImportJob importJob;
-
-// Import all cities
-importJob.importIndianCities();
-
-// Import single city
-importJob.importCity("Bengaluru");
+Response:
+```json
+{
+  "id": 1,
+  "discoveryRunId": 1,
+  "countryCode": "IN",
+  "filterType": "CITY",
+  "status": "COMPLETED",
+  "startedAt": "2025-01-15T10:46:00Z",
+  "completedAt": "2025-01-15T11:15:00Z",
+  "totalLocalities": 550,
+  "successCount": 545,
+  "failureCount": 5,
+  "skippedCount": 0
+}
 ```
-# Retry all failed cities:
+
+## Workflow Example
+
+Start the app
 ```bash
-curl -X POST http://localhost:8080/api/admin/localities/retry-failed-cities
+./gradlew bootRun --args='--spring.profiles.active=local'
 ```
 
-#### View all import jobs:
+
+### Step 1: Start Discovery
 ```bash
-curl http://localhost:8080/api/admin/localities/import-jobs
+curl -X POST "http://localhost:8080/admin/discovery/start?countryCode=IN"
+# Returns: LocalityDiscoveryRun (id=1, status=IN_PROGRESS)
 ```
 
-#### View specific import job with all city statuses:
+### Step 2: Monitor Discovery Progress
 ```bash
-curl http://localhost:8080/api/admin/localities/import-jobs/1
+curl "http://localhost:8080/admin/discovery/status/1"
+
+# After completion:
+{
+  "id": 1,
+  "status": "COMPLETED",
+  "geonamesCount": 150,     # From GeoNames API
+  "osmCount": 100,          # From OSM Overpass API
+  "indiapostCount": 0,      # Optional source
+  "totalRawDiscoveries": 250
+}
 ```
 
-###
-## Cities Included
+**Behind the scenes:**
+- GeoNames: Queries feature codes PPLA (cities), PPLA2 (towns), ADM2 (districts)
+- OSM: Queries Overpass API for admin level boundaries
+- Raw data saved to `raw_locality_discoveries` (allows debugging)
+- Deduplication groups by normalized name + state → `discovered_localities`
+- Result: ~1500-2000 unique localities across all types
 
-Th Database Schema
-
-### localities table
-Cities are stored in the `localities` table with:
-- `id` (auto-generated)
-- `name` (city name, e.g., "Mumbai")
-- `hashtag` (unique, e.g., "#Mumbai")
-- `geo_boundary` (PostGIS Polygon with SRID 4326)
-
-### import_jobs table
-Tracks each import run:
-- `id` (auto-generated)
-- `started_at` (timestamp)
-- `completed_at` (timestamp)
-- `status` (RUNNING, COMPLETED, FAILED, CANCELLED)
-- `total_cities` (total number of cities to import)
-- `success_count` (number of successful imports)
-- `failure_count` (number of failed imports)
-- `skipped_count` (number of skipped cities)
-
-### city_import_status table
-Tracks each city import attempt:
-- `id` (auto-generated)
-- `import_job_id` (foreign key to import_jobs)
-- `city_name` (e.g., "Mumbai")
-- `status` (PENDING, SUCCESS, FAILED, SKIPPED, NO_DATA_FOUND, RATE_LIMITED)
-- `attempted_at` (timestamp)
-- `completed_at` (timestamp)
-- `attempt_count` (number of retry attempts)
-- `error_message` (if import failed)
-- `locality_id` (foreign key to localities, if successful)
-
-## Example Output
-If any cities fail during import (network issues, API errors, etc.), you can retry them:
-
-### Command Line:
+### Step 3: Start Import for Cities
 ```bash
-./gradlew bootRun --args='--import-cities=true'
-# Then use the API to retry:
-curl -X POST http://localhost:8080/api/admin/localities/retry-failed-cities
+curl -X POST "http://localhost:8080/admin/import/start?discoveryRunId=1&localityType=CITY"
+# Returns: ImportJob (id=1, status=IN_PROGRESS, totalLocalities=550)
 ```
 
-### Or directly via API:
+### Step 4: Monitor Import Progress
 ```bash
-curl -X POST http://localhost:8080/api/admin/localities/retry-failed-cities
+curl "http://localhost:8080/admin/import/status/1"
+
+# After completion:
+{
+  "id": 1,
+  "discoveryRunId": 1,
+  "filterType": "CITY",
+  "status": "COMPLETED",
+  "totalLocalities": 550,
+  "successCount": 545,      # Validated with Google Maps
+  "failureCount": 5         # API errors or no match
+}
 ```
 
-This will:
-- Query all cities with FAILED or NO_DATA_FOUND status
-- Attempt to import them again
-- Update attempt counts and error messages
-- Show summary of retry results
+**Behind the scenes:**
+- For each locality: Build query "Bengaluru, Karnataka, India"
+- Call Google Maps Geocoding API
+- Extract geometry (latitude/longitude)
+- Save to `localities` table with status=SUCCESS
+- On error: Set status=FAILED with error message
+- Support retry with attemptCount tracking
 
-## Error Handling
-
-- Automatically skips cities that already exist
-- Logs all errors with detailed messages
-- Provides summary at the end with failure reasons
-- Failed cities can be retried individually or in bulk
-- All errors tracked in `city_import_status` table
-
-## Troubleshooting
-
-### Issue: "Google Maps API key not configured"
-- Set the environment variable: `export GOOGLE_MAPS_API_KEY="your-key"`
-- Or add to `application.yaml`: `google.maps.api-key: your-key`
-- Verify the key is valid and has Geocoding API enabled
-
-### Issue: Cities not getting imported
-- Check database connection
-- Verify PostGIS is installed and enabled
-- Check application logs for specific errors
-- Verify Google Maps API key has Geocoding API enabled
-- Check if you've exceeded API quota
-
-### Issue: API quota exceeded
-- Check your [Google Cloud Console](https://console.cloud.google.com/) for usage
-- Free tier provides 40,000 requests/month
-- Enable billing for higher limits if needed
-- Use retry mechanism to continue after quota reset
-
-### Issue: Viewing import status
+### Step 5: Import Towns and Districts
 ```bash
-# Get all import jobs
-curl http://localhost:8080/api/admin/localities/import-jobs
-
-# Get details of specific job
-curl http://localhost:8080/api/admin/localities/import-jobs/1
-
-# Query database directly
-SELECT * FROM import_jobs ORDER BY started_at DESC;
-SELECT * FROM city_import_status WHERE status = 'FAILED';
+# Repeat for TOWN and DISTRICT types
+curl -X POST "http://localhost:8080/admin/import/start?discoveryRunId=1&localityType=TOWN"
+curl -X POST "http://localhost:8080/admin/import/start?discoveryRunId=1&localityType=DISTRICT"
 ```
 
-### Issue: Testing without API key
-- Test endpoints will need mocking for CI/CD
-- Use `@TestPropertySource` to inject test API key
-- Or mock the `IndianCityPolygonService` in tests
-```bash
-./gradlew bootRun --args='--import-cities=true'
-# Then use the API to retry:
-curl -X POST http://localhost:8080/api/admin/localities/retry-failed-cities
-```
+**Result:** ~1500-2000 localities in database with full audit trail
 
-### Or directly via API:
-- Query `city_import_status` table for detailed error messages:
-  ```sql
-  SELECT * FROM city_import_status WHERE status IN ('FAILED', 'NO_DATA_FOUND');
-  ```
+## Data Volumes
 
-### Issue: Many cities failing
-- Check the specific error messages in `city_import_status` table
-- Use the retry endpoint after fixing any issues
-- Some cities may have incorrect names - try alternative spellings
+- **Raw Discoveries**: ~3000-5000 (includes duplicates)
+- **Deduplicated**: ~1500-2000
+  - Cities: ~500-800
+  - Towns: ~200-400
+  - Districts: ~700-750
+- **Final (after Google Maps)**: ~1500-2000
 
-### Issue: Rate limit errors
-- The service already handles rate limiting
-- If you see 429 errors, the wait time may need to be increased
-- Check if you're running multiple imports simultaneously
+## Cost Estimates
 
-### Issue: Viewing import status
-```bash
-# Get all import jobs
-curl http://localhost:8080/api/admin/localities/import-jobs
+- **Discovery**: FREE
+  - GeoNames: 30k credits/day free tier
+  - OpenStreetMap: Free
+- **Import**: ~$7.50
+  - Google Geocoding: $0.005/request
+  - 1500 × $0.005 = $7.50
+  - Well within $200/month free tier
 
-# Get details of specific job
-curl http://localhost:8080/api/admin/localities/import-jobs/1
+## Key Characteristics
 
-# Query database directly
-SELECT * FROM import_jobs ORDER BY started_at DESC;
-SELECT * FROM city_import_status WHERE status = 'FAILED';
-``` API callscks each city import attempt:
-- `id` (auto-generated)
-- `import_job_id` (foreign key to import_jobs)
-- `city_name` (e.g., "Mumbai")
-- `status` (PENDING, SUCCESS, FAILED, SKIPPED, NO_DATA_FOUND, RATE_LIMITED)
-- `attempted_at` (timestamp)
-- `completed_at` (timestamp)
-- `attempt_count` (number of retry attempts)
-- `error_message` (if import failed)
-- `locality_id` (foreign key to localities, if successfulminutes
-
-## Error Handling
-
-- Automatically skips cities that already exist
-- Logs failed imports
-- Use Google Maps Places API for more detailed boundaries
-- Implement polygon simplification for large boundaries
-- Cache API responses to reduce API calls
-- Support for other countries
-- Validation of imported polygons
-- Admin UI for managing imports
-- Webhook notifications for import completion
-
-## Notes
-
-- First-time import of all cities takes ~20 seconds
-- Subsequent runs skip existing cities (very fast)
-- Safe to run multiple times
-- Uses PostGIS for efficient spatial queries
-- Polygon coordinates use WGS84 (SRID 4326)
-- Bounding boxes are approximate but sufficient for most locality-based features
-- Google Maps provides consistently reliable data for Indian cities
-2026-01-22 10:00:01 INFO  Processing city 1/100: Mumbai
-2026-01-22 10:00:02 INFO  Successfully imported city: Mumbai with hashtag: #Mumbai
-2026-01-22 10:00:03 INFO  Processing city 2/100: Delhi
-2026-01-22 10:00:04 INFO  Successfully imported city: Delhi with hashtag: #Delhi
-...
-========== Import Summary ==========
-Total cities: 100
-Successfully imported: 98
-Failed: 2
-Failed cities: [SomeCity1, SomeCity2]
-===================================
-```
-
-## Troubleshooting
-
-### Issue: Cities not getting imported
-- Check database connection
-- Verify PostGIS is installed and enabled
-- Check application logs for specific errors
-
-### Issue: Rate limit errors
-- The service already handles rate limiting
-- If you see 429 errors, the wait time may need to be increased
-
-### Issue: Polygon parsing errors
-- Some cities may have complex MultiPolygon geometries
-- The service takes the largest polygon from MultiPolygons
-- Check logs for specific city errors
-
-## Future Enhancements
-
-Potential improvements:
-- Add support for districts and smaller localities
-- Implement polygon simplification for large boundaries
-- Add retry mechanism for failed imports
-- Cache API responses
-- Support for other countries
-- Validation of imported polygons
-- Admin UI for managing imports
-
-## Notes
-
-- First-time import of all cities takes ~2-3 minutes
-- Subsequent runs skip existing cities (very fast)
-- Safe to run multiple times
-- Uses PostGIS for efficient spatial queries
-- Polygon coordinates use WGS84 (SRID 4326)
+1. **Full Traceability**: Every step tracked (raw → deduplicated → imported)
+2. **Idempotent**: Re-run discovery safely, no duplicates
+3. **Debuggable**: View raw data from each source
+4. **Controlled**: Import by type, review before importing
+5. **Resumable**: Crash-safe, continue from where stopped
+6. **Cost-Effective**: Free discovery, minimal Google API calls
+7. **Flexible**: Re-run discovery without re-importing, or vice versa

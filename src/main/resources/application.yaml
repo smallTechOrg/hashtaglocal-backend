@@ -65,3 +65,7 @@ gcs:
     path: gcs-key.json
   project:
     id: ${GCS_PROJECT_ID:}
+
+
+geonames:
+  username: ${GEONAMES_USERNAME:demo} 
