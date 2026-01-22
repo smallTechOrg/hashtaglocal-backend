@@ -1,7 +1,6 @@
 package org.smalltech.hashtaglocal_backend.controller;
 
 import java.time.LocalDateTime;
-
 import org.smalltech.hashtaglocal_backend.entity.IssueEntity;
 import org.smalltech.hashtaglocal_backend.entity.Location;
 import org.smalltech.hashtaglocal_backend.entity.MediaEntity;
@@ -36,14 +35,15 @@ public class IssueReportController {
 	}
 
 	@PostMapping
-    @Transactional
+	@Transactional
 	public ResponseEntity<Void> createIssue(@RequestBody IssueReportRequest request) {
 
 		var issueReq = request.getIssue();
 
 		// Save issue location
 		Location issueLocation = Location.builder().lat(issueReq.getLocation().getLat())
-				.lng(issueReq.getLocation().getLng()).name("India").metaData(issueReq.getLocation().getMetaData()).build();
+				.lng(issueReq.getLocation().getLng()).name("India").metaData(issueReq.getLocation().getMetaData())
+				.build();
 
 		issueLocation = locationRepository.save(issueLocation);
 
@@ -54,31 +54,24 @@ public class IssueReportController {
 
 		issue = issueRepository.save(issue);
 
-		//Save Media (if provided)
-        if (issueReq.getMediaUrls() != null && !issueReq.getMediaUrls().isEmpty()) {
-            for (MediaRequest mediaReq : issueReq.getMediaUrls()) {
+		// Save Media (if provided)
+		if (issueReq.getMediaUrls() != null && !issueReq.getMediaUrls().isEmpty()) {
+			for (MediaRequest mediaReq : issueReq.getMediaUrls()) {
 
-                // Save Media Location
-                Location mediaLocation = Location.builder()
-                        .lat(mediaReq.getLocation().getLat())
-                        .lng(mediaReq.getLocation().getLng())
-                        .name("India") // Replace with actual logic if needed
-                        .metaData(mediaReq.getLocation().getMetaData())
-                        .build();
+				// Save Media Location
+				Location mediaLocation = Location.builder().lat(mediaReq.getLocation().getLat())
+						.lng(mediaReq.getLocation().getLng()).name("India") // Replace with actual logic if needed
+						.metaData(mediaReq.getLocation().getMetaData()).build();
 
-                mediaLocation = locationRepository.save(mediaLocation);
+				mediaLocation = locationRepository.save(mediaLocation);
 
-                // Save Media
-                MediaEntity media = MediaEntity.builder()
-                        .issue(issue)
-                        .type(MediaTypeModel.valueOf(mediaReq.getType()))
-                        .url(mediaReq.getUrl())
-                        .location(mediaLocation)
-                        .build();
+				// Save Media
+				MediaEntity media = MediaEntity.builder().issue(issue).type(MediaTypeModel.valueOf(mediaReq.getType()))
+						.url(mediaReq.getUrl()).location(mediaLocation).build();
 
-                mediaRepository.save(media);
-            }
-        }
+				mediaRepository.save(media);
+			}
+		}
 
 		return ResponseEntity.ok().build();
 	}
