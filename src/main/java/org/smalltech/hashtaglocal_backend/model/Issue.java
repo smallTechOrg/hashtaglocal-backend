@@ -9,6 +9,7 @@ import lombok.*;
 @AllArgsConstructor
 @Builder
 public class Issue {
+	private Long id;
 	private User user;
 	private Location location;
 	private String type;

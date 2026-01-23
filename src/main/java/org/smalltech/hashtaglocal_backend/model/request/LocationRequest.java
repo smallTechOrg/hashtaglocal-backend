@@ -6,8 +6,8 @@ import lombok.Data;
 
 @Data
 public class LocationRequest {
-	private String lat;
-	private String lng;
+	private Double lat;
+	private Double lng;
 	@JsonProperty("meta_data")
 	private Map<String, Object> metaData;
 }
