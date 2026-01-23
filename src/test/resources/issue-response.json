@@ -1,6 +1,7 @@
 {
   "data": {
     "issue": {
+      "id": 1,
       "user": {
         "username": "john_doe",
         "profile_photo": "https://example.com/profile.jpg"

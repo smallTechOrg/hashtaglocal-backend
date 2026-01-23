@@ -5,6 +5,7 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import java.time.LocalDateTime;
 import java.util.List;
 import org.smalltech.hashtaglocal_backend.model.APIResponse;
 import org.smalltech.hashtaglocal_backend.model.Issue;
@@ -14,37 +15,24 @@ import org.smalltech.hashtaglocal_backend.model.Media;
 import org.smalltech.hashtaglocal_backend.model.ResponseData;
 import org.smalltech.hashtaglocal_backend.model.User;
 import org.smalltech.hashtaglocal_backend.model.ViewerContext;
-import org.smalltech.hashtaglocal_backend.repository.IssueRepository;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/v1/issue")
-@Tag(name = "Issue", description = "issue API")
+@RequestMapping("/api/v1/issues")
+@Tag(name = "Issues Home", description = "issue home API")
 
-public class IssueController {
+public class IssueHomeController {
 
-	private final IssueRepository issueRepository;
-
-	public IssueController(IssueRepository issueRepository) {
-		this.issueRepository = issueRepository;
-	}
-
-	@GetMapping("/{issueId}")
-	@Operation(summary = "Get issue", description = "Returns a issue response with user, location, locality and viewer context.")
+	@GetMapping
+	@Operation(summary = "Get issue Home", description = "Returns a List of issues with user, location, locality and viewer context.")
 	@ApiResponse(responseCode = "200", description = "Successful issue response", content = @Content(mediaType = "application/json", schema = @Schema(implementation = APIResponse.class)))
-	public APIResponse getIssue(@PathVariable Long issueId) {
-		// Try fetching the requested issue
-		var issueEntity = issueRepository.findById(issueId)
-				// If not found, fetch issue with ID 1 as fallback
-				.orElseGet(() -> issueRepository.findById(1L)
-						.orElseThrow(() -> new RuntimeException("No issue available")));
-		return mapToAPIResponse(issueEntity);
+	public APIResponse getIssues() {
+		return getMockResponse();
 	}
 
-	private APIResponse mapToAPIResponse(org.smalltech.hashtaglocal_backend.entity.IssueEntity entity) {
+	private APIResponse getMockResponse() {
 
 		User user = User.builder().username("john_doe").profilePhoto("https://example.com/profile.jpg").build();
 
@@ -61,12 +49,19 @@ public class IssueController {
 
 		ViewerContext viewerContext = ViewerContext.builder().upvote(true).build();
 
-		Issue issue = Issue.builder().id(entity.getId()).user(user).location(location).type(entity.getType().name())
-				.description(entity.getDescription()).createdAt(entity.getCreatedAt())
-				.mediaUrls(List.of(media1, media2)).voteCount(42).verifyCount(10).status(entity.getStatus().name())
-				.rank(1).viewerContext(viewerContext).build();
+		LocalDateTime createdDateTime = LocalDateTime.of(2025, 12, 26, 18, 0, 0);
 
-		ResponseData data = ResponseData.builder().issue(issue).build();
+		Issue issue1 = Issue.builder().id(1L).user(user).location(location).type("pothole")
+				.description("Large pothole causing traffic issues").createdAt(createdDateTime)
+				.mediaUrls(List.of(media1, media2)).voteCount(42).verifyCount(10).status("OPEN").rank(1)
+				.viewerContext(viewerContext).build();
+
+		Issue issue2 = Issue.builder().id(2L).user(user).location(location).type("pothole")
+				.description("Large pothole causing traffic issues").createdAt(createdDateTime)
+				.mediaUrls(List.of(media1, media2)).voteCount(42).verifyCount(10).status("OPEN").rank(1)
+				.viewerContext(viewerContext).build();
+
+		ResponseData data = ResponseData.builder().issues(List.of(issue1, issue2)).build();
 
 		return APIResponse.builder().data(data).build();
 	}
