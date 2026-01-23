@@ -5,7 +5,6 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import java.time.LocalDateTime;
 import java.util.List;
 import org.smalltech.hashtaglocal_backend.model.APIResponse;
 import org.smalltech.hashtaglocal_backend.model.Issue;
@@ -15,6 +14,9 @@ import org.smalltech.hashtaglocal_backend.model.Media;
 import org.smalltech.hashtaglocal_backend.model.ResponseData;
 import org.smalltech.hashtaglocal_backend.model.User;
 import org.smalltech.hashtaglocal_backend.model.ViewerContext;
+import org.smalltech.hashtaglocal_backend.repository.IssueRepository;
+import org.smalltech.hashtaglocal_backend.repository.MediaRepository;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -22,48 +24,56 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/v1/issues")
 @Tag(name = "Issues Home", description = "issue home API")
-
+@Transactional(readOnly = true)
 public class IssueHomeController {
+
+	private final IssueRepository issueRepository;
+	private final MediaRepository mediaRepository;
+
+	public IssueHomeController(IssueRepository issueRepository, MediaRepository mediaRepository) {
+		this.issueRepository = issueRepository;
+		this.mediaRepository = mediaRepository;
+	}
 
 	@GetMapping
 	@Operation(summary = "Get issue Home", description = "Returns a List of issues with user, location, locality and viewer context.")
 	@ApiResponse(responseCode = "200", description = "Successful issue response", content = @Content(mediaType = "application/json", schema = @Schema(implementation = APIResponse.class)))
 	public APIResponse getIssues() {
-		return getMockResponse();
+		// Fetch all issues from database
+		List<org.smalltech.hashtaglocal_backend.entity.IssueEntity> issueEntities = issueRepository.findAll();
+
+		List<Issue> issues = issueEntities.stream().map(this::mapToIssue).toList();
+
+		ResponseData data = ResponseData.builder().issues(issues).build();
+		return APIResponse.builder().data(data).build();
 	}
 
-	private APIResponse getMockResponse() {
+	private Issue mapToIssue(org.smalltech.hashtaglocal_backend.entity.IssueEntity entity) {
+		// Map User from UserEntity
+		User user = User.builder().username(entity.getUserEntity().getUsername())
+				.profilePhoto(entity.getUserEntity().getProfilePicture()).build();
 
-		User user = User.builder().username("john_doe").profilePhoto("https://example.com/profile.jpg").build();
+		// Map Locality from Location entity
+		Locality locality = Locality.builder().hashtags(List.of("#" + entity.getLocation().getLocality().getHashtag()))
+				.build();
 
-		Locality locality = Locality.builder().hashtags(List.of("#Jaipur")).build();
+		// Extract coordinates from JTS Point and map Location
+		Location location = Location.builder().lat(entity.getLocation().getPoint().getY())
+				.lng(entity.getLocation().getPoint().getX()).locality(locality).address(entity.getLocation().getName())
+				.colloquialName(entity.getLocation().getName()).build();
 
-		Location location = Location.builder().lat(12.34).lng(56.78).locality(locality)
-				.address("Sector 3, Jawahar Nagar").colloquialName("Near Patrika Gate").build();
+		// Fetch media items from database
+		List<org.smalltech.hashtaglocal_backend.entity.MediaEntity> mediaEntities = mediaRepository.findByIssue(entity);
+		List<Media> mediaList = mediaEntities.stream().map(mediaEntity -> Media.builder().location(location)
+				.type(mediaEntity.getType().name().toLowerCase()).url(mediaEntity.getUrl()).build()).toList();
 
-		Media media1 = Media.builder().location(location).type("photo")
-				.url("https://sripath.com/wp-content/uploads/2025/01/iStock-174662203.jpg").build();
+		// Default viewer context (no upvote data in DB yet)
+		ViewerContext viewerContext = ViewerContext.builder().upvote(false).build();
 
-		Media media2 = Media.builder().location(location).type("photo")
-				.url("https://nub.news/api/image/526263/article.png").build();
-
-		ViewerContext viewerContext = ViewerContext.builder().upvote(true).build();
-
-		LocalDateTime createdDateTime = LocalDateTime.of(2025, 12, 26, 18, 0, 0);
-
-		Issue issue1 = Issue.builder().id(1L).user(user).location(location).type("pothole")
-				.description("Large pothole causing traffic issues").createdAt(createdDateTime)
-				.mediaUrls(List.of(media1, media2)).voteCount(42).verifyCount(10).status("OPEN").rank(1)
-				.viewerContext(viewerContext).build();
-
-		Issue issue2 = Issue.builder().id(2L).user(user).location(location).type("pothole")
-				.description("Large pothole causing traffic issues").createdAt(createdDateTime)
-				.mediaUrls(List.of(media1, media2)).voteCount(42).verifyCount(10).status("OPEN").rank(1)
-				.viewerContext(viewerContext).build();
-
-		ResponseData data = ResponseData.builder().issues(List.of(issue1, issue2)).build();
-
-		return APIResponse.builder().data(data).build();
+		return Issue.builder().id(entity.getId()).user(user).location(location)
+				.type(entity.getType().name().toLowerCase()).description(entity.getDescription())
+				.createdAt(entity.getCreatedAt()).mediaUrls(mediaList).voteCount(0).verifyCount(0)
+				.status(entity.getStatus().name()).rank(1).viewerContext(viewerContext).build();
 	}
 
 }
