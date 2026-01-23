@@ -6,8 +6,8 @@
         "profile_photo": "https://example.com/profile.jpg"
       },
       "location": {
-        "lat": "12.34",
-        "lng": "56.78",
+        "lat": 12.34,
+        "lng": 56.78,
         "locality": {
           "hashtags": [
             "#Jaipur"
@@ -16,14 +16,14 @@
         "address": "Sector 3, Jawahar Nagar",
         "colloquial_name": "Near Patrika Gate"
       },
-      "type": "pothole",
+      "type": "POTHOLE",
       "description": "Large pothole causing traffic issues",
       "created_at": "2025-12-26T18:00:00",
       "media_urls": [
         {
           "location": {
-            "lat": "12.34",
-            "lng": "56.78",
+            "lat": 12.34,
+            "lng": 56.78,
             "locality": {
               "hashtags": [
                 "#Jaipur"
@@ -37,8 +37,8 @@
         },
         {
           "location": {
-            "lat": "12.34",
-            "lng": "56.78",
+            "lat": 12.34,
+            "lng": 56.78,
             "locality": {
               "hashtags": [
                 "#Jaipur"

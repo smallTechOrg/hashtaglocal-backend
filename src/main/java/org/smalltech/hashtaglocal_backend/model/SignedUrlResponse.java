@@ -6,6 +6,7 @@ import lombok.*;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class APIResponse {
-	private ResponseData data;
+public class SignedUrlResponse {
+	private String signedUrl;
+	private String path;
 }

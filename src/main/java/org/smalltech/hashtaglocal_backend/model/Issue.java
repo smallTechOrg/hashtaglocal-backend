@@ -1,19 +1,19 @@
 package org.smalltech.hashtaglocal_backend.model;
 
+import java.time.LocalDateTime;
 import java.util.List;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 public class Issue {
 	private User user;
 	private Location location;
 	private String type;
 	private String description;
-	private String createdAt;
+	private LocalDateTime createdAt;
 	private List<Media> mediaUrls;
 	private int voteCount;
 	private int verifyCount;
