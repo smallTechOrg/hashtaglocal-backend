@@ -1,5 +1,6 @@
 package org.smalltech.hashtaglocal_backend.model;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import lombok.*;
 
@@ -13,7 +14,7 @@ public class Issue {
 	private Location location;
 	private String type;
 	private String description;
-	private String createdAt;
+	private LocalDateTime createdAt;
 	private List<Media> mediaUrls;
 	private int voteCount;
 	private int verifyCount;

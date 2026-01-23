@@ -3,46 +3,39 @@ package org.smalltech.hashtaglocal_backend.entity;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 import lombok.*;
-import org.smalltech.hashtaglocal_backend.model.IssueStatusModel;
-import org.smalltech.hashtaglocal_backend.model.IssueTypeModel;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 
 @Entity
-@Table(name = "issues")
+@Table(name = "users")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class IssueEntity {
+public class UserEntity {
 
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	private Long id;
 
 	// Human-readable issue key (optional)
-	@Column(unique = true, length = 50, name = "\"key\"")
-	private String key;
+	@Column(unique = true, length = 100)
+	private String username;
 
-	@ManyToOne(fetch = FetchType.LAZY)
-	@JoinColumn(name = "user_id")
-	private UserEntity userEntity;
-
-	@Column(length = 1000)
-	private String description;
+	private String profilePicture;
 
 	@Column(nullable = false, length = 100)
-	private IssueTypeModel type;
+	private String locale;
 
-	@Enumerated(EnumType.STRING)
-	@Column(nullable = false, length = 100)
-	private IssueStatusModel status;
-
+	@CreationTimestamp
 	@Column(nullable = false, updatable = false)
 	private LocalDateTime createdAt;
 
+	@UpdateTimestamp
 	@Column(nullable = false)
 	private LocalDateTime updatedAt;
 
-	// Primary location of the issue
+	// Primary location of the user
 	@ManyToOne(fetch = FetchType.LAZY)
 	@JoinColumn(name = "location_id")
 	private Location location;

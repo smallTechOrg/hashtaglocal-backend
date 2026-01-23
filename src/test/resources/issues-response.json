@@ -8,8 +8,8 @@
           "profile_photo": "https://example.com/profile.jpg"
         },
         "location": {
-          "lat": "12.34",
-          "lng": "56.78",
+          "lat": 12.34,
+          "lng": 56.78,
           "locality": {
             "hashtags": [
               "#Jaipur"
@@ -24,8 +24,8 @@
         "media_urls": [
           {
             "location": {
-              "lat": "12.34",
-              "lng": "56.78",
+              "lat": 12.34,
+              "lng": 56.78,
               "locality": {
                 "hashtags": [
                   "#Jaipur"
@@ -39,8 +39,8 @@
           },
           {
             "location": {
-              "lat": "12.34",
-              "lng": "56.78",
+              "lat": 12.34,
+              "lng": 56.78,
               "locality": {
                 "hashtags": [
                   "#Jaipur"
@@ -68,8 +68,8 @@
           "profile_photo": "https://example.com/profile.jpg"
         },
         "location": {
-          "lat": "12.34",
-          "lng": "56.78",
+          "lat": 12.34,
+          "lng": 56.78,
           "locality": {
             "hashtags": [
               "#Jaipur"
@@ -84,8 +84,8 @@
         "media_urls": [
           {
             "location": {
-              "lat": "12.34",
-              "lng": "56.78",
+              "lat": 12.34,
+              "lng": 56.78,
               "locality": {
                 "hashtags": [
                   "#Jaipur"
@@ -99,8 +99,8 @@
           },
           {
             "location": {
-              "lat": "12.34",
-              "lng": "56.78",
+              "lat": 12.34,
+              "lng": 56.78,
               "locality": {
                 "hashtags": [
                   "#Jaipur"

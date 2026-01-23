@@ -5,6 +5,7 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import java.time.LocalDateTime;
 import java.util.List;
 import org.smalltech.hashtaglocal_backend.model.APIResponse;
 import org.smalltech.hashtaglocal_backend.model.Issue;
@@ -37,7 +38,7 @@ public class IssueHomeController {
 
 		Locality locality = Locality.builder().hashtags(List.of("#Jaipur")).build();
 
-		Location location = Location.builder().lat("12.34").lng("56.78").locality(locality)
+		Location location = Location.builder().lat(12.34).lng(56.78).locality(locality)
 				.address("Sector 3, Jawahar Nagar").colloquialName("Near Patrika Gate").build();
 
 		Media media1 = Media.builder().location(location).type("photo")
@@ -48,13 +49,15 @@ public class IssueHomeController {
 
 		ViewerContext viewerContext = ViewerContext.builder().upvote(true).build();
 
+		LocalDateTime createdDateTime = LocalDateTime.of(2025, 12, 26, 18, 0, 0);
+
 		Issue issue1 = Issue.builder().id(1L).user(user).location(location).type("pothole")
-				.description("Large pothole causing traffic issues").createdAt("2025-12-26T18:00:00")
+				.description("Large pothole causing traffic issues").createdAt(createdDateTime)
 				.mediaUrls(List.of(media1, media2)).voteCount(42).verifyCount(10).status("OPEN").rank(1)
 				.viewerContext(viewerContext).build();
 
 		Issue issue2 = Issue.builder().id(2L).user(user).location(location).type("pothole")
-				.description("Large pothole causing traffic issues").createdAt("2025-12-26T18:00:00")
+				.description("Large pothole causing traffic issues").createdAt(createdDateTime)
 				.mediaUrls(List.of(media1, media2)).voteCount(42).verifyCount(10).status("OPEN").rank(1)
 				.viewerContext(viewerContext).build();
 

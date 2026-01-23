@@ -50,7 +50,7 @@ public class IssueController {
 
 		Locality locality = Locality.builder().hashtags(List.of("#Jaipur")).build();
 
-		Location location = Location.builder().lat("12.34").lng("56.78").locality(locality)
+		Location location = Location.builder().lat(12.34).lng(56.78).locality(locality)
 				.address("Sector 3, Jawahar Nagar").colloquialName("Near Patrika Gate").build();
 
 		Media media1 = Media.builder().location(location).type("photo")
@@ -61,10 +61,10 @@ public class IssueController {
 
 		ViewerContext viewerContext = ViewerContext.builder().upvote(true).build();
 
-		Issue issue = Issue.builder().id(entity.getId()).user(user).location(location).type(entity.getType())
+		Issue issue = Issue.builder().id(entity.getId()).user(user).location(location).type(entity.getType().name())
 				.description(entity.getDescription()).createdAt(entity.getCreatedAt())
-				.mediaUrls(List.of(media1, media2)).voteCount(42).verifyCount(10).status(entity.getStatus()).rank(1)
-				.viewerContext(viewerContext).build();
+				.mediaUrls(List.of(media1, media2)).voteCount(42).verifyCount(10).status(entity.getStatus().name())
+				.rank(1).viewerContext(viewerContext).build();
 
 		ResponseData data = ResponseData.builder().issue(issue).build();
 
