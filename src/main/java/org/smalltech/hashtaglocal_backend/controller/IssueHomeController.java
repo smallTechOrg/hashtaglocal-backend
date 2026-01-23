@@ -49,9 +49,16 @@ public class IssueHomeController {
 	}
 
 	private Issue mapToIssue(org.smalltech.hashtaglocal_backend.entity.IssueEntity entity) {
-		// Map User from UserEntity
-		User user = User.builder().username(entity.getUserEntity().getUsername())
-				.profilePhoto(entity.getUserEntity().getProfilePicture()).build();
+		// Get user from entity - IssueDataInitializer ensures all issues have user ID 1
+		org.smalltech.hashtaglocal_backend.entity.UserEntity userEntity = entity.getUserEntity();
+		if (userEntity == null) {
+			// Fallback: create a default user if data is corrupted
+			userEntity = new org.smalltech.hashtaglocal_backend.entity.UserEntity();
+			userEntity.setUsername("admin");
+			userEntity.setProfilePicture("https://example.com/default-profile.jpg");
+		}
+		User user = User.builder().username(userEntity.getUsername()).profilePhoto(userEntity.getProfilePicture())
+				.build();
 
 		// Map Locality from Location entity
 		Locality locality = Locality.builder().hashtags(List.of("#" + entity.getLocation().getLocality().getHashtag()))

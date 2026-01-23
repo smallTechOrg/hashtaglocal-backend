@@ -23,6 +23,7 @@ import org.smalltech.hashtaglocal_backend.repository.MediaRepository;
 import org.smalltech.hashtaglocal_backend.repository.UserRepository;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.transaction.annotation.Transactional;
 
 @TestConfiguration
 @RequiredArgsConstructor
@@ -35,6 +36,7 @@ public class IssueTestDataConfig implements CommandLineRunner {
 	private final MediaRepository mediaRepository;
 
 	@Override
+	@Transactional
 	public void run(String... args) {
 		// Only insert if table is empty
 		if (issueRepository.count() == 0) {
