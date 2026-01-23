@@ -15,6 +15,8 @@ import org.smalltech.hashtaglocal_backend.model.ResponseData;
 import org.smalltech.hashtaglocal_backend.model.User;
 import org.smalltech.hashtaglocal_backend.model.ViewerContext;
 import org.smalltech.hashtaglocal_backend.repository.IssueRepository;
+import org.smalltech.hashtaglocal_backend.repository.MediaRepository;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -23,13 +25,15 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/v1/issue")
 @Tag(name = "Issue", description = "issue API")
-
+@Transactional(readOnly = true)
 public class IssueController {
 
 	private final IssueRepository issueRepository;
+	private final MediaRepository mediaRepository;
 
-	public IssueController(IssueRepository issueRepository) {
+	public IssueController(IssueRepository issueRepository, MediaRepository mediaRepository) {
 		this.issueRepository = issueRepository;
+		this.mediaRepository = mediaRepository;
 	}
 
 	@GetMapping("/{issueId}")
@@ -45,26 +49,52 @@ public class IssueController {
 	}
 
 	private APIResponse mapToAPIResponse(org.smalltech.hashtaglocal_backend.entity.IssueEntity entity) {
+		// Get user from entity - IssueDataInitializer ensures all issues have user ID 1
+		org.smalltech.hashtaglocal_backend.entity.UserEntity userEntity = entity.getUserEntity();
+		if (userEntity == null) {
+			// Fallback: create a default user if data is corrupted
+			userEntity = new org.smalltech.hashtaglocal_backend.entity.UserEntity();
+			userEntity.setUsername("admin");
+			userEntity.setProfilePicture("https://example.com/default-profile.jpg");
+		}
+		User user = User.builder().username(userEntity.getUsername()).profilePhoto(userEntity.getProfilePicture())
+				.build();
 
-		User user = User.builder().username("john_doe").profilePhoto("https://example.com/profile.jpg").build();
+		// Map Locality from Location entity with robust null-safety
+		org.smalltech.hashtaglocal_backend.entity.Location locEntity = entity.getLocation();
+		String hashtag = "world";
+		if (locEntity != null && locEntity.getLocality() != null && locEntity.getLocality().getHashtag() != null) {
+			hashtag = locEntity.getLocality().getHashtag();
+		}
+		Locality locality = Locality.builder().hashtags(List.of("#" + hashtag)).build();
 
-		Locality locality = Locality.builder().hashtags(List.of("#Jaipur")).build();
+		double lat = 0.0;
+		double lng = 0.0;
+		String name = "Unknown";
+		if (locEntity != null) {
+			if (locEntity.getPoint() != null) {
+				lat = locEntity.getPoint().getY();
+				lng = locEntity.getPoint().getX();
+			}
+			if (locEntity.getName() != null) {
+				name = locEntity.getName();
+			}
+		}
+		Location location = Location.builder().lat(lat).lng(lng).locality(locality).address(name).colloquialName(name)
+				.build();
 
-		Location location = Location.builder().lat(12.34).lng(56.78).locality(locality)
-				.address("Sector 3, Jawahar Nagar").colloquialName("Near Patrika Gate").build();
+		// Fetch media items from database
+		List<org.smalltech.hashtaglocal_backend.entity.MediaEntity> mediaEntities = mediaRepository.findByIssue(entity);
+		List<Media> mediaList = mediaEntities.stream().map(mediaEntity -> Media.builder().location(location)
+				.type(mediaEntity.getType().name().toLowerCase()).url(mediaEntity.getUrl()).build()).toList();
 
-		Media media1 = Media.builder().location(location).type("photo")
-				.url("https://sripath.com/wp-content/uploads/2025/01/iStock-174662203.jpg").build();
+		// Default viewer context (no upvote data in DB yet)
+		ViewerContext viewerContext = ViewerContext.builder().upvote(false).build();
 
-		Media media2 = Media.builder().location(location).type("photo")
-				.url("https://nub.news/api/image/526263/article.png").build();
-
-		ViewerContext viewerContext = ViewerContext.builder().upvote(true).build();
-
-		Issue issue = Issue.builder().id(entity.getId()).user(user).location(location).type(entity.getType().name())
-				.description(entity.getDescription()).createdAt(entity.getCreatedAt())
-				.mediaUrls(List.of(media1, media2)).voteCount(42).verifyCount(10).status(entity.getStatus().name())
-				.rank(1).viewerContext(viewerContext).build();
+		Issue issue = Issue.builder().id(entity.getId()).user(user).location(location)
+				.type(entity.getType().name().toLowerCase()).description(entity.getDescription())
+				.createdAt(entity.getCreatedAt()).mediaUrls(mediaList).voteCount(0).verifyCount(0)
+				.status(entity.getStatus().name()).rank(1).viewerContext(viewerContext).build();
 
 		ResponseData data = ResponseData.builder().issue(issue).build();
 

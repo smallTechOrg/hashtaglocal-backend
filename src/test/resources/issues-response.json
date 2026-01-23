@@ -53,12 +53,12 @@
             "url": "https://nub.news/api/image/526263/article.png"
           }
         ],
-        "vote_count": 42,
-        "verify_count": 10,
+        "vote_count": 0,
+        "verify_count": 0,
         "status": "OPEN",
         "rank": 1,
         "viewer_context": {
-          "upvote": true
+          "upvote": false
         }
       },
       {
@@ -113,12 +113,12 @@
             "url": "https://nub.news/api/image/526263/article.png"
           }
         ],
-        "vote_count": 42,
-        "verify_count": 10,
+        "vote_count": 0,
+        "verify_count": 0,
         "status": "OPEN",
         "rank": 1,
         "viewer_context": {
-          "upvote": true
+          "upvote": false
         }
       }
     ]

@@ -130,7 +130,6 @@ EOF
 
 ```bash
 # Build the JAR locally (if not already built)
-cd /Users/sai/Workspace/Code/hashtaglocal-backend
 ./gradlew clean build
 
 # Transfer JAR to VM (upload to /tmp first due to permissions)
@@ -190,6 +189,7 @@ Enable and start the service:
 sudo systemctl daemon-reload
 sudo systemctl enable hashtaglocal-backend
 sudo systemctl start hashtaglocal-backend
+sudo systemctl restart hashtaglocal-backend
 
 # Check status
 sudo systemctl status hashtaglocal-backend

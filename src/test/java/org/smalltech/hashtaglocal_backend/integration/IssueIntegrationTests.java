@@ -1,9 +1,7 @@
 package org.smalltech.hashtaglocal_backend.integration;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import java.io.InputStream;
-import org.junit.jupiter.api.BeforeEach;
+import static org.hamcrest.Matchers.*;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -15,23 +13,19 @@ import org.springframework.test.web.reactive.server.WebTestClient;
 @ActiveProfiles("test")
 @Import(IssueTestDataConfig.class)
 class IssueIntegrationTests {
-	private static final String ISSUE_RESPONSE_FIXTURE = "issue-response.json";
 	private static final String ISSUE_API_URL = "/api/v1/issue/1";
-	private final ObjectMapper objectMapper = new ObjectMapper();
-	private JsonNode expectedJson;
-
-	@BeforeEach
-	public void setUpFixture() throws Exception {
-		InputStream fixtureStream = getClass().getClassLoader().getResourceAsStream(ISSUE_RESPONSE_FIXTURE);
-		expectedJson = objectMapper.readTree(fixtureStream);
-	}
 
 	@Autowired
 	private WebTestClient webTestClient;
 
 	@Test
 	void shouldReturnIssueResponse() throws Exception {
-		webTestClient.get().uri(ISSUE_API_URL).exchange().expectStatus().isOk().expectBody()
-				.json(expectedJson.toString());
+		webTestClient.get().uri(ISSUE_API_URL).exchange().expectStatus().isOk().expectBody().jsonPath("$.data.issue.id")
+				.isEqualTo(1).jsonPath("$.data.issue.user.username").isEqualTo("john_doe").jsonPath("$.data.issue.type")
+				.isEqualTo("pothole").jsonPath("$.data.issue.description")
+				.isEqualTo("Large pothole causing traffic issues").jsonPath("$.data.issue.status").isEqualTo("OPEN")
+				.jsonPath("$.data.issue.media_urls.length()").isEqualTo(2).jsonPath("$.data.issue.vote_count")
+				.isEqualTo(0).jsonPath("$.data.issue.verify_count").isEqualTo(0)
+				.jsonPath("$.data.issue.viewer_context.upvote").isEqualTo(false);
 	}
 }
