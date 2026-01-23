@@ -45,23 +45,26 @@ public class IssueTestDataConfig implements CommandLineRunner {
 					.profilePicture("https://example.com/profile.jpg").locale("en_US").build();
 			user = userRepository.save(user);
 
-			// Create locality with JTS Polygon
+			// Create or get default #world locality (ID 1) - universal fallback
 			GeometryFactory geometryFactory = new GeometryFactory();
-			Polygon polygon = geometryFactory
-					.createPolygon(new Coordinate[]{new Coordinate(75.7, 26.8), new Coordinate(75.9, 26.8),
-							new Coordinate(75.9, 27.0), new Coordinate(75.7, 27.0), new Coordinate(75.7, 26.8)});
+			Locality defaultWorldLocality = localityRepository.findById(1L).orElseGet(() -> {
+				// World-wide polygon (covering major parts of Earth)
+				Polygon worldPolygon = geometryFactory
+						.createPolygon(new Coordinate[]{new Coordinate(-180, -90), new Coordinate(180, -90),
+								new Coordinate(180, 90), new Coordinate(-180, 90), new Coordinate(-180, -90)});
+				Locality newLocality = Locality.builder().hashtag("world").name("World").geoBoundary(worldPolygon)
+						.build();
+				return localityRepository.save(newLocality);
+			});
 
-			Locality locality = Locality.builder().hashtag("Jaipur").name("Jaipur").geoBoundary(polygon).build();
-			locality = localityRepository.save(locality);
-
-			// Create location with JTS Point
+			// Create location with JTS Point and use default #world locality
 			Point point = geometryFactory.createPoint(new Coordinate(56.78, 12.34));
 			Map<String, Object> metaData = new HashMap<>();
 			metaData.put("address", "Sector 3, Jawahar Nagar");
 			metaData.put("colloquialName", "Near Patrika Gate");
 
-			Location location = Location.builder().point(point).locality(locality).name("Sector 3, Jawahar Nagar")
-					.metaData(metaData).build();
+			Location location = Location.builder().point(point).locality(defaultWorldLocality)
+					.name("Sector 3, Jawahar Nagar").metaData(metaData).build();
 			location = locationRepository.save(location);
 
 			// Create issue 1

@@ -43,17 +43,18 @@ public class IssueDataInitializer implements CommandLineRunner {
 			return userRepository.save(user);
 		});
 
-		// Create default locality if it doesn't exist
-		Locality locality = localityRepository.findById(1L).orElseGet(() -> {
+		// Create or get default #world locality (ID 1) - universal fallback
+		Locality defaultWorldLocality = localityRepository.findById(1L).orElseGet(() -> {
 			GeometryFactory geometryFactory = new GeometryFactory();
-			Polygon polygon = geometryFactory
-					.createPolygon(new Coordinate[]{new Coordinate(75.7, 26.8), new Coordinate(75.9, 26.8),
-							new Coordinate(75.9, 27.0), new Coordinate(75.7, 27.0), new Coordinate(75.7, 26.8)});
-			Locality newLocality = Locality.builder().hashtag("Jaipur").name("Jaipur").geoBoundary(polygon).build();
+			// World-wide polygon (covering major parts of Earth)
+			Polygon worldPolygon = geometryFactory
+					.createPolygon(new Coordinate[]{new Coordinate(-180, -90), new Coordinate(180, -90),
+							new Coordinate(180, 90), new Coordinate(-180, 90), new Coordinate(-180, -90)});
+			Locality newLocality = Locality.builder().hashtag("world").name("World").geoBoundary(worldPolygon).build();
 			return localityRepository.save(newLocality);
 		});
 
-		// Create default location if it doesn't exist
+		// Create default location if it doesn't exist, with default #world locality
 		Location location = locationRepository.findById(1L).orElseGet(() -> {
 			GeometryFactory geometryFactory = new GeometryFactory();
 			Point point = geometryFactory.createPoint(new Coordinate(56.78, 12.34));
@@ -61,9 +62,19 @@ public class IssueDataInitializer implements CommandLineRunner {
 			metaData.put("address", "Central Jaipur");
 			metaData.put("colloquialName", "City Center");
 
-			Location newLocation = Location.builder().point(point).locality(locality).name("Central Jaipur")
+			Location newLocation = Location.builder().point(point).locality(defaultWorldLocality).name("Central Jaipur")
 					.metaData(metaData).build();
 			return locationRepository.save(newLocation);
+		});
+
+		// Ensure all existing locations have a locality assigned (use default #world if
+		// null)
+		// This handles any legacy data
+		locationRepository.findAll().forEach(loc -> {
+			if (loc.getLocality() == null) {
+				loc.setLocality(defaultWorldLocality);
+				locationRepository.save(loc);
+			}
 		});
 
 		// Only insert issue if none exist

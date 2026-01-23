@@ -60,14 +60,28 @@ public class IssueController {
 		User user = User.builder().username(userEntity.getUsername()).profilePhoto(userEntity.getProfilePicture())
 				.build();
 
-		// Map Locality from Location entity
-		Locality locality = Locality.builder().hashtags(List.of("#" + entity.getLocation().getLocality().getHashtag()))
-				.build();
+		// Map Locality from Location entity with robust null-safety
+		org.smalltech.hashtaglocal_backend.entity.Location locEntity = entity.getLocation();
+		String hashtag = "world";
+		if (locEntity != null && locEntity.getLocality() != null && locEntity.getLocality().getHashtag() != null) {
+			hashtag = locEntity.getLocality().getHashtag();
+		}
+		Locality locality = Locality.builder().hashtags(List.of("#" + hashtag)).build();
 
-		// Extract coordinates from JTS Point and map Location
-		Location location = Location.builder().lat(entity.getLocation().getPoint().getY())
-				.lng(entity.getLocation().getPoint().getX()).locality(locality).address(entity.getLocation().getName())
-				.colloquialName(entity.getLocation().getName()).build();
+		double lat = 0.0;
+		double lng = 0.0;
+		String name = "Unknown";
+		if (locEntity != null) {
+			if (locEntity.getPoint() != null) {
+				lat = locEntity.getPoint().getY();
+				lng = locEntity.getPoint().getX();
+			}
+			if (locEntity.getName() != null) {
+				name = locEntity.getName();
+			}
+		}
+		Location location = Location.builder().lat(lat).lng(lng).locality(locality).address(name).colloquialName(name)
+				.build();
 
 		// Fetch media items from database
 		List<org.smalltech.hashtaglocal_backend.entity.MediaEntity> mediaEntities = mediaRepository.findByIssue(entity);
