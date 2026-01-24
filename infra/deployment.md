@@ -260,7 +260,6 @@ sudo journalctl -u hashtaglocal-backend -n 100
 
 ```bash
 # On local machine
-cd /Users/sai/Workspace/Code/hashtaglocal-backend
 ./gradlew clean build
 
 # Transfer JAR to VM (to /tmp first)
@@ -274,7 +273,7 @@ gcloud compute ssh hashtaglocalbackend --zone=us-central1-f \
 
 # Check logs
 gcloud compute ssh hashtaglocalbackend --zone=us-central1-f \
-  --command="sudo journalctl -u hashtaglocal-backend -n 50"
+  --command="sudo journalctl -u hashtaglocal-backend -n 100"
 ```
 
 ### Database Connection (from VM)
