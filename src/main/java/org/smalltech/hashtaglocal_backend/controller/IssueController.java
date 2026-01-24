@@ -16,6 +16,7 @@ import org.smalltech.hashtaglocal_backend.model.User;
 import org.smalltech.hashtaglocal_backend.model.ViewerContext;
 import org.smalltech.hashtaglocal_backend.repository.IssueRepository;
 import org.smalltech.hashtaglocal_backend.repository.MediaRepository;
+import org.smalltech.hashtaglocal_backend.service.GCSService;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -30,10 +31,12 @@ public class IssueController {
 
 	private final IssueRepository issueRepository;
 	private final MediaRepository mediaRepository;
+	private final GCSService gcsService;
 
-	public IssueController(IssueRepository issueRepository, MediaRepository mediaRepository) {
+	public IssueController(IssueRepository issueRepository, MediaRepository mediaRepository, GCSService gcsService) {
 		this.issueRepository = issueRepository;
 		this.mediaRepository = mediaRepository;
+		this.gcsService = gcsService;
 	}
 
 	@GetMapping("/{issueId}")
@@ -86,7 +89,7 @@ public class IssueController {
 		// Fetch media items from database
 		List<org.smalltech.hashtaglocal_backend.entity.MediaEntity> mediaEntities = mediaRepository.findByIssue(entity);
 		List<Media> mediaList = mediaEntities.stream().map(mediaEntity -> Media.builder().location(location)
-				.type(mediaEntity.getType().name().toLowerCase()).url(mediaEntity.getUrl()).build()).toList();
+				.type(mediaEntity.getType().name().toLowerCase()).url(gcsService.generateSignedUrl(mediaEntity.getUrl())).build()).toList();
 
 		// Default viewer context (no upvote data in DB yet)
 		ViewerContext viewerContext = ViewerContext.builder().upvote(false).build();
