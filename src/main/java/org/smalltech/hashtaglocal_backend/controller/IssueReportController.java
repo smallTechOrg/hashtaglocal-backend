@@ -2,6 +2,7 @@ package org.smalltech.hashtaglocal_backend.controller;
 
 import java.time.LocalDateTime;
 import org.smalltech.hashtaglocal_backend.entity.IssueEntity;
+import org.smalltech.hashtaglocal_backend.entity.Locality;
 import org.smalltech.hashtaglocal_backend.entity.Location;
 import org.smalltech.hashtaglocal_backend.entity.MediaEntity;
 import org.smalltech.hashtaglocal_backend.entity.UserEntity;
@@ -51,6 +52,8 @@ public class IssueReportController {
 		var issueReq = request.getIssue();
 		// Get default #world locality (ID 1)
 		var defaultLocality = localityRepository.findById(1L).orElse(null);
+		var issueLocality = resolveLocality(issueReq.getLocation().getLat(), issueReq.getLocation().getLng(),
+				defaultLocality);
 
 		// Get default admin user (User 1) or first user
 		UserEntity user = userRepository.findById(1L).orElseGet(() -> {
@@ -61,7 +64,8 @@ public class IssueReportController {
 		// Save issue location
 		Location issueLocation = Location.builder()
 				.point(LocationUtil.createPoint(issueReq.getLocation().getLat(), issueReq.getLocation().getLng()))
-				.name("India").locality(defaultLocality).metaData(issueReq.getLocation().getMetaData()).build();
+				.name(issueLocality != null ? issueLocality.getName() : "Unknown").locality(issueLocality)
+				.metaData(issueReq.getLocation().getMetaData()).build();
 
 		issueLocation = locationRepository.save(issueLocation);
 
@@ -75,12 +79,14 @@ public class IssueReportController {
 		// Save Media (if provided)
 		if (issueReq.getMediaUrls() != null && !issueReq.getMediaUrls().isEmpty()) {
 			for (MediaRequest mediaReq : issueReq.getMediaUrls()) {
+				var mediaLocality = resolveLocality(mediaReq.getLocation().getLat(), mediaReq.getLocation().getLng(),
+						defaultLocality);
 
 				// Save Media Location
 				Location mediaLocation = Location.builder()
 						.point(LocationUtil.createPoint(mediaReq.getLocation().getLat(),
 								mediaReq.getLocation().getLng()))
-						.name("India").locality(defaultLocality) // Replace with actual logic if needed
+						.name(mediaLocality != null ? mediaLocality.getName() : "Unknown").locality(mediaLocality)
 						.metaData(mediaReq.getLocation().getMetaData()).build();
 
 				mediaLocation = locationRepository.save(mediaLocation);
@@ -98,5 +104,13 @@ public class IssueReportController {
 		APIResponse response = APIResponse.builder().data(responseData).build();
 
 		return ResponseEntity.ok(response);
+	}
+
+	private Locality resolveLocality(Double latitude, Double longitude, Locality defaultLocality) {
+		if (latitude == null || longitude == null) {
+			return defaultLocality;
+		}
+		return localityRepository.findContainingLocality(latitude, longitude)
+				.or(() -> localityRepository.findNearestLocality(latitude, longitude)).orElse(defaultLocality);
 	}
 }

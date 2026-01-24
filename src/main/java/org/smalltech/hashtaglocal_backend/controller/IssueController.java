@@ -69,7 +69,7 @@ public class IssueController {
 		if (locEntity != null && locEntity.getLocality() != null && locEntity.getLocality().getHashtag() != null) {
 			hashtag = locEntity.getLocality().getHashtag();
 		}
-		Locality locality = Locality.builder().hashtags(List.of("#" + hashtag)).build();
+		Locality locality = Locality.builder().hashtags(List.of(hashtag)).build();
 
 		double lat = 0.0;
 		double lng = 0.0;

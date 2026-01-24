@@ -9,6 +9,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.locationtech.jts.geom.Coordinate;
+import org.locationtech.jts.geom.GeometryFactory;
+import org.locationtech.jts.geom.Polygon;
 import org.smalltech.hashtaglocal_backend.entity.DiscoveredLocality;
 import org.smalltech.hashtaglocal_backend.entity.ImportJob;
 import org.smalltech.hashtaglocal_backend.entity.LocalityDiscoveryRun;
@@ -49,6 +52,9 @@ class LocalityRepositoriesTest {
 
 	@Autowired
 	private LocalityImportStatusRepository importStatusRepository;
+
+	@Autowired
+	private LocalityRepository localityRepository;
 
 	private LocalityDiscoveryRun run;
 	private ImportJob job;
@@ -240,6 +246,33 @@ class LocalityRepositoriesTest {
 			LocalityImportStatus updated = importStatusRepository.findById(failed.getId()).orElse(null);
 			assertEquals(LocalityImportStatus.ImportStatus.SUCCESS, updated.getImportStatus());
 			assertEquals(2, updated.getAttemptCount());
+		}
+	}
+
+	@Nested
+	@DisplayName("Spatial Lookup")
+	class SpatialLookup {
+
+		@Test
+		@DisplayName("Should resolve locality containing Bangalore point")
+		void resolvesBangaloreLocality() {
+			double lat = 12.9629;
+			double lng = 77.5775;
+
+			// Rough bounding box around Bengaluru; coordinates are (lng, lat)
+			Coordinate[] coords = new Coordinate[]{new Coordinate(77.35, 12.80), new Coordinate(77.80, 12.80),
+					new Coordinate(77.80, 13.10), new Coordinate(77.35, 13.10), new Coordinate(77.35, 12.80)};
+			GeometryFactory gf = new GeometryFactory();
+			Polygon polygon = gf.createPolygon(coords);
+			polygon.setSRID(4326);
+
+			var bangalore = org.smalltech.hashtaglocal_backend.entity.Locality.builder().hashtag("#bangalore")
+					.name("Bangalore").geoBoundary(polygon).build();
+			localityRepository.save(bangalore);
+
+			var found = localityRepository.findContainingLocality(lat, lng);
+			assertTrue(found.isPresent(), "Expected locality for Bangalore coordinates");
+			assertEquals("#bangalore", found.get().getHashtag());
 		}
 	}
 }

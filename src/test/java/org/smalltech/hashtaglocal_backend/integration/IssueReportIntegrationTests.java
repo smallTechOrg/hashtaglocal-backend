@@ -1,13 +1,20 @@
 package org.smalltech.hashtaglocal_backend.integration;
 
+import static org.junit.jupiter.api.Assertions.*;
+
+import jakarta.persistence.EntityManager;
 import java.io.File;
 import java.nio.file.Files;
 import java.util.List;
 import org.junit.jupiter.api.Test;
+import org.locationtech.jts.geom.Coordinate;
+import org.locationtech.jts.geom.GeometryFactory;
+import org.locationtech.jts.geom.Polygon;
 import org.smalltech.hashtaglocal_backend.entity.IssueEntity;
 import org.smalltech.hashtaglocal_backend.entity.Location;
 import org.smalltech.hashtaglocal_backend.entity.MediaEntity;
 import org.smalltech.hashtaglocal_backend.repository.IssueRepository;
+import org.smalltech.hashtaglocal_backend.repository.LocalityRepository;
 import org.smalltech.hashtaglocal_backend.repository.LocationRepository;
 import org.smalltech.hashtaglocal_backend.repository.MediaRepository;
 import org.smalltech.hashtaglocal_backend.util.LocationUtil;
@@ -32,6 +39,10 @@ class IssueReportIntegrationTests {
 	private LocationRepository locationRepository;
 	@Autowired
 	private MediaRepository mediaRepository;
+	@Autowired
+	private LocalityRepository localityRepository;
+	@Autowired
+	private EntityManager entityManager;
 
 	@Test
 	@Transactional
@@ -67,5 +78,46 @@ class IssueReportIntegrationTests {
 		assert LocationUtil.getLatitude(mediaLocation.getPoint()).equals(28.7041);
 		assert LocationUtil.getLongitude(mediaLocation.getPoint()).equals(77.1025);
 		assert mediaLocation.getMetaData() != null && mediaLocation.getMetaData().toString().contains("Delhi");
+	}
+
+	@Test
+	void createIssue_shouldAssignBengaluruLocality() {
+		// Seed Bengaluru locality polygon (SRID 4326, lon/lat order)
+		GeometryFactory gf = new GeometryFactory();
+		Coordinate[] coords = new Coordinate[]{new Coordinate(77.3791981, 12.7342888),
+				new Coordinate(78.037506, 12.7342888), new Coordinate(78.037506, 13.173706),
+				new Coordinate(77.3791981, 13.173706), new Coordinate(77.3791981, 12.7342888)};
+		Polygon polygon = gf.createPolygon(coords);
+		polygon.setSRID(4326);
+		var bengaluru = org.smalltech.hashtaglocal_backend.entity.Locality.builder().hashtag("#bengaluru")
+				.name("Bengaluru").geoBoundary(polygon).build();
+		localityRepository.saveAndFlush(bengaluru);
+
+		String requestJson = """
+				{
+				  "issue": {
+				    "type": "POTHOLE",
+				    "description": "Pothole in Bengaluru",
+				    "location": {
+				      "lat": 12.9629,
+				      "lng": 77.5775,
+				      "meta_data": {"city": "Bengaluru"}
+				    },
+				    "media_urls": []
+				  }
+				}
+				""";
+
+		webTestClient.post().uri("/api/v1/issue").contentType(MediaType.APPLICATION_JSON).bodyValue(requestJson)
+				.exchange().expectStatus().isOk().expectBody().jsonPath("$.data.issue_id").exists();
+
+		List<IssueEntity> issues = issueRepository.findAll();
+		IssueEntity latest = issues.stream().max((a, b) -> Long.compare(a.getId(), b.getId())).orElseThrow();
+		Long locId = latest.getLocation().getId();
+		Long localityId = ((Number) entityManager.createNativeQuery("select locality_id from locations where id = :id")
+				.setParameter("id", locId).getSingleResult()).longValue();
+		var locality = localityRepository.findById(localityId).orElse(null);
+		assertNotNull(locality, "Locality should be assigned");
+		assertEquals("#bengaluru", locality.getHashtag(), "Hashtag assigned: " + locality.getHashtag());
 	}
 }
