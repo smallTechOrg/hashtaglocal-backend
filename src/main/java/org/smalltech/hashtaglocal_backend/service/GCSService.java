@@ -22,7 +22,9 @@ public class GCSService {
 	/**
 	 * Generates a signed URL for a given GCS path.
 	 *
-	 * @param gcsPath the GCS path in format "gs://bucket-name/object-path" or just "object-path"
+	 * @param gcsPath
+	 *            the GCS path in format "gs://bucket-name/object-path" or just
+	 *            "object-path"
 	 * @return a signed URL string
 	 */
 	public String generateSignedUrl(String gcsPath) {
@@ -42,7 +44,9 @@ public class GCSService {
 	/**
 	 * Extracts the object path from a GCS path.
 	 *
-	 * @param gcsPath the GCS path in format "gs://bucket-name/object-path" or just "object-path"
+	 * @param gcsPath
+	 *            the GCS path in format "gs://bucket-name/object-path" or just
+	 *            "object-path"
 	 * @return the object path
 	 */
 	private String extractObjectPath(String gcsPath) {

@@ -32,7 +32,8 @@ public class IssueHomeController {
 	private final MediaRepository mediaRepository;
 	private final GCSService gcsService;
 
-	public IssueHomeController(IssueRepository issueRepository, MediaRepository mediaRepository, GCSService gcsService) {
+	public IssueHomeController(IssueRepository issueRepository, MediaRepository mediaRepository,
+			GCSService gcsService) {
 		this.issueRepository = issueRepository;
 		this.mediaRepository = mediaRepository;
 		this.gcsService = gcsService;
@@ -88,8 +89,10 @@ public class IssueHomeController {
 
 		// Fetch media items from database
 		List<org.smalltech.hashtaglocal_backend.entity.MediaEntity> mediaEntities = mediaRepository.findByIssue(entity);
-		List<Media> mediaList = mediaEntities.stream().map(mediaEntity -> Media.builder().location(location)
-				.type(mediaEntity.getType().name().toLowerCase()).url(gcsService.generateSignedUrl(mediaEntity.getUrl())).build()).toList();
+		List<Media> mediaList = mediaEntities.stream()
+				.map(mediaEntity -> Media.builder().location(location).type(mediaEntity.getType().name().toLowerCase())
+						.url(gcsService.generateSignedUrl(mediaEntity.getUrl())).build())
+				.toList();
 
 		// Default viewer context (no upvote data in DB yet)
 		ViewerContext viewerContext = ViewerContext.builder().upvote(false).build();

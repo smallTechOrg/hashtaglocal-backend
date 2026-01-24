@@ -88,8 +88,10 @@ public class IssueController {
 
 		// Fetch media items from database
 		List<org.smalltech.hashtaglocal_backend.entity.MediaEntity> mediaEntities = mediaRepository.findByIssue(entity);
-		List<Media> mediaList = mediaEntities.stream().map(mediaEntity -> Media.builder().location(location)
-				.type(mediaEntity.getType().name().toLowerCase()).url(gcsService.generateSignedUrl(mediaEntity.getUrl())).build()).toList();
+		List<Media> mediaList = mediaEntities.stream()
+				.map(mediaEntity -> Media.builder().location(location).type(mediaEntity.getType().name().toLowerCase())
+						.url(gcsService.generateSignedUrl(mediaEntity.getUrl())).build())
+				.toList();
 
 		// Default viewer context (no upvote data in DB yet)
 		ViewerContext viewerContext = ViewerContext.builder().upvote(false).build();
