@@ -24,6 +24,11 @@ spring:
     init:
       mode: always
 
+# Google Maps API configuration
+google:
+  maps:
+    api-key: ${GOOGLE_MAPS_API_KEY:}
+
 management:
   health:
     diskspace:
@@ -60,3 +65,7 @@ gcs:
     path: gcs-key.json
   project:
     id: ${GCS_PROJECT_ID:}
+
+
+geonames:
+  username: ${GEONAMES_USERNAME:mmk1} 
