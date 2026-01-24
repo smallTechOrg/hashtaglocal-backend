@@ -260,7 +260,6 @@ sudo journalctl -u hashtaglocal-backend -n 100
 
 ```bash
 # On local machine
-cd /Users/sai/Workspace/Code/hashtaglocal-backend
 ./gradlew clean build
 
 # Transfer JAR to VM (to /tmp first)
