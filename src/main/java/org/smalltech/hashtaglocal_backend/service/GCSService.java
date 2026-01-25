@@ -67,4 +67,25 @@ public class GCSService {
 		// Otherwise assume it's already the object path
 		return gcsPath;
 	}
+
+	/**
+	 * Uploads content to the configured GCS bucket and returns the gs:// path.
+	 */
+	public String uploadObject(String objectName, byte[] data, String contentType) {
+		if (objectName == null || objectName.isBlank()) {
+			throw new IllegalArgumentException("objectName cannot be null or blank");
+		}
+
+		if (data == null || data.length == 0) {
+			throw new IllegalArgumentException("data cannot be null or empty");
+		}
+
+		String sanitizedContentType = contentType == null || contentType.isBlank()
+				? "application/octet-stream"
+				: contentType;
+
+		BlobInfo blobInfo = BlobInfo.newBuilder(BUCKET_NAME, objectName).setContentType(sanitizedContentType).build();
+		storage.create(blobInfo, data);
+		return "gs://" + BUCKET_NAME + "/" + objectName;
+	}
 }
