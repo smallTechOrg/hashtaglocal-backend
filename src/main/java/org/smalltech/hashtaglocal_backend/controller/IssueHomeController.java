@@ -44,9 +44,9 @@ public class IssueHomeController {
 	@Operation(summary = "Get issue Home", description = "Returns a List of issues with user, location, locality and viewer context.")
 	@ApiResponse(responseCode = "200", description = "Successful issue response", content = @Content(mediaType = "application/json", schema = @Schema(implementation = APIResponse.class)))
 	public APIResponse getIssues() {
-		// Fetch only OPEN issues from database
+		// Fetch OPEN and ONHOLD issues from database
 		List<org.smalltech.hashtaglocal_backend.entity.IssueEntity> issueEntities = issueRepository
-				.findByStatus(IssueStatusModel.OPEN);
+				.findByStatusInOrderByCreatedAtDesc(List.of(IssueStatusModel.OPEN, IssueStatusModel.ONHOLD));
 
 		List<Issue> issues = issueEntities.stream().map(this::mapToIssue).toList();
 

@@ -13,6 +13,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.smalltech.hashtaglocal_backend.dto.BlrPagesIssueDTO;
+import org.smalltech.hashtaglocal_backend.dto.BlrPagesResponse;
 import org.smalltech.hashtaglocal_backend.entity.IssueEntity;
 import org.smalltech.hashtaglocal_backend.entity.IssueImportJob;
 import org.smalltech.hashtaglocal_backend.entity.IssueImportStatus;
@@ -86,11 +87,16 @@ class IssueImportServiceTest {
 	@Test
 	@DisplayName("Imports and stores blr-pages issues")
 	void importsBlrPagesIssues() {
-		BlrPagesIssueDTO dto = BlrPagesIssueDTO.builder().lat(12.9).lng(77.6).image("https://example.com/photo.jpg")
-				.category(3).createdAt("2025-06-17T17:21:24.077Z").build();
+		BlrPagesIssueDTO dto = BlrPagesIssueDTO.builder().uuid("test-uuid-1").lat(12.9).lng(77.6)
+				.image("https://example.com/photo.jpg").category(3).createdAt("2025-06-17T17:21:24.077Z").build();
 
-		when(restTemplate.getForObject(anyString(), eq(BlrPagesIssueDTO[].class)))
-				.thenReturn(new BlrPagesIssueDTO[]{dto});
+		BlrPagesResponse.Result result = new BlrPagesResponse.Result();
+		result.setData(java.util.List.of(dto));
+		BlrPagesResponse response = new BlrPagesResponse();
+		response.setSuccess(true);
+		response.setResult(result);
+
+		when(restTemplate.getForObject(anyString(), eq(BlrPagesResponse.class))).thenReturn(response);
 
 		when(statusRepository.existsBySourceAndSourceIssueId(any(), anyString())).thenReturn(false);
 
@@ -128,11 +134,16 @@ class IssueImportServiceTest {
 	@Test
 	@DisplayName("Skips duplicate source ids")
 	void skipsDuplicateIssues() {
-		BlrPagesIssueDTO dto = BlrPagesIssueDTO.builder().lat(12.9).lng(77.6).image("https://example.com/photo.jpg")
-				.category(3).createdAt("2025-06-17T17:21:24.077Z").build();
+		BlrPagesIssueDTO dto = BlrPagesIssueDTO.builder().uuid("dup-uuid-1").lat(12.9).lng(77.6)
+				.image("https://example.com/photo.jpg").category(3).createdAt("2025-06-17T17:21:24.077Z").build();
 
-		when(restTemplate.getForObject(anyString(), eq(BlrPagesIssueDTO[].class)))
-				.thenReturn(new BlrPagesIssueDTO[]{dto});
+		BlrPagesResponse.Result result = new BlrPagesResponse.Result();
+		result.setData(java.util.List.of(dto));
+		BlrPagesResponse response = new BlrPagesResponse();
+		response.setSuccess(true);
+		response.setResult(result);
+
+		when(restTemplate.getForObject(anyString(), eq(BlrPagesResponse.class))).thenReturn(response);
 
 		when(statusRepository.existsBySourceAndSourceIssueId(any(), anyString())).thenReturn(true);
 

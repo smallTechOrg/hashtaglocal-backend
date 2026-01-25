@@ -18,4 +18,10 @@ public interface IssueRepository extends JpaRepository<IssueEntity, Long> {
 
 	@EntityGraph(attributePaths = {"userEntity", "location", "location.locality"})
 	List<IssueEntity> findByStatus(IssueStatusModel status);
+
+	@EntityGraph(attributePaths = {"userEntity", "location", "location.locality"})
+	List<IssueEntity> findByStatusOrderByCreatedAtDesc(IssueStatusModel status);
+
+	@EntityGraph(attributePaths = {"userEntity", "location", "location.locality"})
+	List<IssueEntity> findByStatusInOrderByCreatedAtDesc(List<IssueStatusModel> statuses);
 }

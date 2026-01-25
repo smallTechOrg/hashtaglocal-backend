@@ -68,13 +68,13 @@ class IssueHomeControllerTests {
 		Location location = Location.builder().id(1L).point(point).locality(locality).name("Sector 3, Jawahar Nagar")
 				.metaData(metaData).build();
 
-		// Create issue 1
+		// Create issue 1 - older
 		IssueEntity issue1 = IssueEntity.builder().id(1L).key("JPR-001").type(IssueTypeModel.POTHOLE)
 				.status(IssueStatusModel.OPEN).description("Large pothole causing traffic issues")
-				.createdAt(LocalDateTime.parse("2025-12-26T18:00:00"))
-				.updatedAt(LocalDateTime.parse("2025-12-26T18:00:00")).userEntity(user).location(location).build();
+				.createdAt(LocalDateTime.parse("2025-12-25T10:00:00"))
+				.updatedAt(LocalDateTime.parse("2025-12-25T10:00:00")).userEntity(user).location(location).build();
 
-		// Create issue 2
+		// Create issue 2 - newer
 		IssueEntity issue2 = IssueEntity.builder().id(2L).key("JPR-002").type(IssueTypeModel.POTHOLE)
 				.status(IssueStatusModel.OPEN).description("Large pothole causing traffic issues")
 				.createdAt(LocalDateTime.parse("2025-12-26T18:00:00"))
@@ -93,7 +93,9 @@ class IssueHomeControllerTests {
 		MediaEntity media4 = MediaEntity.builder().id(4L).issue(issue2).type(MediaTypeModel.PHOTO)
 				.url("https://nub.news/api/image/526263/article.png").location(location).build();
 
-		when(issueRepository.findByStatus(IssueStatusModel.OPEN)).thenReturn(List.of(issue1, issue2));
+		when(issueRepository
+				.findByStatusInOrderByCreatedAtDesc(List.of(IssueStatusModel.OPEN, IssueStatusModel.ONHOLD)))
+				.thenReturn(List.of(issue2, issue1));
 		when(mediaRepository.findByIssue(issue1)).thenReturn(List.of(media1, media2));
 		when(mediaRepository.findByIssue(issue2)).thenReturn(List.of(media3, media4));
 
@@ -106,17 +108,17 @@ class IssueHomeControllerTests {
 		assertNotNull(actualResponse.getData().getIssues());
 		assertEquals(2, actualResponse.getData().getIssues().size());
 
-		// Verify first issue
+		// Verify first issue is the newer one (issue 2)
 		var firstIssue = actualResponse.getData().getIssues().get(0);
-		assertEquals(1L, firstIssue.getId());
+		assertEquals(2L, firstIssue.getId());
 		assertEquals("john_doe", firstIssue.getUser().getUsername());
 		assertEquals("pothole", firstIssue.getType());
 		assertEquals("Large pothole causing traffic issues", firstIssue.getDescription());
 		assertEquals(2, firstIssue.getMediaUrls().size());
 
-		// Verify second issue
+		// Verify second issue is the older one (issue 1)
 		var secondIssue = actualResponse.getData().getIssues().get(1);
-		assertEquals(2L, secondIssue.getId());
+		assertEquals(1L, secondIssue.getId());
 		assertEquals("john_doe", secondIssue.getUser().getUsername());
 		assertEquals(2, secondIssue.getMediaUrls().size());
 	}
