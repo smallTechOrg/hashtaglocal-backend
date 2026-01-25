@@ -93,7 +93,7 @@ class IssueHomeControllerTests {
 		MediaEntity media4 = MediaEntity.builder().id(4L).issue(issue2).type(MediaTypeModel.PHOTO)
 				.url("https://nub.news/api/image/526263/article.png").location(location).build();
 
-		when(issueRepository.findAll()).thenReturn(List.of(issue1, issue2));
+		when(issueRepository.findByStatus(IssueStatusModel.OPEN)).thenReturn(List.of(issue1, issue2));
 		when(mediaRepository.findByIssue(issue1)).thenReturn(List.of(media1, media2));
 		when(mediaRepository.findByIssue(issue2)).thenReturn(List.of(media3, media4));
 

@@ -5,23 +5,33 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Locale;
 import org.smalltech.hashtaglocal_backend.model.APIResponse;
 import org.smalltech.hashtaglocal_backend.model.Issue;
+import org.smalltech.hashtaglocal_backend.model.IssueStatusModel;
+import org.smalltech.hashtaglocal_backend.model.IssueTypeModel;
 import org.smalltech.hashtaglocal_backend.model.Locality;
 import org.smalltech.hashtaglocal_backend.model.Location;
 import org.smalltech.hashtaglocal_backend.model.Media;
 import org.smalltech.hashtaglocal_backend.model.ResponseData;
 import org.smalltech.hashtaglocal_backend.model.User;
 import org.smalltech.hashtaglocal_backend.model.ViewerContext;
+import org.smalltech.hashtaglocal_backend.model.request.IssuePatchRequest;
 import org.smalltech.hashtaglocal_backend.repository.IssueRepository;
 import org.smalltech.hashtaglocal_backend.repository.MediaRepository;
 import org.smalltech.hashtaglocal_backend.service.GCSService;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
 @RestController
 @RequestMapping("/api/v1/issue")
@@ -49,6 +59,59 @@ public class IssueController {
 				.orElseGet(() -> issueRepository.findById(1L)
 						.orElseThrow(() -> new RuntimeException("No issue available")));
 		return mapToAPIResponse(issueEntity);
+	}
+
+	@PatchMapping("/{issueId}")
+	@Transactional
+	@Operation(summary = "Update issue", description = "Patch issue fields like status, type, and description.")
+	@ApiResponse(responseCode = "200", description = "Issue patched successfully", content = @Content(mediaType = "application/json", schema = @Schema(implementation = APIResponse.class)))
+	public ResponseEntity<APIResponse> patchIssue(@PathVariable Long issueId, @RequestBody IssuePatchRequest request) {
+		if (request == null) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Request body is required");
+		}
+
+		var issueEntity = issueRepository.findById(issueId)
+				.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Issue not found"));
+
+		boolean updated = false;
+
+		if (request.getStatus() != null) {
+			issueEntity.setStatus(parseStatus(request.getStatus()));
+			updated = true;
+		}
+
+		if (request.getType() != null) {
+			issueEntity.setType(parseType(request.getType()));
+			updated = true;
+		}
+
+		if (request.getDescription() != null) {
+			issueEntity.setDescription(request.getDescription());
+			updated = true;
+		}
+
+		if (updated) {
+			issueEntity.setUpdatedAt(LocalDateTime.now());
+			issueRepository.save(issueEntity);
+		}
+
+		return ResponseEntity.ok(mapToAPIResponse(issueEntity));
+	}
+
+	private IssueStatusModel parseStatus(String status) {
+		try {
+			return IssueStatusModel.valueOf(status.toUpperCase(Locale.ROOT));
+		} catch (IllegalArgumentException ex) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid status value: " + status, ex);
+		}
+	}
+
+	private IssueTypeModel parseType(String type) {
+		try {
+			return IssueTypeModel.valueOf(type.toUpperCase(Locale.ROOT));
+		} catch (IllegalArgumentException ex) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid type value: " + type, ex);
+		}
 	}
 
 	private APIResponse mapToAPIResponse(org.smalltech.hashtaglocal_backend.entity.IssueEntity entity) {
