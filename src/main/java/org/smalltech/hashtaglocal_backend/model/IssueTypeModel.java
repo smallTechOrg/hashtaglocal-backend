@@ -1,5 +1,5 @@
 package org.smalltech.hashtaglocal_backend.model;
 
 public enum IssueTypeModel {
-	POTHOLE, GARBAGE, FOOTPATH, SAFETY, POLLUTION, OTHER
+	POTHOLE, WASTE, FOOTPATH, POLLUTION, HYGIENE, SAFETY, OTHER
 }
