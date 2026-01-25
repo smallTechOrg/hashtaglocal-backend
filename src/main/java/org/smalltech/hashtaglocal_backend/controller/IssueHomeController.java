@@ -8,6 +8,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.List;
 import org.smalltech.hashtaglocal_backend.model.APIResponse;
 import org.smalltech.hashtaglocal_backend.model.Issue;
+import org.smalltech.hashtaglocal_backend.model.IssueStatusModel;
 import org.smalltech.hashtaglocal_backend.model.Locality;
 import org.smalltech.hashtaglocal_backend.model.Location;
 import org.smalltech.hashtaglocal_backend.model.Media;
@@ -43,8 +44,9 @@ public class IssueHomeController {
 	@Operation(summary = "Get issue Home", description = "Returns a List of issues with user, location, locality and viewer context.")
 	@ApiResponse(responseCode = "200", description = "Successful issue response", content = @Content(mediaType = "application/json", schema = @Schema(implementation = APIResponse.class)))
 	public APIResponse getIssues() {
-		// Fetch all issues from database
-		List<org.smalltech.hashtaglocal_backend.entity.IssueEntity> issueEntities = issueRepository.findAll();
+		// Fetch only OPEN issues from database
+		List<org.smalltech.hashtaglocal_backend.entity.IssueEntity> issueEntities = issueRepository
+				.findByStatus(IssueStatusModel.OPEN);
 
 		List<Issue> issues = issueEntities.stream().map(this::mapToIssue).toList();
 

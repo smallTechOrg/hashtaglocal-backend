@@ -2,6 +2,10 @@ package org.smalltech.hashtaglocal_backend.controller;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.time.LocalDateTime;
@@ -25,9 +29,12 @@ import org.smalltech.hashtaglocal_backend.model.APIResponse;
 import org.smalltech.hashtaglocal_backend.model.IssueStatusModel;
 import org.smalltech.hashtaglocal_backend.model.IssueTypeModel;
 import org.smalltech.hashtaglocal_backend.model.MediaTypeModel;
+import org.smalltech.hashtaglocal_backend.model.request.IssuePatchRequest;
 import org.smalltech.hashtaglocal_backend.repository.IssueRepository;
 import org.smalltech.hashtaglocal_backend.repository.MediaRepository;
 import org.smalltech.hashtaglocal_backend.service.GCSService;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 
 class IssueControllerTests {
 
@@ -96,5 +103,60 @@ class IssueControllerTests {
 		assertEquals(2, actualResponse.getData().getIssue().getMediaUrls().size());
 		assertEquals(0, actualResponse.getData().getIssue().getVoteCount());
 		assertEquals(0, actualResponse.getData().getIssue().getVerifyCount());
+	}
+
+	@Test
+	void patchIssue_shouldUpdateProvidedFields() {
+		Long issueId = 2L;
+		LocalDateTime originalUpdatedAt = LocalDateTime.now().minusHours(4);
+
+		UserEntity user = UserEntity.builder().id(2L).username("alice").profilePicture("https://example.com/p.png")
+				.locale("en_IN").build();
+
+		IssueEntity entity = IssueEntity.builder().id(issueId).type(IssueTypeModel.POTHOLE)
+				.status(IssueStatusModel.OPEN).description("Original description")
+				.createdAt(LocalDateTime.parse("2025-12-20T09:15:00")).updatedAt(originalUpdatedAt).userEntity(user)
+				.build();
+
+		when(issueRepository.findById(issueId)).thenReturn(Optional.of(entity));
+		when(mediaRepository.findByIssue(entity)).thenReturn(List.of());
+		when(issueRepository.save(entity)).thenReturn(entity);
+
+		IssuePatchRequest request = new IssuePatchRequest();
+		request.setStatus("RESOLVED");
+		request.setType("WASTE");
+		request.setDescription("Updated description");
+
+		var response = controller.patchIssue(issueId, request);
+
+		assertEquals(HttpStatus.OK, response.getStatusCode());
+		assertNotNull(response.getBody());
+		assertNotNull(response.getBody().getData());
+		assertNotNull(response.getBody().getData().getIssue());
+		assertEquals("waste", response.getBody().getData().getIssue().getType());
+		assertEquals("Updated description", response.getBody().getData().getIssue().getDescription());
+		assertEquals(IssueStatusModel.RESOLVED, entity.getStatus());
+		assertEquals(IssueTypeModel.WASTE, entity.getType());
+		assertNotNull(entity.getUpdatedAt());
+		assertTrue(entity.getUpdatedAt().isAfter(originalUpdatedAt));
+		assertEquals(issueId, response.getBody().getData().getIssue().getId());
+		verify(issueRepository, times(1)).save(entity);
+	}
+
+	@Test
+	void patchIssue_withInvalidStatusShouldThrowBadRequest() {
+		Long issueId = 3L;
+
+		IssueEntity entity = IssueEntity.builder().id(issueId).type(IssueTypeModel.SAFETY).status(IssueStatusModel.OPEN)
+				.description("Safety issue").createdAt(LocalDateTime.parse("2025-10-01T10:00:00"))
+				.updatedAt(LocalDateTime.now()).build();
+
+		when(issueRepository.findById(issueId)).thenReturn(Optional.of(entity));
+
+		IssuePatchRequest request = new IssuePatchRequest();
+		request.setStatus("NOT_A_STATUS");
+
+		assertThrows(ResponseStatusException.class, () -> controller.patchIssue(issueId, request));
+		verify(issueRepository, times(0)).save(Mockito.any());
 	}
 }
