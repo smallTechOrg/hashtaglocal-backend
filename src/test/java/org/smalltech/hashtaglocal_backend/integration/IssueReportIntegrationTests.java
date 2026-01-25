@@ -61,7 +61,7 @@ class IssueReportIntegrationTests {
 		IssueEntity issue = issues.get(issues.size() - 1);
 		assert issue.getDescription().equals("Test pothole issue integration");
 		assert issue.getType().name().equals("POTHOLE");
-		assert issue.getStatus().name().equals("OPEN");
+		assert issue.getStatus().name().equals("ONHOLD");
 		assert issue.getLocation() != null;
 		Location issueLocation = locationRepository.findById(issue.getLocation().getId()).orElseThrow();
 		assert LocationUtil.getLatitude(issueLocation.getPoint()).equals(28.7041);

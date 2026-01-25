@@ -67,11 +67,11 @@ public class IssueTestDataConfig implements CommandLineRunner {
 					.name("Sector 3, Jawahar Nagar").metaData(metaData).build();
 			location = locationRepository.save(location);
 
-			// Create issue 1
+			// Create issue 1 - older issue
 			IssueEntity issue1 = IssueEntity.builder().key("JPR-001").type(IssueTypeModel.POTHOLE)
 					.status(IssueStatusModel.OPEN).description("Large pothole causing traffic issues")
-					.createdAt(LocalDateTime.parse("2025-12-26T18:00:00"))
-					.updatedAt(LocalDateTime.parse("2025-12-26T18:00:00")).userEntity(user).location(location).build();
+					.createdAt(LocalDateTime.parse("2025-12-25T10:00:00"))
+					.updatedAt(LocalDateTime.parse("2025-12-25T10:00:00")).userEntity(user).location(location).build();
 			issue1 = issueRepository.save(issue1);
 
 			// Create media for issue 1
@@ -84,7 +84,7 @@ public class IssueTestDataConfig implements CommandLineRunner {
 					.url("https://nub.news/api/image/526263/article.png").location(location).build();
 			mediaRepository.save(media2);
 
-			// Create issue 2
+			// Create issue 2 - newer issue
 			IssueEntity issue2 = IssueEntity.builder().key("JPR-002").type(IssueTypeModel.POTHOLE)
 					.status(IssueStatusModel.OPEN).description("Large pothole causing traffic issues")
 					.createdAt(LocalDateTime.parse("2025-12-26T18:00:00"))
@@ -100,6 +100,18 @@ public class IssueTestDataConfig implements CommandLineRunner {
 			MediaEntity media4 = MediaEntity.builder().issue(issue2).type(MediaTypeModel.PHOTO)
 					.url("https://nub.news/api/image/526263/article.png").location(location).build();
 			mediaRepository.save(media4);
+
+			// Create issue 3 - ONHOLD issue (newest)
+			IssueEntity issue3 = IssueEntity.builder().key("JPR-003").type(IssueTypeModel.WASTE)
+					.status(IssueStatusModel.ONHOLD).description("Garbage pile needs attention")
+					.createdAt(LocalDateTime.parse("2025-12-27T12:00:00"))
+					.updatedAt(LocalDateTime.parse("2025-12-27T12:00:00")).userEntity(user).location(location).build();
+			issue3 = issueRepository.save(issue3);
+
+			// Create media for issue 3
+			MediaEntity media5 = MediaEntity.builder().issue(issue3).type(MediaTypeModel.PHOTO)
+					.url("https://example.com/waste-photo.jpg").location(location).build();
+			mediaRepository.save(media5);
 		}
 	}
 }

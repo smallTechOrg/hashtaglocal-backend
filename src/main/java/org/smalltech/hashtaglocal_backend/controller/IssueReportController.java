@@ -71,7 +71,7 @@ public class IssueReportController {
 
 		// Create issue with user assigned
 		IssueEntity issue = IssueEntity.builder().type(IssueTypeModel.valueOf(issueReq.getType()))
-				.description(issueReq.getDescription()).status(IssueStatusModel.OPEN).createdAt(LocalDateTime.now())
+				.description(issueReq.getDescription()).status(IssueStatusModel.ONHOLD).createdAt(LocalDateTime.now())
 				.updatedAt(LocalDateTime.now()).location(issueLocation).userEntity(user).build();
 
 		issue = issueRepository.save(issue);
