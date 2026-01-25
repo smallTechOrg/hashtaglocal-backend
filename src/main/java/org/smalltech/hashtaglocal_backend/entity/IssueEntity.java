@@ -29,6 +29,7 @@ public class IssueEntity {
 	@Column(length = 1000)
 	private String description;
 
+	@Enumerated(EnumType.STRING)
 	@Column(nullable = false, length = 100)
 	private IssueTypeModel type;
 
