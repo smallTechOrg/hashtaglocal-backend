@@ -1,6 +1,7 @@
 package org.smalltech.hashtaglocal_backend.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -28,11 +29,32 @@ public class GoogleMapsLocationDTO {
 	@JsonIgnoreProperties(ignoreUnknown = true)
 	public static class Result {
 
+		@JsonProperty("formatted_address")
 		private String formattedAddress;
 
 		private Geometry geometry;
 
+		@JsonProperty("place_id")
 		private String placeId;
+
+		private List<String> types;
+
+		@JsonProperty("address_components")
+		private List<AddressComponent> addressComponents;
+	}
+
+	@Data
+	@NoArgsConstructor
+	@AllArgsConstructor
+	@Builder
+	@JsonIgnoreProperties(ignoreUnknown = true)
+	public static class AddressComponent {
+
+		@JsonProperty("long_name")
+		private String longName;
+
+		@JsonProperty("short_name")
+		private String shortName;
 
 		private List<String> types;
 	}

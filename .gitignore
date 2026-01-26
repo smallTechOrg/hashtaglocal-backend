@@ -42,3 +42,7 @@ out/
 ### Local Configs
 *-local.yaml
 *-key.json
+
+### Logs
+logs/
+*.log
