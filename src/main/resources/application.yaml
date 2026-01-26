@@ -79,4 +79,8 @@ gcs:
 
 
 geonames:
-  username: ${GEONAMES_USERNAME:mmk1} 
+  username: ${GEONAMES_USERNAME:mmk1}
+
+# NewsAPI.ai Configuration
+newsapi:
+  api-key: ${NEWSAPI_API_KEY:}
