@@ -5,6 +5,7 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import java.time.LocalDateTime;
 import java.util.List;
 import org.smalltech.hashtaglocal_backend.model.APIResponse;
 import org.smalltech.hashtaglocal_backend.model.Issue;
@@ -44,9 +45,13 @@ public class IssueHomeController {
 	@Operation(summary = "Get issue Home", description = "Returns a List of issues with user, location, locality and viewer context.")
 	@ApiResponse(responseCode = "200", description = "Successful issue response", content = @Content(mediaType = "application/json", schema = @Schema(implementation = APIResponse.class)))
 	public APIResponse getIssues() {
-		// Fetch OPEN and ONHOLD issues from database
+		// Calculate date 4 months ago from now
+		LocalDateTime fourMonthsAgo = LocalDateTime.now().minusMonths(6);
+
+		// Fetch OPEN and ONHOLD issues from the last 4 months, ordered by creation date
 		List<org.smalltech.hashtaglocal_backend.entity.IssueEntity> issueEntities = issueRepository
-				.findByStatusInOrderByCreatedAtDesc(List.of(IssueStatusModel.OPEN, IssueStatusModel.ONHOLD));
+				.findByStatusInAndCreatedAtAfterOrderByCreatedAtDesc(
+						List.of(IssueStatusModel.OPEN, IssueStatusModel.ONHOLD), fourMonthsAgo);
 
 		List<Issue> issues = issueEntities.stream().map(this::mapToIssue).toList();
 
