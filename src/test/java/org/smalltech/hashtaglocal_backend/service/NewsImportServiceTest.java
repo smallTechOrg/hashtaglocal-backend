@@ -4,7 +4,6 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -94,7 +93,6 @@ class NewsImportServiceTest {
 	void testImportNewsForLocality_Success() {
 		// Arrange
 		when(localityRepository.findByHashtag("bengaluru")).thenReturn(Optional.of(testLocality));
-		when(newsImportJobRepository.findRecentSuccessfulImport(any(), any())).thenReturn(Optional.empty());
 		when(newsApiService.searchArticles(any(NewsApiRequest.class))).thenReturn(mockApiResponse);
 		when(newsArticleRepository.findByExternalId(anyString())).thenReturn(Optional.empty());
 		when(newsArticleRepository.save(any(NewsArticleEntity.class)))
@@ -123,28 +121,9 @@ class NewsImportServiceTest {
 	}
 
 	@Test
-	void testImportNewsForLocality_SkipsRecentImport() {
-		// Arrange
-		NewsImportJob recentJob = NewsImportJob.builder().id(1L).importedAt(LocalDateTime.now().minusHours(1))
-				.status(NewsImportJob.ImportStatus.SUCCESS).build();
-
-		when(localityRepository.findByHashtag("bengaluru")).thenReturn(Optional.of(testLocality));
-		when(newsImportJobRepository.findRecentSuccessfulImport(any(), any())).thenReturn(Optional.of(recentJob));
-
-		// Act
-		NewsImportJob result = newsImportService.importNewsForLocality("bengaluru");
-
-		// Assert
-		assertNotNull(result);
-		assertEquals(recentJob, result);
-		verify(newsApiService, never()).searchArticles(any());
-	}
-
-	@Test
 	void testImportNewsForLocality_HandlesDuplicates() {
 		// Arrange
 		when(localityRepository.findByHashtag("bengaluru")).thenReturn(Optional.of(testLocality));
-		when(newsImportJobRepository.findRecentSuccessfulImport(any(), any())).thenReturn(Optional.empty());
 		when(newsApiService.searchArticles(any(NewsApiRequest.class))).thenReturn(mockApiResponse);
 
 		// First article is duplicate, second is new
@@ -168,7 +147,6 @@ class NewsImportServiceTest {
 	void testImportNewsForLocality_HandlesApiError() {
 		// Arrange
 		when(localityRepository.findByHashtag("bengaluru")).thenReturn(Optional.of(testLocality));
-		when(newsImportJobRepository.findRecentSuccessfulImport(any(), any())).thenReturn(Optional.empty());
 		// Make all API calls fail
 		when(newsApiService.searchArticles(any(NewsApiRequest.class)))
 				.thenThrow(new RuntimeException("API Error"));

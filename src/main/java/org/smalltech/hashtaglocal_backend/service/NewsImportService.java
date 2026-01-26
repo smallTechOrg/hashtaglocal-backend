@@ -31,12 +31,17 @@ public class NewsImportService {
 	private final LocalityRepository localityRepository;
 
 	// Keywords for categorizing news articles
-	private static final String[] POTHOLE_KEYWORDS = {"pothole", "road damage", "crater", "road defect"};
-	private static final String[] WASTE_KEYWORDS = {"garbage", "waste", "trash", "litter", "dump"};
-	private static final String[] FOOTPATH_KEYWORDS = {"footpath", "sidewalk", "pavement", "pedestrian path"};
-	private static final String[] POLLUTION_KEYWORDS = {"pollution", "air quality", "smog", "emissions"};
-	private static final String[] HYGIENE_KEYWORDS = {"hygiene", "sanitation", "cleanliness", "sewage"};
-	private static final String[] SAFETY_KEYWORDS = {"safety", "crime", "accident", "danger", "hazard"};
+	private static final String[] POTHOLE_KEYWORDS = {"pothole", "road damage", "crater", "road defect", "road repair",
+			"bad roads", "broken road", "road condition", "damaged road", "road maintenance"};
+	private static final String[] WASTE_KEYWORDS = {"garbage", "waste", "trash", "litter", "dump", "waste management",
+			"garbage collection", "solid waste", "waste disposal", "landfill", "garbage dump"};
+	private static final String[] FOOTPATH_KEYWORDS = {"footpath", "sidewalk", "pavement", "pedestrian path", "walkway",
+			"pedestrian", "footpath encroachment", "broken footpath", "pedestrian safety"};
+	private static final String[] POLLUTION_KEYWORDS = {"pollution", "air quality", "smog", "emissions",
+			"air pollution", "water pollution", "noise pollution", "environmental pollution", "pollutants"};
+	private static final String[] HYGIENE_KEYWORDS = {"hygiene", "sanitation", "cleanliness", "sewage", "drainage",
+			"public health", "clean city", "sanitary", "waste water", "open drain"};
+	private static final String[] SAFETY_KEYWORDS = {"safety", "crime", "accident"};
 
 	public NewsImportService(NewsApiService newsApiService, NewsArticleRepository newsArticleRepository,
 			NewsImportJobRepository newsImportJobRepository, LocalityRepository localityRepository) {
@@ -56,14 +61,6 @@ public class NewsImportService {
 		// Find locality
 		Locality locality = localityRepository.findByHashtag(hashtag)
 				.orElseThrow(() -> new RuntimeException("Locality not found: " + hashtag));
-
-		// Check if we already imported recently (within last 24 hours)
-		LocalDateTime yesterday = LocalDateTime.now().minusHours(24);
-		var recentImport = newsImportJobRepository.findRecentSuccessfulImport(locality, yesterday);
-		if (recentImport.isPresent()) {
-			logger.info("News already imported recently for {}, skipping", hashtag);
-			return recentImport.get();
-		}
 
 		NewsImportJob job = NewsImportJob.builder().locality(locality).importedAt(LocalDateTime.now())
 				.articlesImported(0).articlesDuplicate(0).status(NewsImportJob.ImportStatus.SUCCESS).build();
@@ -113,7 +110,7 @@ public class NewsImportService {
 						// Use last 30 days
 						.dateStart(NewsApiService.formatDate(LocalDate.now().minusDays(30)))
 						.dateEnd(NewsApiService.formatDate(LocalDate.now())).lang("eng") // English articles
-						.articlesPage(1).articlesCount(20) // Limit per keyword
+						.articlesPage(1).articlesCount(50) // Limit per keyword
 						.sortBy("date").sortByAsc("desc").build();
 
 				NewsApiResponse response = newsApiService.searchArticles(request);
