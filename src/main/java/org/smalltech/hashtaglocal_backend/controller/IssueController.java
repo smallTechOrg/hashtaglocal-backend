@@ -8,6 +8,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
+import org.smalltech.hashtaglocal_backend.dto.LocationMetadataDTO;
 import org.smalltech.hashtaglocal_backend.model.APIResponse;
 import org.smalltech.hashtaglocal_backend.model.Issue;
 import org.smalltech.hashtaglocal_backend.model.IssueStatusModel;
@@ -22,6 +23,8 @@ import org.smalltech.hashtaglocal_backend.model.request.IssuePatchRequest;
 import org.smalltech.hashtaglocal_backend.repository.IssueRepository;
 import org.smalltech.hashtaglocal_backend.repository.MediaRepository;
 import org.smalltech.hashtaglocal_backend.service.GCSService;
+import org.smalltech.hashtaglocal_backend.service.GoogleMapsGeocodingService;
+import org.smalltech.hashtaglocal_backend.util.LocationUtil;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.annotation.Transactional;
@@ -42,11 +45,14 @@ public class IssueController {
 	private final IssueRepository issueRepository;
 	private final MediaRepository mediaRepository;
 	private final GCSService gcsService;
+	private final GoogleMapsGeocodingService googleMapsGeocodingService;
 
-	public IssueController(IssueRepository issueRepository, MediaRepository mediaRepository, GCSService gcsService) {
+	public IssueController(IssueRepository issueRepository, MediaRepository mediaRepository, GCSService gcsService,
+			GoogleMapsGeocodingService googleMapsGeocodingService) {
 		this.issueRepository = issueRepository;
 		this.mediaRepository = mediaRepository;
 		this.gcsService = gcsService;
+		this.googleMapsGeocodingService = googleMapsGeocodingService;
 	}
 
 	@GetMapping("/{issueId}")
@@ -63,7 +69,7 @@ public class IssueController {
 
 	@PatchMapping("/{issueId}")
 	@Transactional
-	@Operation(summary = "Update issue", description = "Patch issue fields like status, type, and description.")
+	@Operation(summary = "Update issue", description = "Patch issue fields like status, type, description, and coordinates.")
 	@ApiResponse(responseCode = "200", description = "Issue patched successfully", content = @Content(mediaType = "application/json", schema = @Schema(implementation = APIResponse.class)))
 	public ResponseEntity<APIResponse> patchIssue(@PathVariable Long issueId, @RequestBody IssuePatchRequest request) {
 		if (request == null) {
@@ -90,6 +96,11 @@ public class IssueController {
 			updated = true;
 		}
 
+		if (request.getLat() != null && request.getLng() != null) {
+			updateLocationCoordinates(issueEntity, request.getLat(), request.getLng());
+			updated = true;
+		}
+
 		if (updated) {
 			issueEntity.setUpdatedAt(LocalDateTime.now());
 			issueRepository.save(issueEntity);
@@ -111,6 +122,32 @@ public class IssueController {
 			return IssueTypeModel.valueOf(type.toUpperCase(Locale.ROOT));
 		} catch (IllegalArgumentException ex) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid type value: " + type, ex);
+		}
+	}
+
+	private void updateLocationCoordinates(org.smalltech.hashtaglocal_backend.entity.IssueEntity issueEntity,
+			Double lat, Double lng) {
+		org.smalltech.hashtaglocal_backend.entity.Location locEntity = issueEntity.getLocation();
+		if (locEntity != null) {
+			// Update point with new coordinates
+			locEntity.setPoint(LocationUtil.createPoint(lat, lng));
+
+			// Fetch latest location metadata from Google Maps
+			LocationMetadataDTO metadata = googleMapsGeocodingService.reverseGeocode(lat, lng);
+			if (metadata != null) {
+				// Update location metadata
+				java.util.Map<String, Object> metadataMap = googleMapsGeocodingService.metadataToMap(metadata);
+				locEntity.setMetaData(metadataMap);
+
+				// Update location name if we have a good one
+				if (metadata.getName() != null && !metadata.getName().isEmpty()) {
+					locEntity.setName(metadata.getName());
+				} else if (metadata.getCity() != null) {
+					locEntity.setName(metadata.getCity());
+				}
+			}
+		} else {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Location data not found for issue");
 		}
 	}
 
