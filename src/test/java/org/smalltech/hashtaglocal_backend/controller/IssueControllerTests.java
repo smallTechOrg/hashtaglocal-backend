@@ -20,6 +20,7 @@ import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.Point;
 import org.locationtech.jts.geom.Polygon;
 import org.mockito.Mockito;
+import org.smalltech.hashtaglocal_backend.dto.LocationMetadataDTO;
 import org.smalltech.hashtaglocal_backend.entity.IssueEntity;
 import org.smalltech.hashtaglocal_backend.entity.Locality;
 import org.smalltech.hashtaglocal_backend.entity.Location;
@@ -33,6 +34,7 @@ import org.smalltech.hashtaglocal_backend.model.request.IssuePatchRequest;
 import org.smalltech.hashtaglocal_backend.repository.IssueRepository;
 import org.smalltech.hashtaglocal_backend.repository.MediaRepository;
 import org.smalltech.hashtaglocal_backend.service.GCSService;
+import org.smalltech.hashtaglocal_backend.service.GoogleMapsGeocodingService;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -41,6 +43,7 @@ class IssueControllerTests {
 	private IssueRepository issueRepository;
 	private MediaRepository mediaRepository;
 	private GCSService gcsService;
+	private GoogleMapsGeocodingService googleMapsGeocodingService;
 	private IssueController controller;
 
 	@BeforeEach
@@ -48,7 +51,8 @@ class IssueControllerTests {
 		issueRepository = Mockito.mock(IssueRepository.class);
 		mediaRepository = Mockito.mock(MediaRepository.class);
 		gcsService = Mockito.mock(GCSService.class);
-		controller = new IssueController(issueRepository, mediaRepository, gcsService);
+		googleMapsGeocodingService = Mockito.mock(GoogleMapsGeocodingService.class);
+		controller = new IssueController(issueRepository, mediaRepository, gcsService, googleMapsGeocodingService);
 	}
 
 	@Test
@@ -158,5 +162,52 @@ class IssueControllerTests {
 
 		assertThrows(ResponseStatusException.class, () -> controller.patchIssue(issueId, request));
 		verify(issueRepository, times(0)).save(Mockito.any());
+	}
+
+	@Test
+	void patchIssue_shouldUpdateLatLng() {
+		Long issueId = 4L;
+		LocalDateTime originalUpdatedAt = LocalDateTime.now().minusHours(2);
+
+		GeometryFactory geometryFactory = new GeometryFactory();
+		UserEntity user = UserEntity.builder().id(4L).username("bob").profilePicture("https://example.com/bob.png")
+				.locale("en_US").build();
+
+		Point oldPoint = geometryFactory.createPoint(new Coordinate(77.5, 12.5));
+		Locality locality = Locality.builder().id(1L).hashtag("Bangalore").build();
+		Location location = Location.builder().id(4L).point(oldPoint).locality(locality).name("Old Location")
+				.metaData(new HashMap<>()).build();
+
+		IssueEntity entity = IssueEntity.builder().id(issueId).type(IssueTypeModel.POTHOLE)
+				.status(IssueStatusModel.OPEN).description("Location test").location(location)
+				.createdAt(LocalDateTime.parse("2025-12-20T09:15:00")).updatedAt(originalUpdatedAt).userEntity(user)
+				.build();
+
+		// Mock Google Maps geocoding response
+		LocationMetadataDTO mockMetadata = LocationMetadataDTO.builder().name("Indiranagar, Bangalore")
+				.formattedAddress("Indiranagar, Bengaluru, Karnataka 560038, India").city("Bangalore")
+				.region("Karnataka").country("India").build();
+
+		when(issueRepository.findById(issueId)).thenReturn(Optional.of(entity));
+		when(mediaRepository.findByIssue(entity)).thenReturn(List.of());
+		when(issueRepository.save(entity)).thenReturn(entity);
+		when(googleMapsGeocodingService.reverseGeocode(12.945722, 77.675312)).thenReturn(mockMetadata);
+
+		IssuePatchRequest request = new IssuePatchRequest();
+		request.setLat(12.945722);
+		request.setLng(77.675312);
+
+		var response = controller.patchIssue(issueId, request);
+
+		assertEquals(HttpStatus.OK, response.getStatusCode());
+		assertNotNull(response.getBody());
+		assertEquals(12.945722, entity.getLocation().getPoint().getY());
+		assertEquals(77.675312, entity.getLocation().getPoint().getX());
+		assertEquals("Indiranagar, Bangalore", entity.getLocation().getName());
+		assertNotNull(entity.getLocation().getMetaData());
+		assertNotNull(entity.getUpdatedAt());
+		assertTrue(entity.getUpdatedAt().isAfter(originalUpdatedAt));
+		verify(issueRepository, times(1)).save(entity);
+		verify(googleMapsGeocodingService, times(1)).reverseGeocode(12.945722, 77.675312);
 	}
 }

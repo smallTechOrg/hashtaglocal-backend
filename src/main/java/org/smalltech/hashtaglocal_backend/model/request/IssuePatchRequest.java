@@ -7,4 +7,6 @@ public class IssuePatchRequest {
 	private String status;
 	private String type;
 	private String description;
+	private Double lat;
+	private Double lng;
 }
