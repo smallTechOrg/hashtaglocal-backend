@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Authentication Handler</title>
+</head>
+<body>
+    <h3>Processing authentication...</h3>
+    <script>
+        // Extract tokens from URL fragment (after #)
+        const fragment = window.location.hash.substring(1);
+        const params = new URLSearchParams(fragment);
+        
+        const accessToken = params.get('access_token');
+        const state = params.get('state');
+        
+        if (accessToken) {
+            // Convert fragment to query parameter and redirect
+            const redirectUrl = params.get('redirect_url') || '';
+            const queryParams = new URLSearchParams();
+            queryParams.set('access_token', accessToken);
+            if (redirectUrl) {
+                queryParams.set('redirect_url', redirectUrl);
+            }
+            
+            // Redirect to the token endpoint with query parameters
+            window.location.href = '/auth/google/token?' + queryParams.toString();
+        } else {
+            document.body.innerHTML = '<h3>Error: No access token found in URL</h3><p>Please initiate the OAuth flow again.</p>';
+        }
+    </script>
+</body>
+</html>
