@@ -29,7 +29,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestTemplate;
-import org.springframework.web.servlet.view.RedirectView;
 
 @RestController
 @RequestMapping("/auth/google")
@@ -219,19 +218,13 @@ public class GoogleAuthCallbackController {
 			AuthResponse authResponse = new AuthResponse(myAccessToken, accessExpiry, myRefreshToken, refreshExpiry,
 					user.getId(), providerEntity.getId(), googleUser.getEmail());
 
-			// 4️⃣ If redirectUrl is provided, redirect with tokens as query parameters
-			if (redirectUrl != null && !redirectUrl.isEmpty()) {
-				String finalRedirectUrl = String.format("%s?accessToken=%s&refreshToken=%s&userId=%d&email=%s",
-						redirectUrl, myAccessToken, myRefreshToken, user.getId(),
-						googleUser.getEmail() != null ? googleUser.getEmail() : "");
-				return new RedirectView(finalRedirectUrl);
-			}
-
-			// Otherwise return JSON response
+			// Always return JSON response
+			// The HTML auth-handler page will handle redirecting to the mobile app via deep
+			// link
 			return ResponseEntity.ok(authResponse);
 
 		} catch (Exception e) {
-			return ResponseEntity.status(500).body("Authentication failed: " + e.getMessage());
+			return ResponseEntity.status(401).body(Map.of("error", "Authentication failed: " + e.getMessage()));
 		}
 	}
 }

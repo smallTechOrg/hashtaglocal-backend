@@ -2,31 +2,90 @@
 <html>
 <head>
     <title>Authentication Handler</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
+        .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 20px auto; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .success { color: green; }
+        .error { color: red; }
+    </style>
 </head>
 <body>
-    <h3>Processing authentication...</h3>
+    <h2>Authenticating...</h2>
+    <div class="spinner"></div>
+    <p id="status">Processing your authentication request</p>
+
     <script>
-        // Extract tokens from URL fragment (after #)
-        const fragment = window.location.hash.substring(1);
-        const params = new URLSearchParams(fragment);
-        
-        const accessToken = params.get('access_token');
-        const state = params.get('state');
-        
-        if (accessToken) {
-            // Convert fragment to query parameter and redirect
-            const redirectUrl = params.get('redirect_url') || '';
-            const queryParams = new URLSearchParams();
-            queryParams.set('access_token', accessToken);
-            if (redirectUrl) {
-                queryParams.set('redirect_url', redirectUrl);
+        (function() {
+            // Extract access_token from URL fragment (#)
+            const fragment = window.location.hash.substring(1);
+            const fragmentParams = new URLSearchParams(fragment);
+            const accessToken = fragmentParams.get('access_token');
+            
+            // Extract redirect_url from query params (?)
+            const queryParams = new URLSearchParams(window.location.search);
+            const redirectUrl = queryParams.get('redirect_url');
+            
+            const statusEl = document.getElementById('status');
+            
+            if (!accessToken) {
+                statusEl.className = 'error';
+                statusEl.textContent = 'Error: No access token found. Please try authenticating again.';
+                return;
             }
             
-            // Redirect to the token endpoint with query parameters
-            window.location.href = '/auth/google/token?' + queryParams.toString();
-        } else {
-            document.body.innerHTML = '<h3>Error: No access token found in URL</h3><p>Please initiate the OAuth flow again.</p>';
-        }
+            // Build backend URL
+            let backendUrl = 'auth/google/token?access_token=' + encodeURIComponent(accessToken);
+            if (redirectUrl) {
+                backendUrl += '&redirect_url=' + encodeURIComponent(redirectUrl);
+            }
+            
+            // Call backend to authenticate
+            fetch(backendUrl)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('HTTP ' + response.status);
+                    }
+                    return response.json();
+                })
+                .then(authData => {
+                    statusEl.className = 'success';
+                    statusEl.textContent = 'Authentication successful! Redirecting to app...';
+                    
+                    // Build deep link with auth tokens
+                    const deepLink = `hashtaglocal://auth/callback?` +
+                        `access_token=${encodeURIComponent(authData.access_token)}` +
+                        `&refresh_token=${encodeURIComponent(authData.refresh_token)}` +
+                        `&user_id=${authData.user_id}` +
+                        `&email=${encodeURIComponent(authData.email)}` +
+                        `&provider_id=${authData.provider_id}`;
+                    
+                    // Store data in sessionStorage as backup
+                    sessionStorage.setItem('authData', JSON.stringify(authData));
+                    
+                    // Attempt to open deep link
+                    const timeout = setTimeout(() => {
+                        // Fallback if app doesn't open - try custom scheme
+                        console.log('App did not respond, trying fallback...');
+                    }, 500);
+                    
+                    // Try to open the deep link
+                    window.location.href = deepLink;
+                    
+                    // Clear timeout if deep link worked
+                    setTimeout(() => {
+                        clearTimeout(timeout);
+                        // If we're still here after 3 seconds, deep link didn't work
+                        // Try to close this window
+                        window.close();
+                    }, 3000);
+                })
+                .catch(error => {
+                    statusEl.className = 'error';
+                    statusEl.textContent = 'Authentication failed: ' + error.message + '. Please try again.';
+                    console.error('Auth error:', error);
+                });
+        })();
     </script>
 </body>
 </html>
