@@ -24,6 +24,12 @@ spring:
     init:
       mode: always
 
+google:
+  oauth:
+    client-id: <client-id for your auth>
+    client-secret: <client-secret for your auth>
+    redirect-uri: <redirect-uri for your auth>
+
 logging:
   level:
     root: INFO
