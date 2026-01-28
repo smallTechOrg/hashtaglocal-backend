@@ -61,7 +61,8 @@ public class GoogleAuthCallbackController {
 
 	@GetMapping("/callback")
 	@Operation(summary = "Google OAuth callback")
-	public ResponseEntity<?> googleCallback(@RequestParam("code") String code) throws IOException {
+	public ResponseEntity<?> googleCallback(@RequestParam("code") String code, 
+			@RequestParam(value = "code_verifier", required = false) String codeVerifier) throws IOException {
 
 		// 1️⃣ Exchange code → tokens
 		RestTemplate restTemplate = new RestTemplate();
@@ -72,6 +73,11 @@ public class GoogleAuthCallbackController {
 		body.add("client_secret", clientSecret);
 		body.add("redirect_uri", redirectUri);
 		body.add("grant_type", "authorization_code");
+		
+		// Add code_verifier if PKCE was used
+		if (codeVerifier != null && !codeVerifier.isEmpty()) {
+			body.add("code_verifier", codeVerifier);
+		}
 
 		@SuppressWarnings("unchecked")
 		Map<String, Object> tokenResponse = restTemplate.postForObject(TOKEN_URL, body, Map.class);
