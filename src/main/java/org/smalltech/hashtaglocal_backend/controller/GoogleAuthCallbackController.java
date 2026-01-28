@@ -1,11 +1,16 @@
 package org.smalltech.hashtaglocal_backend.controller;
 
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
+import com.google.api.client.http.javanet.NetHttpTransport;
+import com.google.api.client.json.jackson2.JacksonFactory;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Optional;
-
 import org.smalltech.hashtaglocal_backend.entity.UserAuthProviderEntity;
 import org.smalltech.hashtaglocal_backend.entity.UserAuthSessionEntity;
 import org.smalltech.hashtaglocal_backend.entity.UserEntity;
@@ -23,14 +28,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestTemplate;
-
-import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
-import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
-import com.google.api.client.http.javanet.NetHttpTransport;
-import com.google.api.client.json.jackson2.JacksonFactory;
-
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.tags.Tag;
 
 @RestController
 @RequestMapping("/auth/google")
@@ -54,8 +51,8 @@ public class GoogleAuthCallbackController {
 	private final TokenService tokenService;
 
 	public GoogleAuthCallbackController(UserRepository userRepository,
-			UserAuthProviderRepository userAuthProviderRepository,
-			UserAuthSessionRepository userAuthSessionRepository, TokenService tokenService) {
+			UserAuthProviderRepository userAuthProviderRepository, UserAuthSessionRepository userAuthSessionRepository,
+			TokenService tokenService) {
 		this.userRepository = userRepository;
 		this.userAuthProviderRepository = userAuthProviderRepository;
 		this.userAuthSessionRepository = userAuthSessionRepository;
@@ -111,23 +108,23 @@ public class GoogleAuthCallbackController {
 		// 4️⃣ Find or create provider + user
 		String providerType = "google";
 		Optional<UserAuthProviderEntity> existingProvider = userAuthProviderRepository
-			.findByProviderTypeAndProviderUserId(providerType, googleUserId);
+				.findByProviderTypeAndProviderUserId(providerType, googleUserId);
 
 		UserAuthProviderEntity providerEntity;
 		UserEntity user;
 
 		if (existingProvider.isPresent()) {
-		    providerEntity = existingProvider.get();
-		    user = providerEntity.getUser();
+			providerEntity = existingProvider.get();
+			user = providerEntity.getUser();
 		} else {
-		    // create new user (minimal) and provider
-		    user = UserEntity.builder().username(email != null ? email : "user-" + googleUserId)
-			    .locale("en").profilePicture(picture).build();
-		    user = userRepository.save(user);
+			// create new user (minimal) and provider
+			user = UserEntity.builder().username(email != null ? email : "user-" + googleUserId).locale("en")
+					.profilePicture(picture).build();
+			user = userRepository.save(user);
 
-		    providerEntity = UserAuthProviderEntity.builder().user(user).providerType(providerType)
-			    .providerUserId(googleUserId).email(email).build();
-		    providerEntity = userAuthProviderRepository.save(providerEntity);
+			providerEntity = UserAuthProviderEntity.builder().user(user).providerType(providerType)
+					.providerUserId(googleUserId).email(email).build();
+			providerEntity = userAuthProviderRepository.save(providerEntity);
 		}
 
 		// 5️⃣ Create session + tokens
@@ -136,14 +133,14 @@ public class GoogleAuthCallbackController {
 		long accessExpiry = tokenService.accessExpiryEpochSeconds();
 		long refreshExpiry = tokenService.refreshExpiryEpochSeconds();
 
-		UserAuthSessionEntity session = UserAuthSessionEntity.builder().userAuthProvider(providerEntity)
-			.deviceId(null).user(user).accessToken(accessToken).accessTokenExpiryTs(accessExpiry)
-			.refreshToken(refreshToken).refreshTokenExpiryTs(refreshExpiry).isActive(true).build();
+		UserAuthSessionEntity session = UserAuthSessionEntity.builder().userAuthProvider(providerEntity).deviceId(null)
+				.user(user).accessToken(accessToken).accessTokenExpiryTs(accessExpiry).refreshToken(refreshToken)
+				.refreshTokenExpiryTs(refreshExpiry).isActive(true).build();
 
 		session = userAuthSessionRepository.save(session);
 
 		AuthResponse authResponse = new AuthResponse(accessToken, accessExpiry, refreshToken, refreshExpiry,
-			user.getId(), providerEntity.getId());
+				user.getId(), providerEntity.getId());
 
 		return ResponseEntity.ok(authResponse);
 	}
