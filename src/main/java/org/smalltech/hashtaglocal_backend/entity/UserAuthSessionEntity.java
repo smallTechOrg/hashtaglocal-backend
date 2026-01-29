@@ -18,25 +18,37 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 @Entity
-@Table(name = "users")
+@Table(name = "user_auth_sessions")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class UserEntity {
+public class UserAuthSessionEntity {
 
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	private Long id;
 
-	// Human-readable issue key (optional)
-	@Column(unique = true, length = 100)
-	private String username;
+	@ManyToOne(fetch = FetchType.LAZY)
+	@JoinColumn(name = "user_auth_provider_id", nullable = false)
+	private UserAuthProviderEntity userAuthProvider;
 
-	private String profilePicture;
+	@Column(length = 2000)
+	private String deviceId;
 
-	@Column(nullable = false, length = 100)
-	private String locale;
+	@ManyToOne(fetch = FetchType.LAZY)
+	@JoinColumn(name = "user_id", nullable = false)
+	private UserEntity user;
+
+	@Column(columnDefinition = "text")
+	private String accessToken;
+
+	private Long accessTokenExpiryTs;
+
+	@Column(columnDefinition = "text")
+	private String refreshToken;
+
+	private Long refreshTokenExpiryTs;
 
 	@CreationTimestamp
 	@Column(nullable = false, updatable = false)
@@ -46,8 +58,7 @@ public class UserEntity {
 	@Column(nullable = false)
 	private LocalDateTime updatedAt;
 
-	// Primary location of the user
-	@ManyToOne(fetch = FetchType.LAZY)
-	@JoinColumn(name = "location_id")
-	private Location location;
+	@Builder.Default
+	@Column(nullable = false)
+	private Boolean isActive = true;
 }
