@@ -48,20 +48,23 @@
                     }
                     return response.json();
                 })
-                .then(authData => {
+                .then(authResponse => {
                     statusEl.className = 'success';
                     statusEl.textContent = 'Authentication successful! Redirecting to app...';
                     
+                    const authData = authResponse.data;
+
                     // Build deep link with auth tokens
-                    const deepLink = `hashtaglocal://auth/callback?` +
-                        `access_token=${encodeURIComponent(authData.access_token)}` +
-                        `&refresh_token=${encodeURIComponent(authData.refresh_token)}` +
-                        `&user_id=${authData.user_id}` +
-                        `&email=${encodeURIComponent(authData.email)}` +
-                        `&provider_id=${authData.provider_id}`;
+                    const deepLink = `hashtaglocalfrontend://auth/callback?` +
+                        `access_token=${encodeURIComponent(authData.access_token.value)}` +
+                        `&refresh_token=${encodeURIComponent(authData.refresh_token.value)}` +
+                        `&access_expiry=${authData.access_token.expiry}` +
+                        `&refresh_expiry=${authData.refresh_token.expiry}`;
+                    
+                    console.log(deepLink)
                     
                     // Store data in sessionStorage as backup
-                    sessionStorage.setItem('authData', JSON.stringify(authData));
+                    sessionStorage.setItem('authData', JSON.stringify(authResponse));
                     
                     // Attempt to open deep link
                     const timeout = setTimeout(() => {
