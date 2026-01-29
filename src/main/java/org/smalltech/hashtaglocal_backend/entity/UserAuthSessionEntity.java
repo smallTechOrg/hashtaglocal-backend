@@ -33,33 +33,32 @@ public class UserAuthSessionEntity {
 	@JoinColumn(name = "user_auth_provider_id", nullable = false)
 	private UserAuthProviderEntity userAuthProvider;
 
-	@Column(name = "device_id", length = 200)
+	@Column(length = 2000)
 	private String deviceId;
 
 	@ManyToOne(fetch = FetchType.LAZY)
 	@JoinColumn(name = "user_id", nullable = false)
 	private UserEntity user;
 
-	@Column(name = "access_token", columnDefinition = "text")
+	@Column(columnDefinition = "text")
 	private String accessToken;
 
-	@Column(name = "access_token_expiry_ts")
 	private Long accessTokenExpiryTs;
 
-	@Column(name = "refresh_token", columnDefinition = "text")
+	@Column(columnDefinition = "text")
 	private String refreshToken;
 
-	@Column(name = "refresh_token_expiry_ts")
 	private Long refreshTokenExpiryTs;
 
 	@CreationTimestamp
-	@Column(name = "created_at", nullable = false, updatable = false)
+	@Column(nullable = false, updatable = false)
 	private LocalDateTime createdAt;
 
 	@UpdateTimestamp
-	@Column(name = "updated_at", nullable = false)
+	@Column(nullable = false)
 	private LocalDateTime updatedAt;
 
-	@Column(name = "is_active", nullable = false)
+	@Builder.Default
+	@Column(nullable = false)
 	private Boolean isActive = true;
 }

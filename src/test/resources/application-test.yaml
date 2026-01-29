@@ -2,8 +2,8 @@ spring:
   datasource:
     url: jdbc:postgresql://localhost:5432/hashtaglocaltest
     driver-class-name: org.postgresql.Driver
-    username: username
-    password: password
+    username: postgres
+    password: Postgres
 
   jpa:
     hibernate:
@@ -13,13 +13,6 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
-
-# Google OAuth Configuration for tests
-google:
-  oauth:
-    client-id: test-client-id
-    client-secret: test-client-secret
-    redirect-uri: http://localhost:8080/auth/google/callback
 
 # NewsAPI configuration for tests
 newsapi:
