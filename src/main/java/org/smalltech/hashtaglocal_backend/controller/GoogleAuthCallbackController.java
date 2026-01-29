@@ -14,8 +14,10 @@ import java.util.Optional;
 import org.smalltech.hashtaglocal_backend.entity.UserAuthProviderEntity;
 import org.smalltech.hashtaglocal_backend.entity.UserAuthSessionEntity;
 import org.smalltech.hashtaglocal_backend.entity.UserEntity;
-import org.smalltech.hashtaglocal_backend.model.AuthResponse;
+import org.smalltech.hashtaglocal_backend.model.APIResponse;
 import org.smalltech.hashtaglocal_backend.model.GoogleUserResponse;
+import org.smalltech.hashtaglocal_backend.model.ResponseData;
+import org.smalltech.hashtaglocal_backend.model.TokenResponse;
 import org.smalltech.hashtaglocal_backend.repository.UserAuthProviderRepository;
 import org.smalltech.hashtaglocal_backend.repository.UserAuthSessionRepository;
 import org.smalltech.hashtaglocal_backend.repository.UserRepository;
@@ -147,10 +149,16 @@ public class GoogleAuthCallbackController {
 
 		session = userAuthSessionRepository.save(session);
 
-		AuthResponse authResponse = new AuthResponse(accessToken, accessExpiry, refreshToken, refreshExpiry,
-				user.getId(), providerEntity.getId(), providerEntity.getEmail());
+		TokenResponse accessTkn = TokenResponse.builder().value(accessToken).expiry(accessExpiry).build();
+		TokenResponse refreshTkn = TokenResponse.builder().value(refreshToken).expiry(refreshExpiry).build();
 
-		return ResponseEntity.ok(authResponse);
+		ResponseData data = ResponseData.builder().accessToken(accessTkn).refreshToken(refreshTkn).build();
+
+		APIResponse finalResponse = APIResponse.builder().data(data).build();
+		// Always return JSON response
+		// The HTML auth-handler page will handle redirecting to the mobile app via deep
+		// link
+		return ResponseEntity.ok(finalResponse);
 	}
 
 	@GetMapping("/token")
@@ -215,13 +223,16 @@ public class GoogleAuthCallbackController {
 
 			session = userAuthSessionRepository.save(session);
 
-			AuthResponse authResponse = new AuthResponse(myAccessToken, accessExpiry, myRefreshToken, refreshExpiry,
-					user.getId(), providerEntity.getId(), googleUser.getEmail());
+			TokenResponse accessTkn = TokenResponse.builder().value(myAccessToken).expiry(accessExpiry).build();
+			TokenResponse refreshTkn = TokenResponse.builder().value(myRefreshToken).expiry(refreshExpiry).build();
 
+			ResponseData data = ResponseData.builder().accessToken(accessTkn).refreshToken(refreshTkn).build();
+
+			APIResponse finalResponse = APIResponse.builder().data(data).build();
 			// Always return JSON response
 			// The HTML auth-handler page will handle redirecting to the mobile app via deep
 			// link
-			return ResponseEntity.ok(authResponse);
+			return ResponseEntity.ok(finalResponse);
 
 		} catch (Exception e) {
 			return ResponseEntity.status(401).body(Map.of("error", "Authentication failed: " + e.getMessage()));
