@@ -16,4 +16,5 @@ public class ResponseData {
 	private Long issueId;
 	private TokenResponse refreshToken;
 	private TokenResponse accessToken;
+	private UserProfileModel user;
 }
