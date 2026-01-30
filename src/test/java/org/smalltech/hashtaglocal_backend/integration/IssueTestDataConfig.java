@@ -1,9 +1,10 @@
 package org.smalltech.hashtaglocal_backend.integration;
 
+// ...existing imports...
+
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
-import lombok.RequiredArgsConstructor;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.Point;
@@ -26,7 +27,6 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.transaction.annotation.Transactional;
 
 @TestConfiguration
-@RequiredArgsConstructor
 public class IssueTestDataConfig implements CommandLineRunner {
 
 	private final IssueRepository issueRepository;
@@ -35,20 +35,29 @@ public class IssueTestDataConfig implements CommandLineRunner {
 	private final LocationRepository locationRepository;
 	private final MediaRepository mediaRepository;
 
+	public IssueTestDataConfig(IssueRepository issueRepository, UserRepository userRepository,
+			LocalityRepository localityRepository, LocationRepository locationRepository,
+			MediaRepository mediaRepository) {
+		this.issueRepository = issueRepository;
+		this.userRepository = userRepository;
+		this.localityRepository = localityRepository;
+		this.locationRepository = locationRepository;
+		this.mediaRepository = mediaRepository;
+	}
+
 	@Override
 	@Transactional
 	public void run(String... args) {
-		// Only insert if table is empty
 		if (issueRepository.count() == 0) {
 			// Create user
 			UserEntity user = UserEntity.builder().username("john_doe")
 					.profilePicture("https://example.com/profile.jpg").locale("en_US").build();
 			user = userRepository.save(user);
 
-			// Create or get default #world locality (ID 1) - universal fallback
 			GeometryFactory geometryFactory = new GeometryFactory();
+
+			// Create or get default #world locality (ID 1) - universal fallback
 			Locality defaultWorldLocality = localityRepository.findById(1L).orElseGet(() -> {
-				// World-wide polygon (covering major parts of Earth)
 				Polygon worldPolygon = geometryFactory
 						.createPolygon(new Coordinate[]{new Coordinate(-180, -90), new Coordinate(180, -90),
 								new Coordinate(180, 90), new Coordinate(-180, 90), new Coordinate(-180, -90)});
@@ -56,6 +65,14 @@ public class IssueTestDataConfig implements CommandLineRunner {
 						.build();
 				return localityRepository.save(newLocality);
 			});
+
+			// Create Jaipur locality
+			Polygon jaipurPolygon = geometryFactory
+					.createPolygon(new Coordinate[]{new Coordinate(75.7, 26.8), new Coordinate(75.9, 26.8),
+							new Coordinate(75.9, 27.0), new Coordinate(75.7, 27.0), new Coordinate(75.7, 26.8)});
+			Locality jaipurLocality = Locality.builder().hashtag("Jaipur").name("Jaipur").geoBoundary(jaipurPolygon)
+					.build();
+			jaipurLocality = localityRepository.save(jaipurLocality);
 
 			// Create location with JTS Point and use default #world locality
 			Point point = geometryFactory.createPoint(new Coordinate(56.78, 12.34));
@@ -67,7 +84,12 @@ public class IssueTestDataConfig implements CommandLineRunner {
 					.name("Sector 3, Jawahar Nagar").metaData(metaData).build();
 			location = locationRepository.save(location);
 
-			// Create issue 1 - older issue
+			// Create Jaipur location
+			Location jaipurLocation = Location.builder().point(point).locality(jaipurLocality)
+					.name("Sector 3, Jawahar Nagar").metaData(metaData).build();
+			jaipurLocation = locationRepository.save(jaipurLocation);
+
+			// Create issue 1 - older issue (world)
 			IssueEntity issue1 = IssueEntity.builder().key("JPR-001").type(IssueTypeModel.POTHOLE)
 					.status(IssueStatusModel.OPEN).description("Large pothole causing traffic issues")
 					.createdAt(LocalDateTime.parse("2025-12-25T10:00:00"))
@@ -84,7 +106,7 @@ public class IssueTestDataConfig implements CommandLineRunner {
 					.url("https://nub.news/api/image/526263/article.png").location(location).build();
 			mediaRepository.save(media2);
 
-			// Create issue 2 - newer issue
+			// Create issue 2 - newer issue (world)
 			IssueEntity issue2 = IssueEntity.builder().key("JPR-002").type(IssueTypeModel.POTHOLE)
 					.status(IssueStatusModel.OPEN).description("Large pothole causing traffic issues")
 					.createdAt(LocalDateTime.parse("2025-12-26T18:00:00"))
@@ -101,7 +123,7 @@ public class IssueTestDataConfig implements CommandLineRunner {
 					.url("https://nub.news/api/image/526263/article.png").location(location).build();
 			mediaRepository.save(media4);
 
-			// Create issue 3 - ONHOLD issue (newest)
+			// Create issue 3 - ONHOLD issue (world, newest)
 			IssueEntity issue3 = IssueEntity.builder().key("JPR-003").type(IssueTypeModel.WASTE)
 					.status(IssueStatusModel.ONHOLD).description("Garbage pile needs attention")
 					.createdAt(LocalDateTime.parse("2025-12-27T12:00:00"))
@@ -112,6 +134,18 @@ public class IssueTestDataConfig implements CommandLineRunner {
 			MediaEntity media5 = MediaEntity.builder().issue(issue3).type(MediaTypeModel.PHOTO)
 					.url("https://example.com/waste-photo.jpg").location(location).build();
 			mediaRepository.save(media5);
+
+			// Create issue 4 - Jaipur locality
+			IssueEntity jaipurIssue = IssueEntity.builder().key("JPR-004").type(IssueTypeModel.POTHOLE)
+					.status(IssueStatusModel.OPEN).description("Jaipur pothole issue")
+					.createdAt(LocalDateTime.parse("2025-12-28T09:00:00"))
+					.updatedAt(LocalDateTime.parse("2025-12-28T09:00:00")).userEntity(user).location(jaipurLocation)
+					.build();
+			jaipurIssue = issueRepository.save(jaipurIssue);
+
+			MediaEntity jaipurMedia = MediaEntity.builder().issue(jaipurIssue).type(MediaTypeModel.PHOTO)
+					.url("https://example.com/jaipur-pothole.jpg").location(jaipurLocation).build();
+			mediaRepository.save(jaipurMedia);
 		}
 	}
 }

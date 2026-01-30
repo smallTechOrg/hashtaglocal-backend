@@ -22,6 +22,7 @@ import org.smalltech.hashtaglocal_backend.service.GCSService;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -42,19 +43,19 @@ public class IssueHomeController {
 	}
 
 	@GetMapping
-	@Operation(summary = "Get issue Home", description = "Returns a List of issues with user, location, locality and viewer context.")
+	@Operation(summary = "Get issue Home", description = "Returns a List of issues with user, location, locality and viewer context. Optionally filter by locality hashtag.")
 	@ApiResponse(responseCode = "200", description = "Successful issue response", content = @Content(mediaType = "application/json", schema = @Schema(implementation = APIResponse.class)))
-	public APIResponse getIssues() {
-		// Calculate date 4 months ago from now
+	public APIResponse getIssues(@RequestParam(value = "locality", required = false) String localityHashtag) {
 		LocalDateTime fourMonthsAgo = LocalDateTime.now().minusMonths(6);
-
-		// Fetch OPEN and ONHOLD issues from the last 4 months, ordered by creation date
-		List<org.smalltech.hashtaglocal_backend.entity.IssueEntity> issueEntities = issueRepository
-				.findByStatusInAndCreatedAtAfterOrderByCreatedAtDesc(
-						List.of(IssueStatusModel.OPEN, IssueStatusModel.ONHOLD), fourMonthsAgo);
-
+		List<org.smalltech.hashtaglocal_backend.entity.IssueEntity> issueEntities;
+		if (localityHashtag != null && !localityHashtag.isBlank()) {
+			issueEntities = issueRepository.findByStatusInAndCreatedAtAfterAndLocalityHashtagOrderByCreatedAtDesc(
+					List.of(IssueStatusModel.OPEN, IssueStatusModel.ONHOLD), fourMonthsAgo, localityHashtag);
+		} else {
+			issueEntities = issueRepository.findByStatusInAndCreatedAtAfterOrderByCreatedAtDesc(
+					List.of(IssueStatusModel.OPEN, IssueStatusModel.ONHOLD), fourMonthsAgo);
+		}
 		List<Issue> issues = issueEntities.stream().map(this::mapToIssue).toList();
-
 		ResponseData data = ResponseData.builder().issues(issues).build();
 		return APIResponse.builder().data(data).build();
 	}
