@@ -32,6 +32,9 @@ public class ProfileController {
 	@GetMapping()
 	public ResponseEntity<APIResponse> getMyProfile(@RequestHeader(value = "Authorization") String authorization) {
 
+		System.out.println("➡️ /account/profile called");
+		System.out.println("Authorization header: " + authorization);
+
 		String accessToken = extractBearerToken(authorization);
 
 		if (accessToken == null) {
