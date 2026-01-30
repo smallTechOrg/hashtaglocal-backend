@@ -32,4 +32,10 @@ public interface IssueRepository extends JpaRepository<IssueEntity, Long> {
 	@Query("SELECT i FROM IssueEntity i WHERE i.status IN :statuses AND i.createdAt >= :startDate ORDER BY i.createdAt DESC")
 	List<IssueEntity> findByStatusInAndCreatedAtAfterOrderByCreatedAtDesc(
 			@Param("statuses") List<IssueStatusModel> statuses, @Param("startDate") LocalDateTime startDate);
+
+	@EntityGraph(attributePaths = {"userEntity", "location", "location.locality"})
+	@Query("SELECT i FROM IssueEntity i WHERE i.status IN :statuses AND i.createdAt >= :startDate AND LOWER(i.location.locality.hashtag) = LOWER(:localityHashtag) ORDER BY i.createdAt DESC")
+	List<IssueEntity> findByStatusInAndCreatedAtAfterAndLocalityHashtagOrderByCreatedAtDesc(
+			@Param("statuses") List<IssueStatusModel> statuses, @Param("startDate") LocalDateTime startDate,
+			@Param("localityHashtag") String localityHashtag);
 }
