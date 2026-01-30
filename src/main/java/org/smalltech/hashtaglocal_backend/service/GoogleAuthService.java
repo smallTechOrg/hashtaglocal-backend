@@ -85,7 +85,7 @@ public class GoogleAuthService {
 
 		GoogleIdToken.Payload payload = verifyIdToken(idTokenString);
 
-		return loginOrSignup(payload.getSubject(), payload.getEmail(), (String) payload.get("picture"));
+		return loginOrSignup(payload.getSubject(), payload.getEmail(), (String) payload.get("picture"), (String) payload.get("name"));
 	}
 
 	/*
@@ -102,7 +102,7 @@ public class GoogleAuthService {
 		GoogleUserResponse googleUser = restTemplate.getForObject(USERINFO_URL + "?access_token=" + accessToken,
 				GoogleUserResponse.class);
 
-		return loginOrSignup(googleUser.getId(), googleUser.getEmail(), googleUser.getPicture());
+		return loginOrSignup(googleUser.getId(), googleUser.getEmail(), googleUser.getPicture(), googleUser.getName());
 	}
 
 	/*
@@ -110,7 +110,7 @@ public class GoogleAuthService {
 	 * ===============================
 	 */
 
-	private APIResponse loginOrSignup(String providerUserId, String email, String picture) {
+	private APIResponse loginOrSignup(String providerUserId, String email, String picture, String name) {
 
 		System.out.println("👤 Google userId: " + providerUserId);
 
@@ -128,7 +128,15 @@ public class GoogleAuthService {
 		} else {
 			System.out.println("🆕 Creating new user");
 
-			user = userRepository.save(UserEntity.builder().username(email != null ? email : "google-" + providerUserId)
+			String baseUsername = normalizeUsername(
+					name != null
+							? name
+							: (email != null ? email.split("@")[0] : "google")
+			);
+
+			String uniqueUsername = generateUniqueUsername(baseUsername);
+
+			user = userRepository.save(UserEntity.builder().username(uniqueUsername)
 					.locale("en").profilePicture(picture).build());
 
 			System.out.println("✅ User saved | ID: " + user.getId());
@@ -165,6 +173,42 @@ public class GoogleAuthService {
 				.refreshToken(
 						TokenResponse.builder().value(refreshToken).expiry(session.getRefreshTokenExpiryTs()).build())
 				.build()).build();
+	}
+
+	/*
+	 * =============================== USERNAME HELPERS
+	 * ===============================
+	 */
+	private String normalizeUsername(String name) {
+
+		if (name == null || name.isBlank()) {
+			return "user";
+		}
+
+		return name
+				.toLowerCase()
+				.replaceAll("\\s+", "")
+				.replaceAll("[^a-z0-9]", "");
+	}
+
+	private String generateUniqueUsername(String baseUsername) {
+
+		String username = baseUsername;
+		int attempt = 0;
+
+		while (userRepository.findByUsername(username).isPresent()) {
+
+			int random = 100 + (int) (Math.random() * 900);
+			username = baseUsername + random;
+			attempt++;
+
+			if (attempt > 3) {
+				username = baseUsername + (System.currentTimeMillis() % 100000);
+				break;
+			}
+		}
+
+		return username;
 	}
 
 	/*
