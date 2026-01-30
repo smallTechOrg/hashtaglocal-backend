@@ -85,7 +85,8 @@ public class GoogleAuthService {
 
 		GoogleIdToken.Payload payload = verifyIdToken(idTokenString);
 
-		return loginOrSignup(payload.getSubject(), payload.getEmail(), (String) payload.get("picture"), (String) payload.get("name"));
+		return loginOrSignup(payload.getSubject(), payload.getEmail(), (String) payload.get("picture"),
+				(String) payload.get("name"));
 	}
 
 	/*
@@ -129,15 +130,12 @@ public class GoogleAuthService {
 			System.out.println("🆕 Creating new user");
 
 			String baseUsername = normalizeUsername(
-					name != null
-							? name
-							: (email != null ? email.split("@")[0] : "google")
-			);
+					name != null ? name : (email != null ? email.split("@")[0] : "google"));
 
 			String uniqueUsername = generateUniqueUsername(baseUsername);
 
-			user = userRepository.save(UserEntity.builder().username(uniqueUsername)
-					.locale("en").profilePicture(picture).build());
+			user = userRepository
+					.save(UserEntity.builder().username(uniqueUsername).locale("en").profilePicture(picture).build());
 
 			System.out.println("✅ User saved | ID: " + user.getId());
 
@@ -185,10 +183,7 @@ public class GoogleAuthService {
 			return "user";
 		}
 
-		return name
-				.toLowerCase()
-				.replaceAll("\\s+", "")
-				.replaceAll("[^a-z0-9]", "");
+		return name.toLowerCase().replaceAll("\\s+", "").replaceAll("[^a-z0-9]", "");
 	}
 
 	private String generateUniqueUsername(String baseUsername) {
