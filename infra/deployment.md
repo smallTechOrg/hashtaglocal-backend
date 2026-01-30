@@ -273,7 +273,15 @@ gcloud compute ssh hashtaglocalbackend --zone=us-central1-f \
 
 # Check logs
 gcloud compute ssh hashtaglocalbackend --zone=us-central1-f \
-  --command="sudo journalctl -u hashtaglocal-backend -n 100"
+  --command="sudo journalctl -u hashtaglocal-backend -f"
+```
+
+# VM Commands 
+
+For memory
+```
+free | grep Mem | awk '{print $3/$2 * 100.0"%"}'
+df -h
 ```
 
 ### Database Connection (from VM)
