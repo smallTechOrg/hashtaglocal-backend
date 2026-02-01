@@ -7,6 +7,6 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface UserAuthSessionRepository extends JpaRepository<UserAuthSessionEntity, Long> {
-
 	Optional<UserAuthSessionEntity> findByAccessToken(String accessToken);
+	Optional<UserAuthSessionEntity> findByRefreshToken(String refreshToken);
 }

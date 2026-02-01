@@ -88,3 +88,9 @@ geonames:
 # NewsAPI.ai Configuration
 newsapi:
   api-key: ${NEWSAPI_API_KEY:}
+
+auth:
+  access-token:
+    expiry-seconds: ${AUTH_ACCESS_TOKEN_EXPIRY_SECONDS:10}
+  refresh-token:
+    expiry-seconds: ${AUTH_REFRESH_TOKEN_EXPIRY_SECONDS:30}
