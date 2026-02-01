@@ -38,4 +38,12 @@ public interface IssueRepository extends JpaRepository<IssueEntity, Long> {
 	List<IssueEntity> findByStatusInAndCreatedAtAfterAndLocalityHashtagOrderByCreatedAtDesc(
 			@Param("statuses") List<IssueStatusModel> statuses, @Param("startDate") LocalDateTime startDate,
 			@Param("localityHashtag") String localityHashtag);
+
+	@Query(value = "SELECT i.* FROM issues i " + "INNER JOIN locations l ON i.location_id = l.id "
+			+ "WHERE i.status IN :statuses " + "AND i.created_at >= :startDate "
+			+ "AND ST_DWithin(l.point::geography, ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography, :radiusMeters) "
+			+ "ORDER BY i.created_at DESC", nativeQuery = true)
+	List<IssueEntity> findByStatusInAndCreatedAtAfterAndWithinRadius(@Param("statuses") List<String> statuses,
+			@Param("startDate") LocalDateTime startDate, @Param("lat") double lat, @Param("lng") double lng,
+			@Param("radiusMeters") double radiusMeters);
 }
