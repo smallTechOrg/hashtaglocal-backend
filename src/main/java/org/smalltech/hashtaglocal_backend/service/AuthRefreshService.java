@@ -35,12 +35,13 @@ public class AuthRefreshService {
 
 		UserAuthSessionEntity session = sessionOpt.get();
 
-		// Check access token expiry
-		long currentEpochSeconds = tokenService.nowEpochSeconds();
-		if (session.getAccessTokenExpiryTs() > currentEpochSeconds) {
-			System.out.println(" Access token is still active, refresh not needed");
-			throw new RuntimeException("Access token is still active. Refresh not required at this time");
+		// Check if session is active
+		if (!session.getIsActive()) {
+			System.out.println(" Session is inactive");
+			throw new RuntimeException("Session is inactive");
 		}
+
+		long currentEpochSeconds = tokenService.nowEpochSeconds();
 
 		// Check if refresh token is expired
 		if (session.getRefreshTokenExpiryTs() < currentEpochSeconds) {
@@ -48,13 +49,20 @@ public class AuthRefreshService {
 			throw new RuntimeException("Refresh token has expired");
 		}
 
-		// Check if session is active
-		if (!session.getIsActive()) {
-			System.out.println(" Session is inactive");
-			throw new RuntimeException("Session is inactive");
-		}
-
 		System.out.println(" Valid refresh token found | Session ID: " + session.getId());
+
+		// Check access token expiry
+		if (session.getAccessTokenExpiryTs() > currentEpochSeconds) {
+			System.out.println(" Access token is still active, returning existing tokens");
+			return APIResponse.builder()
+					.data(ResponseData.builder()
+							.accessToken(TokenResponse.builder().value(session.getAccessToken())
+									.expiry(session.getAccessTokenExpiryTs()).build())
+							.refreshToken(TokenResponse.builder().value(session.getRefreshToken())
+									.expiry(session.getRefreshTokenExpiryTs()).build())
+							.build())
+					.build();
+		}
 
 		// Generate new tokens
 		String newAccessToken = tokenService.generateToken();
