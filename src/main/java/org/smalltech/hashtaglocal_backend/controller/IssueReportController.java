@@ -17,9 +17,9 @@ import org.smalltech.hashtaglocal_backend.repository.IssueRepository;
 import org.smalltech.hashtaglocal_backend.repository.LocalityRepository;
 import org.smalltech.hashtaglocal_backend.repository.LocationRepository;
 import org.smalltech.hashtaglocal_backend.repository.MediaRepository;
-import org.smalltech.hashtaglocal_backend.repository.UserRepository;
 import org.smalltech.hashtaglocal_backend.util.LocationUtil;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -33,33 +33,26 @@ public class IssueReportController {
 	private final IssueRepository issueRepository;
 	private final LocationRepository locationRepository;
 	private final MediaRepository mediaRepository;
-	private final UserRepository userRepository;
 	private final LocalityRepository localityRepository;
 
 	public IssueReportController(IssueRepository issueRepository, LocationRepository locationRepository,
-			MediaRepository mediaRepository, UserRepository userRepository, LocalityRepository localityRepository) {
+			MediaRepository mediaRepository, LocalityRepository localityRepository) {
 		this.issueRepository = issueRepository;
 		this.locationRepository = locationRepository;
 		this.mediaRepository = mediaRepository;
-		this.userRepository = userRepository;
 		this.localityRepository = localityRepository;
 	}
 
 	@PostMapping
 	@Transactional
-	public ResponseEntity<APIResponse> createIssue(@RequestBody IssueReportRequest request) {
+	public ResponseEntity<APIResponse> createIssue(@AuthenticationPrincipal UserEntity user,
+			@RequestBody IssueReportRequest request) {
 
 		var issueReq = request.getIssue();
 		// Get default #world locality (ID 1)
 		var defaultLocality = localityRepository.findById(1L).orElse(null);
 		var issueLocality = resolveLocality(issueReq.getLocation().getLat(), issueReq.getLocation().getLng(),
 				defaultLocality);
-
-		// Get default admin user (User 1) or first user
-		UserEntity user = userRepository.findById(1L).orElseGet(() -> {
-			var allUsers = userRepository.findAll();
-			return allUsers.isEmpty() ? null : allUsers.get(0);
-		});
 
 		// Save issue location
 		Location issueLocation = Location.builder()
