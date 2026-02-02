@@ -1,5 +1,6 @@
 package org.smalltech.hashtaglocal_backend.config;
 
+import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.examples.Example;
 import io.swagger.v3.oas.models.info.Contact;
@@ -9,6 +10,8 @@ import io.swagger.v3.oas.models.media.Content;
 import io.swagger.v3.oas.models.media.MediaType;
 import io.swagger.v3.oas.models.responses.ApiResponse;
 import io.swagger.v3.oas.models.responses.ApiResponses;
+import io.swagger.v3.oas.models.security.SecurityRequirement;
+import io.swagger.v3.oas.models.security.SecurityScheme;
 import io.swagger.v3.oas.models.tags.Tag;
 import java.util.List;
 import java.util.Map;
@@ -28,6 +31,12 @@ public class SwaggerConfig {
 						.contact(new Contact().name("Hashtag Local").email("contact@smalltech.in"))
 						.license(new License().name("Apache 2.0")
 								.url("https://www.apache.org/licenses/LICENSE-2.0.html")))
+
+				.components(new Components().addSecuritySchemes("BearerAuth",
+						new SecurityScheme().type(SecurityScheme.Type.HTTP).scheme("bearer").bearerFormat("JWT")))
+
+				.addSecurityItem(new SecurityRequirement().addList("BearerAuth"))
+
 				.tags(List.of(new Tag().name("Actuator").description("Spring Boot Actuator endpoints")));
 	}
 
