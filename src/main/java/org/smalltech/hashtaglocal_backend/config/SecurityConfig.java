@@ -21,8 +21,7 @@ public class SecurityConfig {
 	public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
 
 		http.csrf(csrf -> csrf.disable())
-				.authorizeHttpRequests(auth -> auth.requestMatchers(HttpMethod.GET, "/account/profile").authenticated()
-						.requestMatchers(HttpMethod.POST, "/api/v1/issue").authenticated()
+				.authorizeHttpRequests(auth -> auth.requestMatchers(HttpMethod.POST, "/api/v1/issue").authenticated()
 						.requestMatchers(HttpMethod.GET, "/api/v1/media/upload-url").authenticated().anyRequest()
 						.permitAll())
 				.addFilterBefore(accessTokenAuthFilter, UsernamePasswordAuthenticationFilter.class);

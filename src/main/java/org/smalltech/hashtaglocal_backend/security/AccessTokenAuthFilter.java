@@ -1,19 +1,21 @@
 
 package org.smalltech.hashtaglocal_backend.security;
 
-import jakarta.servlet.FilterChain;
-import jakarta.servlet.ServletException;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Collections;
+
 import org.smalltech.hashtaglocal_backend.entity.UserAuthSessionEntity;
 import org.smalltech.hashtaglocal_backend.repository.UserAuthSessionRepository;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
+
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 @Component
 public class AccessTokenAuthFilter extends OncePerRequestFilter {
@@ -36,18 +38,25 @@ public class AccessTokenAuthFilter extends OncePerRequestFilter {
 		}
 
 		String accessToken = authHeader.substring(7);
-
+		System.out.println("🔐 Authorization header = " + authHeader);
+		System.out.println("🔐 Extracted accessToken = " + accessToken);
 		UserAuthSessionEntity session = userAuthSessionRepository.findByAccessToken(accessToken)
 				.filter(UserAuthSessionEntity::getIsActive).filter(s -> s.getAccessTokenExpiryTs() == null
 						|| s.getAccessTokenExpiryTs() > Instant.now().getEpochSecond())
 				.orElse(null);
 
 		if (session == null) {
+			System.out.println("SESSION NOT FOUND");
 			response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
 			return;
 		}
 
-		UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(session.getUser(),
+		System.out.println("✅ Session found");
+        System.out.println("   isActive = " + session.getIsActive());
+        System.out.println("   expiry  = " + session.getAccessTokenExpiryTs());
+        System.out.println("   now     = " + Instant.now().getEpochSecond());
+
+		UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(session.getUser().getId(),
 				null, Collections.emptyList());
 
 		SecurityContextHolder.getContext().setAuthentication(authentication);
@@ -60,9 +69,6 @@ public class AccessTokenAuthFilter extends OncePerRequestFilter {
 		// Apply security ONLY to protected APIs
 		String uri = request.getRequestURI();
 		String method = request.getMethod();
-		if ("GET".equals(method) && "/account/profile".equals(uri)) {
-			return false; // Apply filter
-		}
 		if ("POST".equals(method) && "/api/v1/issue".equals(uri)) {
 			return false; // Apply filter
 		}

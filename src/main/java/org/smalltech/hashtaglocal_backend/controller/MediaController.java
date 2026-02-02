@@ -9,6 +9,7 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import java.net.URL;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -24,6 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/v1/media")
+@SecurityRequirement(name = "bearerAuth")
 @Tag(name = "Media", description = "Media upload and signed URL APIs")
 public class MediaController {
 

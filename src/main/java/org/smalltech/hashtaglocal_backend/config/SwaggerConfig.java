@@ -1,5 +1,13 @@
 package org.smalltech.hashtaglocal_backend.config;
 
+import java.util.List;
+import java.util.Map;
+
+import org.springdoc.core.customizers.OperationCustomizer;
+import org.springdoc.core.models.GroupedOpenApi;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
 import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.examples.Example;
@@ -13,12 +21,6 @@ import io.swagger.v3.oas.models.responses.ApiResponses;
 import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.security.SecurityScheme;
 import io.swagger.v3.oas.models.tags.Tag;
-import java.util.List;
-import java.util.Map;
-import org.springdoc.core.customizers.OperationCustomizer;
-import org.springdoc.core.models.GroupedOpenApi;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
 
 @Configuration
 public class SwaggerConfig {
@@ -32,7 +34,7 @@ public class SwaggerConfig {
 						.license(new License().name("Apache 2.0")
 								.url("https://www.apache.org/licenses/LICENSE-2.0.html")))
 
-				.components(new Components().addSecuritySchemes("BearerAuth",
+				.components(new Components().addSecuritySchemes("bearerAuth",
 						new SecurityScheme().type(SecurityScheme.Type.HTTP).scheme("bearer").bearerFormat("JWT")))
 
 				.addSecurityItem(new SecurityRequirement().addList("BearerAuth"))
