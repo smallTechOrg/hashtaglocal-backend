@@ -1,5 +1,6 @@
 package org.smalltech.hashtaglocal_backend.controller;
 
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import java.time.LocalDateTime;
 import org.smalltech.hashtaglocal_backend.entity.IssueEntity;
 import org.smalltech.hashtaglocal_backend.entity.Locality;
@@ -20,6 +21,7 @@ import org.smalltech.hashtaglocal_backend.repository.MediaRepository;
 import org.smalltech.hashtaglocal_backend.repository.UserRepository;
 import org.smalltech.hashtaglocal_backend.util.LocationUtil;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -28,26 +30,27 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/v1/issue")
+@SecurityRequirement(name = "bearerAuth")
 public class IssueReportController {
 
 	private final IssueRepository issueRepository;
 	private final LocationRepository locationRepository;
 	private final MediaRepository mediaRepository;
-	private final UserRepository userRepository;
 	private final LocalityRepository localityRepository;
-
+	private final UserRepository userRepository;
 	public IssueReportController(IssueRepository issueRepository, LocationRepository locationRepository,
-			MediaRepository mediaRepository, UserRepository userRepository, LocalityRepository localityRepository) {
+			MediaRepository mediaRepository, LocalityRepository localityRepository, UserRepository userRepository) {
 		this.issueRepository = issueRepository;
 		this.locationRepository = locationRepository;
 		this.mediaRepository = mediaRepository;
-		this.userRepository = userRepository;
 		this.localityRepository = localityRepository;
+		this.userRepository = userRepository;
 	}
 
 	@PostMapping
 	@Transactional
-	public ResponseEntity<APIResponse> createIssue(@RequestBody IssueReportRequest request) {
+	public ResponseEntity<APIResponse> createIssue(@AuthenticationPrincipal Long userId,
+			@RequestBody IssueReportRequest request) {
 
 		var issueReq = request.getIssue();
 		// Get default #world locality (ID 1)
@@ -55,11 +58,7 @@ public class IssueReportController {
 		var issueLocality = resolveLocality(issueReq.getLocation().getLat(), issueReq.getLocation().getLng(),
 				defaultLocality);
 
-		// Get default admin user (User 1) or first user
-		UserEntity user = userRepository.findById(1L).orElseGet(() -> {
-			var allUsers = userRepository.findAll();
-			return allUsers.isEmpty() ? null : allUsers.get(0);
-		});
+		UserEntity user = userRepository.findById(userId).orElseThrow(() -> new RuntimeException("User not found"));
 
 		// Save issue location
 		Location issueLocation = Location.builder()
