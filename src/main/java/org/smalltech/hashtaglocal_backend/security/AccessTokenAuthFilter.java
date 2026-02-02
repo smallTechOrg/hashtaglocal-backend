@@ -1,21 +1,19 @@
 
 package org.smalltech.hashtaglocal_backend.security;
 
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Collections;
-
 import org.smalltech.hashtaglocal_backend.entity.UserAuthSessionEntity;
 import org.smalltech.hashtaglocal_backend.repository.UserAuthSessionRepository;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
-
-import jakarta.servlet.FilterChain;
-import jakarta.servlet.ServletException;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
 
 @Component
 public class AccessTokenAuthFilter extends OncePerRequestFilter {
@@ -52,12 +50,12 @@ public class AccessTokenAuthFilter extends OncePerRequestFilter {
 		}
 
 		System.out.println("✅ Session found");
-        System.out.println("   isActive = " + session.getIsActive());
-        System.out.println("   expiry  = " + session.getAccessTokenExpiryTs());
-        System.out.println("   now     = " + Instant.now().getEpochSecond());
+		System.out.println("   isActive = " + session.getIsActive());
+		System.out.println("   expiry  = " + session.getAccessTokenExpiryTs());
+		System.out.println("   now     = " + Instant.now().getEpochSecond());
 
-		UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(session.getUser().getId(),
-				null, Collections.emptyList());
+		UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
+				session.getUser().getId(), null, Collections.emptyList());
 
 		SecurityContextHolder.getContext().setAuthentication(authentication);
 
