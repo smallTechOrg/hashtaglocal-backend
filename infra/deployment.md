@@ -13,8 +13,15 @@ This guide walks through deploying the Hashtag Local Backend Java application on
 
 ## Step 1: SSH into the VM Instance
 
+
+Prod
 ```bash
 gcloud compute ssh hashtaglocalbackend --zone=us-central1-f
+```
+
+Stating
+```bash
+gcloud compute ssh ai-agent-staging --zone=us-central1-c
 ```
 
 ---
@@ -275,6 +282,18 @@ gcloud compute ssh hashtaglocalbackend --zone=us-central1-f \
 gcloud compute ssh hashtaglocalbackend --zone=us-central1-f \
   --command="sudo journalctl -u hashtaglocal-backend -f"
 ```
+
+
+## Staging
+gcloud compute scp build/libs/hashtaglocal-backend-0.0.1-SNAPSHOT.jar \
+  ai-agent-staging:/tmp/hashtaglocal-backend.jar \
+  --zone=us-central1-c
+
+gcloud compute scp gcs-key.json \
+  ai-agent-staging:/tmp/gcs-key.json \
+  --zone=us-central1-c
+
+
 
 # VM Commands 
 
