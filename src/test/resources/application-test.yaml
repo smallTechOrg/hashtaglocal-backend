@@ -8,9 +8,11 @@ spring:
   jpa:
     hibernate:
       ddl-auto: create-drop
+    defer-datasource-initialization: true
     show-sql: false
-    database-platform: org.hibernate.spatial.dialect.postgis.PostgisDialect
-
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
 
 # NewsAPI configuration for tests
 newsapi:
