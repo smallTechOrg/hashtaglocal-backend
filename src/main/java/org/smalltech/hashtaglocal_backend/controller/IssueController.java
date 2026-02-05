@@ -135,9 +135,9 @@ public class IssueController {
 		}
 
 		String action = request.getIssueAction().getAction();
-		if (action == null || !(action.equalsIgnoreCase("VERIFY") || action.equalsIgnoreCase("RESOLVED"))) {
+		if (action == null || !(action.equalsIgnoreCase("VERIFY") || action.equalsIgnoreCase("RESOLVE"))) {
 			System.out.println("DEBUG: ERROR - Invalid action: " + action);
-			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid action. Expected VERIFY or RESOLVED");
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid action. Expected VERIFY or RESOLVE");
 		}
 
 		var issueEntity = issueRepository.findById(issueId)
@@ -168,7 +168,7 @@ public class IssueController {
 		// Action-based status update
 		if (action.equalsIgnoreCase("VERIFY")) {
 			issueEntity.setStatus(IssueStatusModel.OPEN);
-		} else if (action.equalsIgnoreCase("RESOLVED")) {
+		} else if (action.equalsIgnoreCase("RESOLVE")) {
 			issueEntity.setStatus(IssueStatusModel.PENDING);
 		}
 		issueEntity.setUpdatedAt(LocalDateTime.now());
