@@ -1,4 +1,4 @@
-package org.smalltech.hashtaglocal_backend.model;
+package org.smalltech.hashtaglocal_backend.model.response;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -6,11 +6,9 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 @Data
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
-public class Media {
-	private Location location;
-	private String type;
-	private String url;
+public class IssueVerifyResponseData {
+	private Long issueId;
 }

@@ -22,8 +22,8 @@ public class SecurityConfig {
 
 		http.csrf(csrf -> csrf.disable())
 				.authorizeHttpRequests(auth -> auth.requestMatchers(HttpMethod.POST, "/api/v1/issue").authenticated()
-						.requestMatchers(HttpMethod.GET, "/api/v1/media/upload-url").authenticated().anyRequest()
-						.permitAll())
+						.requestMatchers(HttpMethod.GET, "/api/v1/media/upload-url").authenticated()
+						.requestMatchers(HttpMethod.PUT, "/api/v1/issue/**").authenticated().anyRequest().permitAll())
 				.addFilterBefore(accessTokenAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
 		return http.build();

@@ -73,6 +73,9 @@ public class AccessTokenAuthFilter extends OncePerRequestFilter {
 		if ("GET".equals(method) && "/api/v1/media/upload-url".equals(uri)) {
 			return false; // Apply filter
 		}
+		if ("PUT".equals(method) && uri.startsWith("/api/v1/issue/")) {
+			return false; // Apply filter
+		}
 		return true; // Do not apply filter
 	}
 }

@@ -7,4 +7,5 @@ public class MediaRequest {
 	private String type; // PHOTO / VIDEO
 	private String url;
 	private LocationRequest location;
+	private String description;
 }
