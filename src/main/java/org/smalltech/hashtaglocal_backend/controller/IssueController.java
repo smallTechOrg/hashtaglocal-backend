@@ -120,14 +120,14 @@ public class IssueController {
 	@PutMapping("/{issueId}")
 	@SecurityRequirement(name = "bearerAuth")
 	@Transactional
-	@Operation(summary = "Verify issue", description = "Verify an issue with media attachments and create verification records.")
+	@Operation(summary = "Verify or resolve issue", description = "Verify an issue with media attachments and create verification records.")
 	@ApiResponse(responseCode = "200", description = "Issue verified successfully", content = @Content(mediaType = "application/json", schema = @Schema(implementation = APIResponse.class)))
 	public ResponseEntity<APIResponse> verifyIssue(@PathVariable Long issueId, @AuthenticationPrincipal Long userId,
 			@RequestBody IssueVerifyRequest request) {
-		
+
 		// 1. Debug the Raw Request Path
-    	System.out.println("DEBUG: Received verify request for issueId: " + issueId);
-    	System.out.println("DEBUG: Authenticated userId: " + userId);
+		System.out.println("DEBUG: Received verify request for issueId: " + issueId);
+		System.out.println("DEBUG: Authenticated userId: " + userId);
 
 		if (request == null || request.getIssueAction() == null) {
 			System.out.println("DEBUG: ERROR - Request body is null");
@@ -135,9 +135,9 @@ public class IssueController {
 		}
 
 		String action = request.getIssueAction().getAction();
-		if (action == null || !action.equalsIgnoreCase("VERIFY")) {
+		if (action == null || !(action.equalsIgnoreCase("VERIFY") || action.equalsIgnoreCase("RESOLVED"))) {
 			System.out.println("DEBUG: ERROR - Invalid action: " + action);
-			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid action. Expected VERIFY");
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid action. Expected VERIFY or RESOLVED");
 		}
 
 		var issueEntity = issueRepository.findById(issueId)
@@ -165,8 +165,12 @@ public class IssueController {
 			}
 		}
 
-		// Update issue status to VERIFIED
-		issueEntity.setStatus(IssueStatusModel.OPEN);
+		// Action-based status update
+		if (action.equalsIgnoreCase("VERIFY")) {
+			issueEntity.setStatus(IssueStatusModel.OPEN);
+		} else if (action.equalsIgnoreCase("RESOLVED")) {
+			issueEntity.setStatus(IssueStatusModel.PENDING);
+		}
 		issueEntity.setUpdatedAt(LocalDateTime.now());
 		issueRepository.save(issueEntity);
 
