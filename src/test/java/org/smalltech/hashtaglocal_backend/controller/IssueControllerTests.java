@@ -13,7 +13,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.locationtech.jts.geom.Coordinate;
@@ -56,7 +55,8 @@ class IssueControllerTests {
 		userRepository = Mockito.mock(UserRepository.class);
 		gcsService = Mockito.mock(GCSService.class);
 		googleMapsGeocodingService = Mockito.mock(GoogleMapsGeocodingService.class);
-		controller = new IssueController(issueRepository, mediaRepository, userRepository, gcsService, googleMapsGeocodingService);
+		controller = new IssueController(issueRepository, mediaRepository, userRepository, gcsService,
+				googleMapsGeocodingService);
 	}
 
 	@Test
