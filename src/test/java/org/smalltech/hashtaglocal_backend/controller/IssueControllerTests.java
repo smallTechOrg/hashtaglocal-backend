@@ -13,6 +13,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.locationtech.jts.geom.Coordinate;
@@ -33,6 +34,7 @@ import org.smalltech.hashtaglocal_backend.model.MediaTypeModel;
 import org.smalltech.hashtaglocal_backend.model.request.IssuePatchRequest;
 import org.smalltech.hashtaglocal_backend.repository.IssueRepository;
 import org.smalltech.hashtaglocal_backend.repository.MediaRepository;
+import org.smalltech.hashtaglocal_backend.repository.UserRepository;
 import org.smalltech.hashtaglocal_backend.service.GCSService;
 import org.smalltech.hashtaglocal_backend.service.GoogleMapsGeocodingService;
 import org.springframework.http.HttpStatus;
@@ -42,6 +44,7 @@ class IssueControllerTests {
 
 	private IssueRepository issueRepository;
 	private MediaRepository mediaRepository;
+	private UserRepository userRepository;
 	private GCSService gcsService;
 	private GoogleMapsGeocodingService googleMapsGeocodingService;
 	private IssueController controller;
@@ -50,9 +53,10 @@ class IssueControllerTests {
 	void setup() {
 		issueRepository = Mockito.mock(IssueRepository.class);
 		mediaRepository = Mockito.mock(MediaRepository.class);
+		userRepository = Mockito.mock(UserRepository.class);
 		gcsService = Mockito.mock(GCSService.class);
 		googleMapsGeocodingService = Mockito.mock(GoogleMapsGeocodingService.class);
-		controller = new IssueController(issueRepository, mediaRepository, gcsService, googleMapsGeocodingService);
+		controller = new IssueController(issueRepository, mediaRepository, userRepository, gcsService, googleMapsGeocodingService);
 	}
 
 	@Test
