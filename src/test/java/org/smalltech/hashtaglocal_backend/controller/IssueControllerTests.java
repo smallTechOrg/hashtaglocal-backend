@@ -30,7 +30,10 @@ import org.smalltech.hashtaglocal_backend.model.APIResponse;
 import org.smalltech.hashtaglocal_backend.model.IssueStatusModel;
 import org.smalltech.hashtaglocal_backend.model.IssueTypeModel;
 import org.smalltech.hashtaglocal_backend.model.MediaTypeModel;
+import org.smalltech.hashtaglocal_backend.model.request.MediaRequest;
 import org.smalltech.hashtaglocal_backend.model.request.IssuePatchRequest;
+import org.smalltech.hashtaglocal_backend.model.request.IssueVerifyRequest;
+import org.smalltech.hashtaglocal_backend.model.request.IssueVerifyRequest.IssueActionRequest;
 import org.smalltech.hashtaglocal_backend.repository.IssueRepository;
 import org.smalltech.hashtaglocal_backend.repository.MediaRepository;
 import org.smalltech.hashtaglocal_backend.repository.UserRepository;
@@ -214,4 +217,49 @@ class IssueControllerTests {
 		verify(issueRepository, times(1)).save(entity);
 		verify(googleMapsGeocodingService, times(1)).reverseGeocode(12.945722, 77.675312);
 	}
+
+	@Test
+	void verifyIssue_withVerifyAction_shouldSaveMediaAndKeepStatusOpen() {
+		Long issueId = 10L;
+		Long userId = 1L;
+
+		UserEntity user = UserEntity.builder()
+				.id(userId)
+				.username("rahul")
+				.build();
+
+		IssueEntity issue = IssueEntity.builder()
+				.id(issueId)
+				.status(IssueStatusModel.OPEN)
+				.type(IssueTypeModel.POTHOLE)
+				.createdAt(LocalDateTime.now().minusDays(1))
+				.updatedAt(LocalDateTime.now().minusDays(1))
+				.userEntity(user)
+				.build();
+
+		when(issueRepository.findById(issueId)).thenReturn(Optional.of(issue));
+		when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+		when(mediaRepository.save(Mockito.any())).thenAnswer(invocation -> invocation.getArgument(0));
+		when(issueRepository.save(issue)).thenReturn(issue);
+
+		MediaRequest mediaReq = new MediaRequest();
+		mediaReq.setType("PHOTO");
+		mediaReq.setUrl("test-url");
+		mediaReq.setDescription("verification proof");
+
+		IssueActionRequest issueAction = new IssueVerifyRequest.IssueActionRequest();
+		issueAction.setAction("VERIFY");
+		issueAction.setMediaUrls(List.of(mediaReq));
+
+		IssueVerifyRequest request = new IssueVerifyRequest();
+		request.setIssueAction(issueAction);
+
+		var response = controller.verifyIssue(issueId, userId, request);
+
+		assertEquals(HttpStatus.OK, response.getStatusCode());
+		assertEquals(IssueStatusModel.OPEN, issue.getStatus());
+		verify(mediaRepository, times(1)).save(Mockito.any(MediaEntity.class));
+		verify(issueRepository, times(1)).save(issue);
+	}
+
 }
