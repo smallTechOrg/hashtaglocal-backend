@@ -4,6 +4,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -20,17 +21,21 @@ import org.smalltech.hashtaglocal_backend.model.ResponseData;
 import org.smalltech.hashtaglocal_backend.model.User;
 import org.smalltech.hashtaglocal_backend.model.ViewerContext;
 import org.smalltech.hashtaglocal_backend.model.request.IssuePatchRequest;
+import org.smalltech.hashtaglocal_backend.model.request.IssueVerifyRequest;
 import org.smalltech.hashtaglocal_backend.repository.IssueRepository;
 import org.smalltech.hashtaglocal_backend.repository.MediaRepository;
+import org.smalltech.hashtaglocal_backend.repository.UserRepository;
 import org.smalltech.hashtaglocal_backend.service.GCSService;
 import org.smalltech.hashtaglocal_backend.service.GoogleMapsGeocodingService;
 import org.smalltech.hashtaglocal_backend.util.LocationUtil;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -44,13 +49,16 @@ public class IssueController {
 
 	private final IssueRepository issueRepository;
 	private final MediaRepository mediaRepository;
+	private final UserRepository userRepository;
 	private final GCSService gcsService;
 	private final GoogleMapsGeocodingService googleMapsGeocodingService;
 
-	public IssueController(IssueRepository issueRepository, MediaRepository mediaRepository, GCSService gcsService,
+	public IssueController(IssueRepository issueRepository, MediaRepository mediaRepository,
+			UserRepository userRepository, GCSService gcsService,
 			GoogleMapsGeocodingService googleMapsGeocodingService) {
 		this.issueRepository = issueRepository;
 		this.mediaRepository = mediaRepository;
+		this.userRepository = userRepository;
 		this.gcsService = gcsService;
 		this.googleMapsGeocodingService = googleMapsGeocodingService;
 	}
@@ -107,6 +115,77 @@ public class IssueController {
 		}
 
 		return ResponseEntity.ok(mapToAPIResponse(issueEntity));
+	}
+
+	@PutMapping("/{issueId}")
+	@SecurityRequirement(name = "bearerAuth")
+	@Transactional
+	@Operation(summary = "Verify or resolve issue", description = "Verify an issue with media attachments and create verification records.")
+	@ApiResponse(responseCode = "200", description = "Issue verified successfully", content = @Content(mediaType = "application/json", schema = @Schema(implementation = APIResponse.class)))
+	public ResponseEntity<APIResponse> verifyIssue(@PathVariable Long issueId, @AuthenticationPrincipal Long userId,
+			@RequestBody IssueVerifyRequest request) {
+
+		// 1. Debug the Raw Request Path
+		System.out.println("DEBUG: Received verify request for issueId: " + issueId);
+		System.out.println("DEBUG: Authenticated userId: " + userId);
+
+		if (request == null || request.getIssueAction() == null) {
+			System.out.println("DEBUG: ERROR - Request body is null");
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Request body with issueAction is required");
+		}
+
+		String action = request.getIssueAction().getAction();
+		if (action == null || !(action.equalsIgnoreCase("VERIFY") || action.equalsIgnoreCase("RESOLVE"))) {
+			System.out.println("DEBUG: ERROR - Invalid action: " + action);
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid action. Expected VERIFY or RESOLVE");
+		}
+
+		var issueEntity = issueRepository.findById(issueId)
+				.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Issue not found"));
+
+		// Resolve authenticated user from security context
+		if (userId == null) {
+			throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not authenticated");
+		}
+		var userEntity = userRepository.findById(userId)
+				.orElseThrow(() -> new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "User not found"));
+
+		// Process media URLs if provided
+		if (request.getIssueAction().getMediaUrls() != null && !request.getIssueAction().getMediaUrls().isEmpty()) {
+			for (var mediaRequest : request.getIssueAction().getMediaUrls()) {
+
+				System.out.println("DEBUG media type: " + mediaRequest.getType());
+				System.out.println("DEBUG media url: " + mediaRequest.getUrl());
+				System.out.println("DEBUG media desc: " + mediaRequest.getDescription());
+
+				var mediaEntity = org.smalltech.hashtaglocal_backend.entity.MediaEntity.builder().issue(issueEntity)
+						.type(parseMediaType(mediaRequest.getType())).url(mediaRequest.getUrl()).user(userEntity)
+						.description(mediaRequest.getDescription()).createdAt(LocalDateTime.now()).build();
+				mediaRepository.save(mediaEntity);
+			}
+		}
+
+		// Action-based status update
+		if (action.equalsIgnoreCase("VERIFY")) {
+			issueEntity.setStatus(IssueStatusModel.OPEN);
+		} else if (action.equalsIgnoreCase("RESOLVE")) {
+			issueEntity.setStatus(IssueStatusModel.PENDING);
+		}
+		issueEntity.setUpdatedAt(LocalDateTime.now());
+		issueRepository.save(issueEntity);
+
+		// Build response
+		APIResponse response = APIResponse.builder().data(ResponseData.builder().issueId(issueId).build()).build();
+
+		return ResponseEntity.ok(response);
+	}
+
+	private org.smalltech.hashtaglocal_backend.model.MediaTypeModel parseMediaType(String type) {
+		try {
+			return org.smalltech.hashtaglocal_backend.model.MediaTypeModel.valueOf(type.toUpperCase(Locale.ROOT));
+		} catch (IllegalArgumentException ex) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid media type: " + type, ex);
+		}
 	}
 
 	private IssueStatusModel parseStatus(String status) {
@@ -188,10 +267,15 @@ public class IssueController {
 
 		// Fetch media items from database
 		List<org.smalltech.hashtaglocal_backend.entity.MediaEntity> mediaEntities = mediaRepository.findByIssue(entity);
-		List<Media> mediaList = mediaEntities.stream()
-				.map(mediaEntity -> Media.builder().location(location).type(mediaEntity.getType().name().toLowerCase())
-						.url(gcsService.generateSignedUrl(mediaEntity.getUrl())).build())
-				.toList();
+		List<Media> mediaList = mediaEntities.stream().map(mediaEntity -> {
+			String username = "admin";
+			if (mediaEntity.getUser() != null && mediaEntity.getUser().getUsername() != null) {
+				username = mediaEntity.getUser().getUsername();
+			}
+			return Media.builder().location(location).type(mediaEntity.getType().name().toLowerCase())
+					.url(gcsService.generateSignedUrl(mediaEntity.getUrl())).description(mediaEntity.getDescription())
+					.username(username).createdAt(mediaEntity.getCreatedAt()).build();
+		}).toList();
 
 		// Default viewer context (no upvote data in DB yet)
 		ViewerContext viewerContext = ViewerContext.builder().upvote(false).build();

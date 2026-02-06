@@ -99,11 +99,12 @@ public class IssueTestDataConfig implements CommandLineRunner {
 			// Create media for issue 1
 			MediaEntity media1 = MediaEntity.builder().issue(issue1).type(MediaTypeModel.PHOTO)
 					.url("https://sripath.com/wp-content/uploads/2025/01/iStock-174662203.jpg").location(location)
-					.build();
+					.createdAt(LocalDateTime.now()).build();
 			mediaRepository.save(media1);
 
 			MediaEntity media2 = MediaEntity.builder().issue(issue1).type(MediaTypeModel.PHOTO)
-					.url("https://nub.news/api/image/526263/article.png").location(location).build();
+					.url("https://nub.news/api/image/526263/article.png").location(location)
+					.createdAt(LocalDateTime.now()).build();
 			mediaRepository.save(media2);
 
 			// Create issue 2 - newer issue (world)
@@ -116,11 +117,12 @@ public class IssueTestDataConfig implements CommandLineRunner {
 			// Create media for issue 2
 			MediaEntity media3 = MediaEntity.builder().issue(issue2).type(MediaTypeModel.PHOTO)
 					.url("https://sripath.com/wp-content/uploads/2025/01/iStock-174662203.jpg").location(location)
-					.build();
+					.createdAt(LocalDateTime.now()).build();
 			mediaRepository.save(media3);
 
 			MediaEntity media4 = MediaEntity.builder().issue(issue2).type(MediaTypeModel.PHOTO)
-					.url("https://nub.news/api/image/526263/article.png").location(location).build();
+					.url("https://nub.news/api/image/526263/article.png").location(location)
+					.createdAt(LocalDateTime.now()).build();
 			mediaRepository.save(media4);
 
 			// Create issue 3 - ONHOLD issue (world, newest)
@@ -132,7 +134,8 @@ public class IssueTestDataConfig implements CommandLineRunner {
 
 			// Create media for issue 3
 			MediaEntity media5 = MediaEntity.builder().issue(issue3).type(MediaTypeModel.PHOTO)
-					.url("https://example.com/waste-photo.jpg").location(location).build();
+					.url("https://example.com/waste-photo.jpg").location(location).createdAt(LocalDateTime.now())
+					.build();
 			mediaRepository.save(media5);
 
 			// Create issue 4 - Jaipur locality
@@ -144,7 +147,8 @@ public class IssueTestDataConfig implements CommandLineRunner {
 			jaipurIssue = issueRepository.save(jaipurIssue);
 
 			MediaEntity jaipurMedia = MediaEntity.builder().issue(jaipurIssue).type(MediaTypeModel.PHOTO)
-					.url("https://example.com/jaipur-pothole.jpg").location(jaipurLocation).build();
+					.url("https://example.com/jaipur-pothole.jpg").location(jaipurLocation)
+					.createdAt(LocalDateTime.now()).build();
 			mediaRepository.save(jaipurMedia);
 		}
 	}
