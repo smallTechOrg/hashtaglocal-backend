@@ -30,10 +30,10 @@ import org.smalltech.hashtaglocal_backend.model.APIResponse;
 import org.smalltech.hashtaglocal_backend.model.IssueStatusModel;
 import org.smalltech.hashtaglocal_backend.model.IssueTypeModel;
 import org.smalltech.hashtaglocal_backend.model.MediaTypeModel;
-import org.smalltech.hashtaglocal_backend.model.request.MediaRequest;
 import org.smalltech.hashtaglocal_backend.model.request.IssuePatchRequest;
 import org.smalltech.hashtaglocal_backend.model.request.IssueVerifyRequest;
 import org.smalltech.hashtaglocal_backend.model.request.IssueVerifyRequest.IssueActionRequest;
+import org.smalltech.hashtaglocal_backend.model.request.MediaRequest;
 import org.smalltech.hashtaglocal_backend.repository.IssueRepository;
 import org.smalltech.hashtaglocal_backend.repository.MediaRepository;
 import org.smalltech.hashtaglocal_backend.repository.UserRepository;
@@ -223,19 +223,11 @@ class IssueControllerTests {
 		Long issueId = 10L;
 		Long userId = 1L;
 
-		UserEntity user = UserEntity.builder()
-				.id(userId)
-				.username("rahul")
-				.build();
+		UserEntity user = UserEntity.builder().id(userId).username("rahul").build();
 
-		IssueEntity issue = IssueEntity.builder()
-				.id(issueId)
-				.status(IssueStatusModel.OPEN)
-				.type(IssueTypeModel.POTHOLE)
-				.createdAt(LocalDateTime.now().minusDays(1))
-				.updatedAt(LocalDateTime.now().minusDays(1))
-				.userEntity(user)
-				.build();
+		IssueEntity issue = IssueEntity.builder().id(issueId).status(IssueStatusModel.OPEN).type(IssueTypeModel.POTHOLE)
+				.createdAt(LocalDateTime.now().minusDays(1)).updatedAt(LocalDateTime.now().minusDays(1))
+				.userEntity(user).build();
 
 		when(issueRepository.findById(issueId)).thenReturn(Optional.of(issue));
 		when(userRepository.findById(userId)).thenReturn(Optional.of(user));
