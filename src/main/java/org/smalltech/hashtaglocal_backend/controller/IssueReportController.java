@@ -92,7 +92,7 @@ public class IssueReportController {
 
 				// Save Media
 				MediaEntity media = MediaEntity.builder().issue(issue).type(MediaTypeModel.valueOf(mediaReq.getType()))
-						.url(mediaReq.getUrl()).location(mediaLocation).build();
+						.url(mediaReq.getUrl()).location(mediaLocation).createdAt(LocalDateTime.now()).build();
 
 				mediaRepository.save(media);
 			}
