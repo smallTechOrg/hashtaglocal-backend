@@ -10,8 +10,10 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
 import org.smalltech.hashtaglocal_backend.dto.LocationMetadataDTO;
+import org.smalltech.hashtaglocal_backend.entity.IssueActionEntity;
 import org.smalltech.hashtaglocal_backend.model.APIResponse;
 import org.smalltech.hashtaglocal_backend.model.Issue;
+import org.smalltech.hashtaglocal_backend.model.IssueActionModel;
 import org.smalltech.hashtaglocal_backend.model.IssueStatusModel;
 import org.smalltech.hashtaglocal_backend.model.IssueTypeModel;
 import org.smalltech.hashtaglocal_backend.model.Locality;
@@ -22,6 +24,7 @@ import org.smalltech.hashtaglocal_backend.model.User;
 import org.smalltech.hashtaglocal_backend.model.ViewerContext;
 import org.smalltech.hashtaglocal_backend.model.request.IssuePatchRequest;
 import org.smalltech.hashtaglocal_backend.model.request.IssueVerifyRequest;
+import org.smalltech.hashtaglocal_backend.repository.IssueActionRepository;
 import org.smalltech.hashtaglocal_backend.repository.IssueRepository;
 import org.smalltech.hashtaglocal_backend.repository.MediaRepository;
 import org.smalltech.hashtaglocal_backend.repository.UserRepository;
@@ -47,15 +50,17 @@ import org.springframework.web.server.ResponseStatusException;
 @Transactional(readOnly = true)
 public class IssueController {
 
+	private final IssueActionRepository issueActionRepository;
 	private final IssueRepository issueRepository;
 	private final MediaRepository mediaRepository;
 	private final UserRepository userRepository;
 	private final GCSService gcsService;
 	private final GoogleMapsGeocodingService googleMapsGeocodingService;
 
-	public IssueController(IssueRepository issueRepository, MediaRepository mediaRepository,
-			UserRepository userRepository, GCSService gcsService,
+	public IssueController(IssueActionRepository issueActionRepository, IssueRepository issueRepository,
+			MediaRepository mediaRepository, UserRepository userRepository, GCSService gcsService,
 			GoogleMapsGeocodingService googleMapsGeocodingService) {
+		this.issueActionRepository = issueActionRepository;
 		this.issueRepository = issueRepository;
 		this.mediaRepository = mediaRepository;
 		this.userRepository = userRepository;
@@ -135,9 +140,12 @@ public class IssueController {
 		}
 
 		String action = request.getIssueAction().getAction();
-		if (action == null || !(action.equalsIgnoreCase("VERIFY") || action.equalsIgnoreCase("RESOLVE"))) {
-			System.out.println("DEBUG: ERROR - Invalid action: " + action);
-			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid action. Expected VERIFY or RESOLVE");
+
+		IssueActionModel issueActionModel;
+		try {
+			issueActionModel = IssueActionModel.valueOf(action.toUpperCase());
+		} catch (Exception e) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid action:" + action);
 		}
 
 		var issueEntity = issueRepository.findById(issueId)
@@ -164,6 +172,12 @@ public class IssueController {
 				mediaRepository.save(mediaEntity);
 			}
 		}
+
+		// Save issue action record
+		IssueActionEntity issueActionEntity = IssueActionEntity.builder().issueEntity(issueEntity)
+				.userEntity(userEntity).action(issueActionModel).createdAt(LocalDateTime.now()).build();
+
+		issueActionRepository.save(issueActionEntity);
 
 		// Action-based status update
 		if (action.equalsIgnoreCase("VERIFY")) {
@@ -277,12 +291,14 @@ public class IssueController {
 					.username(username).createdAt(mediaEntity.getCreatedAt()).build();
 		}).toList();
 
+		int verifyCount = issueActionRepository.countByIssueEntityAndAction(entity, IssueActionModel.VERIFY);
+
 		// Default viewer context (no upvote data in DB yet)
 		ViewerContext viewerContext = ViewerContext.builder().upvote(false).build();
 
 		Issue issue = Issue.builder().id(entity.getId()).user(user).location(location)
 				.type(entity.getType().name().toLowerCase()).description(entity.getDescription())
-				.createdAt(entity.getCreatedAt()).mediaUrls(mediaList).voteCount(0).verifyCount(0)
+				.createdAt(entity.getCreatedAt()).mediaUrls(mediaList).voteCount(0).verifyCount(verifyCount)
 				.status(entity.getStatus().name()).rank(1).viewerContext(viewerContext).build();
 
 		ResponseData data = ResponseData.builder().issue(issue).build();

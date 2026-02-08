@@ -27,6 +27,7 @@ import org.smalltech.hashtaglocal_backend.entity.Location;
 import org.smalltech.hashtaglocal_backend.entity.MediaEntity;
 import org.smalltech.hashtaglocal_backend.entity.UserEntity;
 import org.smalltech.hashtaglocal_backend.model.APIResponse;
+import org.smalltech.hashtaglocal_backend.model.IssueActionModel;
 import org.smalltech.hashtaglocal_backend.model.IssueStatusModel;
 import org.smalltech.hashtaglocal_backend.model.IssueTypeModel;
 import org.smalltech.hashtaglocal_backend.model.MediaTypeModel;
@@ -34,6 +35,7 @@ import org.smalltech.hashtaglocal_backend.model.request.IssuePatchRequest;
 import org.smalltech.hashtaglocal_backend.model.request.IssueVerifyRequest;
 import org.smalltech.hashtaglocal_backend.model.request.IssueVerifyRequest.IssueActionRequest;
 import org.smalltech.hashtaglocal_backend.model.request.MediaRequest;
+import org.smalltech.hashtaglocal_backend.repository.IssueActionRepository;
 import org.smalltech.hashtaglocal_backend.repository.IssueRepository;
 import org.smalltech.hashtaglocal_backend.repository.MediaRepository;
 import org.smalltech.hashtaglocal_backend.repository.UserRepository;
@@ -44,6 +46,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 class IssueControllerTests {
 
+	private IssueActionRepository issueActionRepository;
 	private IssueRepository issueRepository;
 	private MediaRepository mediaRepository;
 	private UserRepository userRepository;
@@ -53,13 +56,14 @@ class IssueControllerTests {
 
 	@BeforeEach
 	void setup() {
+		issueActionRepository = Mockito.mock(IssueActionRepository.class);
 		issueRepository = Mockito.mock(IssueRepository.class);
 		mediaRepository = Mockito.mock(MediaRepository.class);
 		userRepository = Mockito.mock(UserRepository.class);
 		gcsService = Mockito.mock(GCSService.class);
 		googleMapsGeocodingService = Mockito.mock(GoogleMapsGeocodingService.class);
-		controller = new IssueController(issueRepository, mediaRepository, userRepository, gcsService,
-				googleMapsGeocodingService);
+		controller = new IssueController(issueActionRepository, issueRepository, mediaRepository, userRepository,
+				gcsService, googleMapsGeocodingService);
 	}
 
 	@Test
@@ -229,6 +233,7 @@ class IssueControllerTests {
 				.createdAt(LocalDateTime.now().minusDays(1)).updatedAt(LocalDateTime.now().minusDays(1))
 				.userEntity(user).build();
 
+		when(issueActionRepository.save(Mockito.any())).thenAnswer(invocation -> invocation.getArgument(0));
 		when(issueRepository.findById(issueId)).thenReturn(Optional.of(issue));
 		when(userRepository.findById(userId)).thenReturn(Optional.of(user));
 		when(mediaRepository.save(Mockito.any())).thenAnswer(invocation -> invocation.getArgument(0));
@@ -252,6 +257,11 @@ class IssueControllerTests {
 		assertEquals(IssueStatusModel.OPEN, issue.getStatus());
 		verify(mediaRepository, times(1)).save(Mockito.any(MediaEntity.class));
 		verify(issueRepository, times(1)).save(issue);
+
+		verify(issueActionRepository, times(1))
+				.save(Mockito.argThat(action -> action.getIssueEntity().getId().equals(issueId)
+						&& action.getUserEntity().getId().equals(userId)
+						&& action.getAction() == IssueActionModel.VERIFY));
 	}
 
 }
