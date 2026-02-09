@@ -123,6 +123,11 @@ class IssueReportIntegrationTests {
 
 		assert media.getType().name().equals("PHOTO");
 		assert media.getLocation() != null;
+
+		// User_id in media table
+		assertNotNull(media.getUser(), "Media user should be assigned");
+		assertEquals(issue.getUserEntity().getId(), media.getUser().getId(), "Media user should match issue user");
+
 		Location mediaLocation = locationRepository.findById(media.getLocation().getId()).orElseThrow();
 		assert LocationUtil.getLatitude(mediaLocation.getPoint()).equals(28.7041);
 		assert LocationUtil.getLongitude(mediaLocation.getPoint()).equals(77.1025);
