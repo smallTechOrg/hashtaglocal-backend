@@ -158,6 +158,14 @@ public class IssueController {
 		var userEntity = userRepository.findById(userId)
 				.orElseThrow(() -> new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "User not found"));
 
+		// Reject issue
+		if (issueActionModel == IssueActionModel.REJECT) {
+			Long ownerId = issueEntity.getUserEntity() != null ? issueEntity.getUserEntity().getId() : null;
+			if (ownerId == null || !ownerId.equals(userId)) {
+				throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only the issue owner can reject the issue");
+			}
+		}
+
 		// Process media URLs if provided
 		if (request.getIssueAction().getMediaUrls() != null && !request.getIssueAction().getMediaUrls().isEmpty()) {
 			for (var mediaRequest : request.getIssueAction().getMediaUrls()) {
@@ -184,7 +192,10 @@ public class IssueController {
 			issueEntity.setStatus(IssueStatusModel.OPEN);
 		} else if (action.equalsIgnoreCase("RESOLVE")) {
 			issueEntity.setStatus(IssueStatusModel.PENDING);
+		} else if (action.equalsIgnoreCase("REJECT")) {
+			issueEntity.setStatus(IssueStatusModel.REJECTED);
 		}
+
 		issueEntity.setUpdatedAt(LocalDateTime.now());
 		issueRepository.save(issueEntity);
 
