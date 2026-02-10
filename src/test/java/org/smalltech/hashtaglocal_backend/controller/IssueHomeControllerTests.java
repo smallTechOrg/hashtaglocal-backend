@@ -24,12 +24,14 @@ import org.smalltech.hashtaglocal_backend.model.APIResponse;
 import org.smalltech.hashtaglocal_backend.model.IssueStatusModel;
 import org.smalltech.hashtaglocal_backend.model.IssueTypeModel;
 import org.smalltech.hashtaglocal_backend.model.MediaTypeModel;
+import org.smalltech.hashtaglocal_backend.repository.IssueActionRepository;
 import org.smalltech.hashtaglocal_backend.repository.IssueRepository;
 import org.smalltech.hashtaglocal_backend.repository.MediaRepository;
 import org.smalltech.hashtaglocal_backend.service.GCSService;
 
 class IssueHomeControllerTests {
 
+	private IssueActionRepository issueActionRepository;
 	private IssueRepository issueRepository;
 	private MediaRepository mediaRepository;
 	private GCSService gcsService;
@@ -37,10 +39,11 @@ class IssueHomeControllerTests {
 
 	@BeforeEach
 	void setup() {
+		issueActionRepository = Mockito.mock(IssueActionRepository.class);
 		issueRepository = Mockito.mock(IssueRepository.class);
 		mediaRepository = Mockito.mock(MediaRepository.class);
 		gcsService = Mockito.mock(GCSService.class);
-		controller = new IssueHomeController(issueRepository, mediaRepository, gcsService);
+		controller = new IssueHomeController(issueActionRepository, issueRepository, mediaRepository, gcsService);
 	}
 
 	@Test

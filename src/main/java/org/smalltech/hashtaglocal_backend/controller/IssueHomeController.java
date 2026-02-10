@@ -9,6 +9,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import org.smalltech.hashtaglocal_backend.model.APIResponse;
 import org.smalltech.hashtaglocal_backend.model.Issue;
+import org.smalltech.hashtaglocal_backend.model.IssueActionModel;
 import org.smalltech.hashtaglocal_backend.model.IssueStatusModel;
 import org.smalltech.hashtaglocal_backend.model.Locality;
 import org.smalltech.hashtaglocal_backend.model.Location;
@@ -16,6 +17,7 @@ import org.smalltech.hashtaglocal_backend.model.Media;
 import org.smalltech.hashtaglocal_backend.model.ResponseData;
 import org.smalltech.hashtaglocal_backend.model.User;
 import org.smalltech.hashtaglocal_backend.model.ViewerContext;
+import org.smalltech.hashtaglocal_backend.repository.IssueActionRepository;
 import org.smalltech.hashtaglocal_backend.repository.IssueRepository;
 import org.smalltech.hashtaglocal_backend.repository.MediaRepository;
 import org.smalltech.hashtaglocal_backend.service.GCSService;
@@ -31,12 +33,14 @@ import org.springframework.web.bind.annotation.RestController;
 @Transactional(readOnly = true)
 public class IssueHomeController {
 
+	private final IssueActionRepository issueActionRepository;
 	private final IssueRepository issueRepository;
 	private final MediaRepository mediaRepository;
 	private final GCSService gcsService;
 
-	public IssueHomeController(IssueRepository issueRepository, MediaRepository mediaRepository,
-			GCSService gcsService) {
+	public IssueHomeController(IssueActionRepository issueActionRepository, IssueRepository issueRepository,
+			MediaRepository mediaRepository, GCSService gcsService) {
+		this.issueActionRepository = issueActionRepository;
 		this.issueRepository = issueRepository;
 		this.mediaRepository = mediaRepository;
 		this.gcsService = gcsService;
@@ -102,12 +106,15 @@ public class IssueHomeController {
 						.url(gcsService.generateSignedUrl(mediaEntity.getUrl())).build())
 				.toList();
 
+		int verifyCount = issueActionRepository.countDistinctUserByIssueAndAction(entity,
+				IssueActionModel.VERIFY);
+
 		// Default viewer context (no upvote data in DB yet)
 		ViewerContext viewerContext = ViewerContext.builder().upvote(false).build();
 
 		return Issue.builder().id(entity.getId()).user(user).location(location)
 				.type(entity.getType().name().toLowerCase()).description(entity.getDescription())
-				.createdAt(entity.getCreatedAt()).mediaUrls(mediaList).voteCount(0).verifyCount(0)
+				.createdAt(entity.getCreatedAt()).mediaUrls(mediaList).voteCount(0).verifyCount(verifyCount)
 				.status(entity.getStatus().name()).rank(1).viewerContext(viewerContext).build();
 	}
 

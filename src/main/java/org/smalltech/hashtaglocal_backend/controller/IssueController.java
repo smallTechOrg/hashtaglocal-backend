@@ -10,8 +10,10 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
 import org.smalltech.hashtaglocal_backend.dto.LocationMetadataDTO;
+import org.smalltech.hashtaglocal_backend.entity.IssueActionEntity;
 import org.smalltech.hashtaglocal_backend.model.APIResponse;
 import org.smalltech.hashtaglocal_backend.model.Issue;
+import org.smalltech.hashtaglocal_backend.model.IssueActionModel;
 import org.smalltech.hashtaglocal_backend.model.IssueStatusModel;
 import org.smalltech.hashtaglocal_backend.model.IssueTypeModel;
 import org.smalltech.hashtaglocal_backend.model.Locality;
@@ -22,11 +24,13 @@ import org.smalltech.hashtaglocal_backend.model.User;
 import org.smalltech.hashtaglocal_backend.model.ViewerContext;
 import org.smalltech.hashtaglocal_backend.model.request.IssuePatchRequest;
 import org.smalltech.hashtaglocal_backend.model.request.IssueVerifyRequest;
+import org.smalltech.hashtaglocal_backend.repository.IssueActionRepository;
 import org.smalltech.hashtaglocal_backend.repository.IssueRepository;
 import org.smalltech.hashtaglocal_backend.repository.MediaRepository;
 import org.smalltech.hashtaglocal_backend.repository.UserRepository;
 import org.smalltech.hashtaglocal_backend.service.GCSService;
 import org.smalltech.hashtaglocal_backend.service.GoogleMapsGeocodingService;
+import org.smalltech.hashtaglocal_backend.service.LocationService;
 import org.smalltech.hashtaglocal_backend.util.LocationUtil;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -47,20 +51,24 @@ import org.springframework.web.server.ResponseStatusException;
 @Transactional(readOnly = true)
 public class IssueController {
 
+	private final IssueActionRepository issueActionRepository;
 	private final IssueRepository issueRepository;
 	private final MediaRepository mediaRepository;
 	private final UserRepository userRepository;
 	private final GCSService gcsService;
 	private final GoogleMapsGeocodingService googleMapsGeocodingService;
+	private final LocationService locationService;
 
-	public IssueController(IssueRepository issueRepository, MediaRepository mediaRepository,
-			UserRepository userRepository, GCSService gcsService,
-			GoogleMapsGeocodingService googleMapsGeocodingService) {
+	public IssueController(IssueActionRepository issueActionRepository, IssueRepository issueRepository,
+			MediaRepository mediaRepository, UserRepository userRepository, GCSService gcsService,
+			GoogleMapsGeocodingService googleMapsGeocodingService, LocationService locationService) {
+		this.issueActionRepository = issueActionRepository;
 		this.issueRepository = issueRepository;
 		this.mediaRepository = mediaRepository;
 		this.userRepository = userRepository;
 		this.gcsService = gcsService;
 		this.googleMapsGeocodingService = googleMapsGeocodingService;
+		this.locationService = locationService;
 	}
 
 	@GetMapping("/{issueId}")
@@ -135,9 +143,12 @@ public class IssueController {
 		}
 
 		String action = request.getIssueAction().getAction();
-		if (action == null || !(action.equalsIgnoreCase("VERIFY") || action.equalsIgnoreCase("RESOLVE"))) {
-			System.out.println("DEBUG: ERROR - Invalid action: " + action);
-			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid action. Expected VERIFY or RESOLVE");
+
+		IssueActionModel issueActionModel;
+		try {
+			issueActionModel = IssueActionModel.valueOf(action.toUpperCase());
+		} catch (Exception e) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid action:" + action);
 		}
 
 		var issueEntity = issueRepository.findById(issueId)
@@ -150,6 +161,14 @@ public class IssueController {
 		var userEntity = userRepository.findById(userId)
 				.orElseThrow(() -> new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "User not found"));
 
+		// Reject issue
+		if (issueActionModel == IssueActionModel.REJECT) {
+			Long ownerId = issueEntity.getUserEntity() != null ? issueEntity.getUserEntity().getId() : null;
+			if (ownerId == null || !ownerId.equals(userId)) {
+				throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only the issue owner can reject the issue");
+			}
+		}
+
 		// Process media URLs if provided
 		if (request.getIssueAction().getMediaUrls() != null && !request.getIssueAction().getMediaUrls().isEmpty()) {
 			for (var mediaRequest : request.getIssueAction().getMediaUrls()) {
@@ -158,19 +177,41 @@ public class IssueController {
 				System.out.println("DEBUG media url: " + mediaRequest.getUrl());
 				System.out.println("DEBUG media desc: " + mediaRequest.getDescription());
 
+				var mediaLocReq = mediaRequest.getLocation();
+
+				// Save Media Location
+				org.smalltech.hashtaglocal_backend.entity.Location mediaLocation = locationService
+						.createAndSaveLocation(mediaLocReq.getLat(), mediaLocReq.getLng(), mediaLocReq.getMetaData(),
+								"Unknown");
+
 				var mediaEntity = org.smalltech.hashtaglocal_backend.entity.MediaEntity.builder().issue(issueEntity)
 						.type(parseMediaType(mediaRequest.getType())).url(mediaRequest.getUrl()).user(userEntity)
-						.description(mediaRequest.getDescription()).createdAt(LocalDateTime.now()).build();
+						.description(mediaRequest.getDescription()).location(mediaLocation)
+						.createdAt(LocalDateTime.now()).build();
 				mediaRepository.save(mediaEntity);
 			}
 		}
 
+		// Save issue action record
+		IssueActionEntity issueActionEntity = IssueActionEntity.builder().issueEntity(issueEntity)
+				.userEntity(userEntity).action(issueActionModel).createdAt(LocalDateTime.now()).build();
+
+		issueActionRepository.save(issueActionEntity);
+
 		// Action-based status update
-		if (action.equalsIgnoreCase("VERIFY")) {
-			issueEntity.setStatus(IssueStatusModel.OPEN);
-		} else if (action.equalsIgnoreCase("RESOLVE")) {
-			issueEntity.setStatus(IssueStatusModel.PENDING);
+		if (action.equalsIgnoreCase("REJECT")) {
+			issueEntity.setStatus(IssueStatusModel.REJECTED);
+
+		} else if (!IssueStatusModel.ONHOLD.equals(issueEntity.getStatus())) {
+
+			if (action.equalsIgnoreCase("VERIFY")) {
+				issueEntity.setStatus(IssueStatusModel.OPEN);
+
+			} else if (action.equalsIgnoreCase("RESOLVE")) {
+				issueEntity.setStatus(IssueStatusModel.PENDING);
+			}
 		}
+
 		issueEntity.setUpdatedAt(LocalDateTime.now());
 		issueRepository.save(issueEntity);
 
@@ -277,12 +318,15 @@ public class IssueController {
 					.username(username).createdAt(mediaEntity.getCreatedAt()).build();
 		}).toList();
 
+		int verifyCount = issueActionRepository.countDistinctUserByIssueAndAction(entity,
+				IssueActionModel.VERIFY);
+
 		// Default viewer context (no upvote data in DB yet)
 		ViewerContext viewerContext = ViewerContext.builder().upvote(false).build();
 
 		Issue issue = Issue.builder().id(entity.getId()).user(user).location(location)
 				.type(entity.getType().name().toLowerCase()).description(entity.getDescription())
-				.createdAt(entity.getCreatedAt()).mediaUrls(mediaList).voteCount(0).verifyCount(0)
+				.createdAt(entity.getCreatedAt()).mediaUrls(mediaList).voteCount(0).verifyCount(verifyCount)
 				.status(entity.getStatus().name()).rank(1).viewerContext(viewerContext).build();
 
 		ResponseData data = ResponseData.builder().issue(issue).build();

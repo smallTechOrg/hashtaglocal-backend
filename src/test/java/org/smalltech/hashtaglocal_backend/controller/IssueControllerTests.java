@@ -27,39 +27,47 @@ import org.smalltech.hashtaglocal_backend.entity.Location;
 import org.smalltech.hashtaglocal_backend.entity.MediaEntity;
 import org.smalltech.hashtaglocal_backend.entity.UserEntity;
 import org.smalltech.hashtaglocal_backend.model.APIResponse;
+import org.smalltech.hashtaglocal_backend.model.IssueActionModel;
 import org.smalltech.hashtaglocal_backend.model.IssueStatusModel;
 import org.smalltech.hashtaglocal_backend.model.IssueTypeModel;
 import org.smalltech.hashtaglocal_backend.model.MediaTypeModel;
 import org.smalltech.hashtaglocal_backend.model.request.IssuePatchRequest;
 import org.smalltech.hashtaglocal_backend.model.request.IssueVerifyRequest;
 import org.smalltech.hashtaglocal_backend.model.request.IssueVerifyRequest.IssueActionRequest;
+import org.smalltech.hashtaglocal_backend.model.request.LocationRequest;
 import org.smalltech.hashtaglocal_backend.model.request.MediaRequest;
+import org.smalltech.hashtaglocal_backend.repository.IssueActionRepository;
 import org.smalltech.hashtaglocal_backend.repository.IssueRepository;
 import org.smalltech.hashtaglocal_backend.repository.MediaRepository;
 import org.smalltech.hashtaglocal_backend.repository.UserRepository;
 import org.smalltech.hashtaglocal_backend.service.GCSService;
 import org.smalltech.hashtaglocal_backend.service.GoogleMapsGeocodingService;
+import org.smalltech.hashtaglocal_backend.service.LocationService;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
 class IssueControllerTests {
 
+	private IssueActionRepository issueActionRepository;
 	private IssueRepository issueRepository;
 	private MediaRepository mediaRepository;
 	private UserRepository userRepository;
 	private GCSService gcsService;
 	private GoogleMapsGeocodingService googleMapsGeocodingService;
+	private LocationService locationService;
 	private IssueController controller;
 
 	@BeforeEach
 	void setup() {
+		issueActionRepository = Mockito.mock(IssueActionRepository.class);
 		issueRepository = Mockito.mock(IssueRepository.class);
 		mediaRepository = Mockito.mock(MediaRepository.class);
 		userRepository = Mockito.mock(UserRepository.class);
 		gcsService = Mockito.mock(GCSService.class);
 		googleMapsGeocodingService = Mockito.mock(GoogleMapsGeocodingService.class);
-		controller = new IssueController(issueRepository, mediaRepository, userRepository, gcsService,
-				googleMapsGeocodingService);
+		locationService = Mockito.mock(LocationService.class);
+		controller = new IssueController(issueActionRepository, issueRepository, mediaRepository, userRepository,
+				gcsService, googleMapsGeocodingService, locationService);
 	}
 
 	@Test
@@ -225,19 +233,30 @@ class IssueControllerTests {
 
 		UserEntity user = UserEntity.builder().id(userId).username("rahul").build();
 
+		Location issueLocation = Location.builder().id(100L)
+				.point(new GeometryFactory().createPoint(new Coordinate(77.1025, 28.7041))).name("Delhi")
+				.metaData(Map.of("city", "Delhi")).build();
+
 		IssueEntity issue = IssueEntity.builder().id(issueId).status(IssueStatusModel.OPEN).type(IssueTypeModel.POTHOLE)
 				.createdAt(LocalDateTime.now().minusDays(1)).updatedAt(LocalDateTime.now().minusDays(1))
-				.userEntity(user).build();
+				.userEntity(user).location(issueLocation).build();
 
+		when(issueActionRepository.save(Mockito.any())).thenAnswer(invocation -> invocation.getArgument(0));
 		when(issueRepository.findById(issueId)).thenReturn(Optional.of(issue));
 		when(userRepository.findById(userId)).thenReturn(Optional.of(user));
 		when(mediaRepository.save(Mockito.any())).thenAnswer(invocation -> invocation.getArgument(0));
 		when(issueRepository.save(issue)).thenReturn(issue);
 
+		LocationRequest mediaLocationReq = new LocationRequest();
+		mediaLocationReq.setLat(12.0);
+		mediaLocationReq.setLng(77.0);
+		mediaLocationReq.setMetaData(Map.of());
+
 		MediaRequest mediaReq = new MediaRequest();
 		mediaReq.setType("PHOTO");
 		mediaReq.setUrl("test-url");
 		mediaReq.setDescription("verification proof");
+		mediaReq.setLocation(mediaLocationReq);
 
 		IssueActionRequest issueAction = new IssueVerifyRequest.IssueActionRequest();
 		issueAction.setAction("VERIFY");
@@ -252,6 +271,11 @@ class IssueControllerTests {
 		assertEquals(IssueStatusModel.OPEN, issue.getStatus());
 		verify(mediaRepository, times(1)).save(Mockito.any(MediaEntity.class));
 		verify(issueRepository, times(1)).save(issue);
+
+		verify(issueActionRepository, times(1))
+				.save(Mockito.argThat(action -> action.getIssueEntity().getId().equals(issueId)
+						&& action.getUserEntity().getId().equals(userId)
+						&& action.getAction() == IssueActionModel.VERIFY));
 	}
 
 }
