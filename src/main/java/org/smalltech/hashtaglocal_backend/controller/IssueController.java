@@ -199,12 +199,17 @@ public class IssueController {
 		issueActionRepository.save(issueActionEntity);
 
 		// Action-based status update
-		if (action.equalsIgnoreCase("VERIFY")) {
-			issueEntity.setStatus(IssueStatusModel.OPEN);
-		} else if (action.equalsIgnoreCase("RESOLVE")) {
-			issueEntity.setStatus(IssueStatusModel.PENDING);
-		} else if (action.equalsIgnoreCase("REJECT")) {
+		if (action.equalsIgnoreCase("REJECT")) {
 			issueEntity.setStatus(IssueStatusModel.REJECTED);
+
+		} else if (!IssueStatusModel.ONHOLD.equals(issueEntity.getStatus())) {
+
+			if (action.equalsIgnoreCase("VERIFY")) {
+				issueEntity.setStatus(IssueStatusModel.OPEN);
+
+			} else if (action.equalsIgnoreCase("RESOLVE")) {
+				issueEntity.setStatus(IssueStatusModel.PENDING);
+			}
 		}
 
 		issueEntity.setUpdatedAt(LocalDateTime.now());
