@@ -11,9 +11,8 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface IssueActionRepository extends JpaRepository<IssueActionEntity, Long> {
 
-    @Query("SELECT COUNT(DISTINCT ia.userEntity.id) " +
-           "FROM IssueActionEntity ia " +
-           "WHERE ia.issueEntity = :issue AND ia.action = :action")
-    int countDistinctUserByIssueAndAction(@Param("issue") IssueEntity issueEntity,
-                                          @Param("action") IssueActionModel action);
+	@Query("SELECT COUNT(DISTINCT ia.userEntity.id) " + "FROM IssueActionEntity ia "
+			+ "WHERE ia.issueEntity = :issue AND ia.action = :action")
+	int countDistinctUserByIssueAndAction(@Param("issue") IssueEntity issueEntity,
+			@Param("action") IssueActionModel action);
 }
