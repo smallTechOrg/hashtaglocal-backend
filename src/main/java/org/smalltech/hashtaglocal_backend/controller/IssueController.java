@@ -30,6 +30,7 @@ import org.smalltech.hashtaglocal_backend.repository.MediaRepository;
 import org.smalltech.hashtaglocal_backend.repository.UserRepository;
 import org.smalltech.hashtaglocal_backend.service.GCSService;
 import org.smalltech.hashtaglocal_backend.service.GoogleMapsGeocodingService;
+import org.smalltech.hashtaglocal_backend.service.LocationService;
 import org.smalltech.hashtaglocal_backend.util.LocationUtil;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -56,16 +57,18 @@ public class IssueController {
 	private final UserRepository userRepository;
 	private final GCSService gcsService;
 	private final GoogleMapsGeocodingService googleMapsGeocodingService;
+	private final LocationService locationService;
 
 	public IssueController(IssueActionRepository issueActionRepository, IssueRepository issueRepository,
 			MediaRepository mediaRepository, UserRepository userRepository, GCSService gcsService,
-			GoogleMapsGeocodingService googleMapsGeocodingService) {
+			GoogleMapsGeocodingService googleMapsGeocodingService, LocationService locationService) {
 		this.issueActionRepository = issueActionRepository;
 		this.issueRepository = issueRepository;
 		this.mediaRepository = mediaRepository;
 		this.userRepository = userRepository;
 		this.gcsService = gcsService;
 		this.googleMapsGeocodingService = googleMapsGeocodingService;
+		this.locationService = locationService;
 	}
 
 	@GetMapping("/{issueId}")
@@ -174,9 +177,17 @@ public class IssueController {
 				System.out.println("DEBUG media url: " + mediaRequest.getUrl());
 				System.out.println("DEBUG media desc: " + mediaRequest.getDescription());
 
+				var mediaLocReq = mediaRequest.getLocation();
+
+				// Save Media Location
+				org.smalltech.hashtaglocal_backend.entity.Location mediaLocation = locationService
+						.createAndSaveLocation(mediaLocReq.getLat(), mediaLocReq.getLng(), mediaLocReq.getMetaData(),
+								"Unknown");
+
 				var mediaEntity = org.smalltech.hashtaglocal_backend.entity.MediaEntity.builder().issue(issueEntity)
 						.type(parseMediaType(mediaRequest.getType())).url(mediaRequest.getUrl()).user(userEntity)
-						.description(mediaRequest.getDescription()).createdAt(LocalDateTime.now()).build();
+						.description(mediaRequest.getDescription()).location(mediaLocation)
+						.createdAt(LocalDateTime.now()).build();
 				mediaRepository.save(mediaEntity);
 			}
 		}

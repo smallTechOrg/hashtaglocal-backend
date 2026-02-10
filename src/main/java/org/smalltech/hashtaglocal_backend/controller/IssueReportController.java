@@ -19,7 +19,7 @@ import org.smalltech.hashtaglocal_backend.repository.LocalityRepository;
 import org.smalltech.hashtaglocal_backend.repository.LocationRepository;
 import org.smalltech.hashtaglocal_backend.repository.MediaRepository;
 import org.smalltech.hashtaglocal_backend.repository.UserRepository;
-import org.smalltech.hashtaglocal_backend.util.LocationUtil;
+import org.smalltech.hashtaglocal_backend.service.LocationService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,13 +38,16 @@ public class IssueReportController {
 	private final MediaRepository mediaRepository;
 	private final LocalityRepository localityRepository;
 	private final UserRepository userRepository;
+	private final LocationService locationService;
 	public IssueReportController(IssueRepository issueRepository, LocationRepository locationRepository,
-			MediaRepository mediaRepository, LocalityRepository localityRepository, UserRepository userRepository) {
+			MediaRepository mediaRepository, LocalityRepository localityRepository, UserRepository userRepository,
+			LocationService locationService) {
 		this.issueRepository = issueRepository;
 		this.locationRepository = locationRepository;
 		this.mediaRepository = mediaRepository;
 		this.localityRepository = localityRepository;
 		this.userRepository = userRepository;
+		this.locationService = locationService;
 	}
 
 	@PostMapping
@@ -53,20 +56,12 @@ public class IssueReportController {
 			@RequestBody IssueReportRequest request) {
 
 		var issueReq = request.getIssue();
-		// Get default #world locality (ID 1)
-		var defaultLocality = localityRepository.findById(1L).orElse(null);
-		var issueLocality = resolveLocality(issueReq.getLocation().getLat(), issueReq.getLocation().getLng(),
-				defaultLocality);
 
 		UserEntity user = userRepository.findById(userId).orElseThrow(() -> new RuntimeException("User not found"));
 
 		// Save issue location
-		Location issueLocation = Location.builder()
-				.point(LocationUtil.createPoint(issueReq.getLocation().getLat(), issueReq.getLocation().getLng()))
-				.name(issueLocality != null ? issueLocality.getName() : "Unknown").locality(issueLocality)
-				.metaData(issueReq.getLocation().getMetaData()).build();
-
-		issueLocation = locationRepository.save(issueLocation);
+		Location issueLocation = locationService.createAndSaveLocation(issueReq.getLocation().getLat(),
+				issueReq.getLocation().getLng(), issueReq.getLocation().getMetaData(), "Unknown");
 
 		// Create issue with user assigned
 		IssueEntity issue = IssueEntity.builder().type(IssueTypeModel.valueOf(issueReq.getType()))
@@ -78,15 +73,12 @@ public class IssueReportController {
 		// Save Media (if provided)
 		if (issueReq.getMediaUrls() != null && !issueReq.getMediaUrls().isEmpty()) {
 			for (MediaRequest mediaReq : issueReq.getMediaUrls()) {
-				var mediaLocality = resolveLocality(mediaReq.getLocation().getLat(), mediaReq.getLocation().getLng(),
-						defaultLocality);
+
+				var mediaLocReq = mediaReq.getLocation();
 
 				// Save Media Location
-				Location mediaLocation = Location.builder()
-						.point(LocationUtil.createPoint(mediaReq.getLocation().getLat(),
-								mediaReq.getLocation().getLng()))
-						.name(mediaLocality != null ? mediaLocality.getName() : "Unknown").locality(mediaLocality)
-						.metaData(mediaReq.getLocation().getMetaData()).build();
+				Location mediaLocation = locationService.createAndSaveLocation(mediaLocReq.getLat(),
+						mediaLocReq.getLng(), mediaLocReq.getMetaData(), "Unknown");
 
 				mediaLocation = locationRepository.save(mediaLocation);
 
