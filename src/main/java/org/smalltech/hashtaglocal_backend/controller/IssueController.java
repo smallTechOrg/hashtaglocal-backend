@@ -9,6 +9,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
+import org.smalltech.hashtaglocal_backend.config.CustomProperties;
 import org.smalltech.hashtaglocal_backend.dto.LocationMetadataDTO;
 import org.smalltech.hashtaglocal_backend.entity.IssueActionEntity;
 import org.smalltech.hashtaglocal_backend.model.APIResponse;
@@ -29,6 +30,7 @@ import org.smalltech.hashtaglocal_backend.repository.IssueRepository;
 import org.smalltech.hashtaglocal_backend.repository.MediaRepository;
 import org.smalltech.hashtaglocal_backend.repository.UserRepository;
 import org.smalltech.hashtaglocal_backend.service.GCSService;
+import org.smalltech.hashtaglocal_backend.service.GeoFenceService;
 import org.smalltech.hashtaglocal_backend.service.GoogleMapsGeocodingService;
 import org.smalltech.hashtaglocal_backend.service.LocationService;
 import org.smalltech.hashtaglocal_backend.util.LocationUtil;
@@ -51,22 +53,27 @@ import org.springframework.web.server.ResponseStatusException;
 @Transactional(readOnly = true)
 public class IssueController {
 
+	private final CustomProperties customProperties;
 	private final IssueActionRepository issueActionRepository;
 	private final IssueRepository issueRepository;
 	private final MediaRepository mediaRepository;
 	private final UserRepository userRepository;
 	private final GCSService gcsService;
+	private final GeoFenceService geoFenceService;
 	private final GoogleMapsGeocodingService googleMapsGeocodingService;
 	private final LocationService locationService;
 
-	public IssueController(IssueActionRepository issueActionRepository, IssueRepository issueRepository,
-			MediaRepository mediaRepository, UserRepository userRepository, GCSService gcsService,
+	public IssueController(CustomProperties customProperties, IssueActionRepository issueActionRepository,
+			IssueRepository issueRepository, MediaRepository mediaRepository, UserRepository userRepository,
+			GCSService gcsService, GeoFenceService geoFenceService,
 			GoogleMapsGeocodingService googleMapsGeocodingService, LocationService locationService) {
+		this.customProperties = customProperties;
 		this.issueActionRepository = issueActionRepository;
 		this.issueRepository = issueRepository;
 		this.mediaRepository = mediaRepository;
 		this.userRepository = userRepository;
 		this.gcsService = gcsService;
+		this.geoFenceService = geoFenceService;
 		this.googleMapsGeocodingService = googleMapsGeocodingService;
 		this.locationService = locationService;
 	}
@@ -167,6 +174,23 @@ public class IssueController {
 			if (ownerId == null || !ownerId.equals(userId)) {
 				throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only the issue owner can reject the issue");
 			}
+		}
+
+		// Enforce geo-fence for VERIFY / RESOLVE
+		if (issueActionModel == IssueActionModel.VERIFY || issueActionModel == IssueActionModel.RESOLVE) {
+
+			var actionLocation = request.getIssueAction().getMediaUrls().get(0).getLocation();
+
+			if (actionLocation == null || actionLocation.getLat() == null || actionLocation.getLng() == null) {
+				throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+						"Location is required to verify or resolve an issue");
+			}
+
+			geoFenceService.assertWithinRadius(issueEntity.getLocation(), // original issue location
+					actionLocation.getLat(), // user's current lat
+					actionLocation.getLng(), // user's current lng
+					customProperties.getVerifyRadiusMeters() // meters
+			);
 		}
 
 		// Process media URLs if provided
