@@ -168,7 +168,7 @@ class OSMDiscoveryServiceTest {
 	@DisplayName("Should handle API error gracefully")
 	void handleAPIError() {
 		when(restTemplate.postForObject(anyString(), any(), eq(String.class)))
-			.thenThrow(new RuntimeException("API timeout"));
+				.thenThrow(new RuntimeException("API timeout"));
 
 		// Act
 		List<RawDiscoveryDTO> discoveries = service.discoverCities("IN");

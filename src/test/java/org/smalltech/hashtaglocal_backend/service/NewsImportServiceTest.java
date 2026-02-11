@@ -127,8 +127,7 @@ class NewsImportServiceTest {
 		when(newsApiService.searchArticles(any(NewsApiRequest.class))).thenReturn(mockApiResponse);
 
 		// First article is duplicate, second is new
-		when(newsArticleRepository.findByExternalId("article-1"))
-				.thenReturn(Optional.of(new NewsArticleEntity()));
+		when(newsArticleRepository.findByExternalId("article-1")).thenReturn(Optional.of(new NewsArticleEntity()));
 		when(newsArticleRepository.findByExternalId("article-2")).thenReturn(Optional.empty());
 		when(newsArticleRepository.save(any(NewsArticleEntity.class)))
 				.thenAnswer(invocation -> invocation.getArgument(0));
@@ -148,8 +147,7 @@ class NewsImportServiceTest {
 		// Arrange
 		when(localityRepository.findByHashtag("bengaluru")).thenReturn(Optional.of(testLocality));
 		// Make all API calls fail
-		when(newsApiService.searchArticles(any(NewsApiRequest.class)))
-				.thenThrow(new RuntimeException("API Error"));
+		when(newsApiService.searchArticles(any(NewsApiRequest.class))).thenThrow(new RuntimeException("API Error"));
 		when(newsImportJobRepository.save(any(NewsImportJob.class)))
 				.thenAnswer(invocation -> invocation.getArgument(0));
 

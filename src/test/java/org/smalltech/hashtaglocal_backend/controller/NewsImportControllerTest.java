@@ -44,8 +44,7 @@ class NewsImportControllerTest {
 		when(newsImportService.importNewsForLocality("bengaluru")).thenReturn(successfulJob);
 
 		// Act
-		ResponseEntity<NewsImportController.ImportResponse> response = newsImportController
-				.importNews("bengaluru");
+		ResponseEntity<NewsImportController.ImportResponse> response = newsImportController.importNews("bengaluru");
 
 		// Assert
 		assertNotNull(response);
@@ -65,8 +64,7 @@ class NewsImportControllerTest {
 		when(newsImportService.importNewsForLocality("bengaluru")).thenReturn(failedJob);
 
 		// Act
-		ResponseEntity<NewsImportController.ImportResponse> response = newsImportController
-				.importNews("bengaluru");
+		ResponseEntity<NewsImportController.ImportResponse> response = newsImportController.importNews("bengaluru");
 
 		// Assert
 		assertNotNull(response);
@@ -79,8 +77,7 @@ class NewsImportControllerTest {
 	@Test
 	void testImportNews_ServiceException() {
 		// Arrange
-		when(newsImportService.importNewsForLocality(anyString()))
-				.thenThrow(new RuntimeException("Service error"));
+		when(newsImportService.importNewsForLocality(anyString())).thenThrow(new RuntimeException("Service error"));
 
 		// Act & Assert
 		assertThrows(RuntimeException.class, () -> newsImportController.importNews("bengaluru"));

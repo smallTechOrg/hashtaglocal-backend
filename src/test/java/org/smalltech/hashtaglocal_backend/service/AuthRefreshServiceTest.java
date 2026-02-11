@@ -130,8 +130,7 @@ class AuthRefreshServiceTest {
 		when(userAuthSessionRepository.findByRefreshToken(REFRESH_TOKEN)).thenReturn(Optional.empty());
 
 		// Act & Assert
-		RuntimeException exception = assertThrows(
-				RuntimeException.class,
+		RuntimeException exception = assertThrows(RuntimeException.class,
 				() -> authRefreshService.refreshTokens(REFRESH_TOKEN));
 		assertEquals("Invalid refresh token", exception.getMessage());
 
