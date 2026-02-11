@@ -40,7 +40,6 @@ public class LocationService {
 				.or(() -> localityRepository.findNearestLocality(latitude, longitude)).orElse(defaultLocality);
 	}
 
-	
 	String getNameFromMetaData(Map<String, Object> metaData) {
 		if (metaData == null) {
 			return null;

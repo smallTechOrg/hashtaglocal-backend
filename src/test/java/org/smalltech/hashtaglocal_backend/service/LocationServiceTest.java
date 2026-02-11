@@ -18,7 +18,8 @@ class LocationServiceTest {
 
 	static Stream<Map<String, Object>> metaDataProvider() throws Exception {
 		InputStream inputStream = LocationServiceTest.class.getClassLoader().getResourceAsStream("meta-data.json");
-		List<Map<String, Object>> entries = objectMapper.readValue(inputStream, new TypeReference<>() {});
+		List<Map<String, Object>> entries = objectMapper.readValue(inputStream, new TypeReference<>() {
+		});
 		return entries.stream();
 	}
 
