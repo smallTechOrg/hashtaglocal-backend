@@ -3,7 +3,7 @@ plugins {
 	id("org.springframework.boot") version "3.5.7"
 	id("io.spring.dependency-management") version "1.1.7"
     // Linting
-    id("com.diffplug.spotless") version "6.25.0"
+    id("com.diffplug.spotless") version "8.2.1"
 }
 
 group = "org.smalltech"
@@ -49,9 +49,12 @@ tasks.withType<Test> {
 	useJUnitPlatform()
 }
 
+
 spotless {
+    lineEndings = com.diffplug.spotless.LineEnding.UNIX
+
     java {
-        eclipse()                // works with Java 25
+        eclipse()
         importOrder()
         removeUnusedImports()
         trimTrailingWhitespace()

@@ -163,8 +163,7 @@ class GeoNamesDiscoveryServiceTest {
 	@Test
 	@DisplayName("Should handle API error and return empty list")
 	void handleAPIError() {
-		when(restTemplate.getForObject(any(), eq(String.class)))
-			.thenThrow(new RuntimeException("API timeout"));
+		when(restTemplate.getForObject(any(), eq(String.class))).thenThrow(new RuntimeException("API timeout"));
 
 		// Act
 		List<RawDiscoveryDTO> discoveries = service.discoverCities("IN");
