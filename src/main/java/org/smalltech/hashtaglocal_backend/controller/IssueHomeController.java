@@ -106,8 +106,7 @@ public class IssueHomeController {
 						.url(gcsService.generateSignedUrl(mediaEntity.getUrl())).build())
 				.toList();
 
-		int verifyCount = issueActionRepository.countDistinctUserByIssueAndAction(entity,
-				IssueActionModel.VERIFY);
+		int verifyCount = issueActionRepository.countDistinctUserByIssueAndAction(entity, IssueActionModel.VERIFY);
 
 		// Default viewer context (no upvote data in DB yet)
 		ViewerContext viewerContext = ViewerContext.builder().upvote(false).build();
