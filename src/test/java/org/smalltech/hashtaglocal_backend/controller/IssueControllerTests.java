@@ -20,6 +20,7 @@ import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.Point;
 import org.locationtech.jts.geom.Polygon;
 import org.mockito.Mockito;
+import org.smalltech.hashtaglocal_backend.config.CustomProperties;
 import org.smalltech.hashtaglocal_backend.dto.LocationMetadataDTO;
 import org.smalltech.hashtaglocal_backend.entity.IssueEntity;
 import org.smalltech.hashtaglocal_backend.entity.Locality;
@@ -41,6 +42,7 @@ import org.smalltech.hashtaglocal_backend.repository.IssueRepository;
 import org.smalltech.hashtaglocal_backend.repository.MediaRepository;
 import org.smalltech.hashtaglocal_backend.repository.UserRepository;
 import org.smalltech.hashtaglocal_backend.service.GCSService;
+import org.smalltech.hashtaglocal_backend.service.GeoFenceService;
 import org.smalltech.hashtaglocal_backend.service.GoogleMapsGeocodingService;
 import org.smalltech.hashtaglocal_backend.service.LocationService;
 import org.springframework.http.HttpStatus;
@@ -48,26 +50,30 @@ import org.springframework.web.server.ResponseStatusException;
 
 class IssueControllerTests {
 
+	private CustomProperties customProperties;
 	private IssueActionRepository issueActionRepository;
 	private IssueRepository issueRepository;
 	private MediaRepository mediaRepository;
 	private UserRepository userRepository;
 	private GCSService gcsService;
+	private GeoFenceService geoFenceService;
 	private GoogleMapsGeocodingService googleMapsGeocodingService;
 	private LocationService locationService;
 	private IssueController controller;
 
 	@BeforeEach
 	void setup() {
+		customProperties = new CustomProperties();
 		issueActionRepository = Mockito.mock(IssueActionRepository.class);
 		issueRepository = Mockito.mock(IssueRepository.class);
 		mediaRepository = Mockito.mock(MediaRepository.class);
 		userRepository = Mockito.mock(UserRepository.class);
 		gcsService = Mockito.mock(GCSService.class);
+		geoFenceService = Mockito.mock(GeoFenceService.class);
 		googleMapsGeocodingService = Mockito.mock(GoogleMapsGeocodingService.class);
 		locationService = Mockito.mock(LocationService.class);
-		controller = new IssueController(issueActionRepository, issueRepository, mediaRepository, userRepository,
-				gcsService, googleMapsGeocodingService, locationService);
+		controller = new IssueController(customProperties, issueActionRepository, issueRepository, mediaRepository,
+				userRepository, gcsService, geoFenceService, googleMapsGeocodingService, locationService);
 	}
 
 	@Test
