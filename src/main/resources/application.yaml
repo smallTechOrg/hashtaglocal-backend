@@ -35,6 +35,11 @@ logging:
       max-file-size: 10MB
       max-history: 10
 
+# Application-specific custom configuration
+app:
+  geo:
+    verify-radius-meters: 50
+
 # Google Maps API configuration
 google:
   maps:

@@ -9,6 +9,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
+import org.smalltech.hashtaglocal_backend.config.CustomProperties;
 import org.smalltech.hashtaglocal_backend.dto.LocationMetadataDTO;
 import org.smalltech.hashtaglocal_backend.entity.IssueActionEntity;
 import org.smalltech.hashtaglocal_backend.model.APIResponse;
@@ -52,6 +53,7 @@ import org.springframework.web.server.ResponseStatusException;
 @Transactional(readOnly = true)
 public class IssueController {
 
+	private final CustomProperties customProperties;
 	private final IssueActionRepository issueActionRepository;
 	private final IssueRepository issueRepository;
 	private final MediaRepository mediaRepository;
@@ -61,10 +63,11 @@ public class IssueController {
 	private final GoogleMapsGeocodingService googleMapsGeocodingService;
 	private final LocationService locationService;
 
-	public IssueController(IssueActionRepository issueActionRepository, IssueRepository issueRepository,
-			MediaRepository mediaRepository, UserRepository userRepository, GCSService gcsService,
-			GeoFenceService geoFenceService, GoogleMapsGeocodingService googleMapsGeocodingService,
-			LocationService locationService) {
+	public IssueController(CustomProperties customProperties, IssueActionRepository issueActionRepository,
+			IssueRepository issueRepository, MediaRepository mediaRepository, UserRepository userRepository,
+			GCSService gcsService, GeoFenceService geoFenceService,
+			GoogleMapsGeocodingService googleMapsGeocodingService, LocationService locationService) {
+		this.customProperties = customProperties;
 		this.issueActionRepository = issueActionRepository;
 		this.issueRepository = issueRepository;
 		this.mediaRepository = mediaRepository;
@@ -186,7 +189,7 @@ public class IssueController {
 			geoFenceService.assertWithinRadius(issueEntity.getLocation(), // original issue location
 					actionLocation.getLat(), // user's current lat
 					actionLocation.getLng(), // user's current lng
-					50 // meters
+					customProperties.getVerifyRadiusMeters() // meters
 			);
 		}
 
