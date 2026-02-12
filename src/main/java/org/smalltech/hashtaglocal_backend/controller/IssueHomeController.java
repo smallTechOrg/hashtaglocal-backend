@@ -54,10 +54,11 @@ public class IssueHomeController {
 		List<org.smalltech.hashtaglocal_backend.entity.IssueEntity> issueEntities;
 		if (localityHashtag != null && !localityHashtag.isBlank()) {
 			issueEntities = issueRepository.findByStatusInAndCreatedAtAfterAndLocalityHashtagOrderByCreatedAtDesc(
-					List.of(IssueStatusModel.OPEN, IssueStatusModel.ONHOLD), fourMonthsAgo, localityHashtag);
+					List.of(IssueStatusModel.OPEN, IssueStatusModel.ONHOLD, IssueStatusModel.PENDING), fourMonthsAgo,
+					localityHashtag);
 		} else {
 			issueEntities = issueRepository.findByStatusInAndCreatedAtAfterOrderByCreatedAtDesc(
-					List.of(IssueStatusModel.OPEN, IssueStatusModel.ONHOLD), fourMonthsAgo);
+					List.of(IssueStatusModel.OPEN, IssueStatusModel.ONHOLD, IssueStatusModel.PENDING), fourMonthsAgo);
 		}
 		List<Issue> issues = issueEntities.stream().map(this::mapToIssue).toList();
 		ResponseData data = ResponseData.builder().issues(issues).build();
