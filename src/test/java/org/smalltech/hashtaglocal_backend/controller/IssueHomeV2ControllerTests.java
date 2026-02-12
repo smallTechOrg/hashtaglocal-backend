@@ -80,7 +80,7 @@ class IssueHomeV2ControllerTests {
 
 		when(issueRepository.findByStatusInAndCreatedAtAfterAndWithinRadius(
 				Mockito.eq(List.of(IssueStatusModel.OPEN.name(), IssueStatusModel.ONHOLD.name(),
-						IssueStatusModel.PENDING.name())),
+						IssueStatusModel.PENDING.name(), IssueStatusModel.RESOLVED.name())),
 				Mockito.any(LocalDateTime.class), Mockito.eq(testLat), Mockito.eq(testLng), Mockito.eq(radiusMeters)))
 				.thenReturn(List.of(issue2, issue1));
 		when(mediaRepository.findByIssue(issue1)).thenReturn(List.of(media1, media2));
@@ -120,7 +120,7 @@ class IssueHomeV2ControllerTests {
 
 		when(issueRepository.findByStatusInAndCreatedAtAfterAndWithinRadius(
 				Mockito.eq(List.of(IssueStatusModel.OPEN.name(), IssueStatusModel.ONHOLD.name(),
-						IssueStatusModel.PENDING.name())),
+						IssueStatusModel.PENDING.name(), IssueStatusModel.RESOLVED.name())),
 				Mockito.any(LocalDateTime.class), Mockito.eq(testLat), Mockito.eq(testLng), Mockito.eq(radiusMeters)))
 				.thenReturn(List.of());
 
