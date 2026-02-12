@@ -48,7 +48,7 @@ public class IssueHomeV2Controller {
 	public APIResponse getIssuesNearby(@RequestParam("lat") double lat, @RequestParam("lng") double lng) {
 		LocalDateTime fourMonthsAgo = LocalDateTime.now().minusMonths(6);
 		List<String> statusStrings = List.of(IssueStatusModel.OPEN.name(), IssueStatusModel.ONHOLD.name(),
-				IssueStatusModel.PENDING.name());
+				IssueStatusModel.PENDING.name(), IssueStatusModel.RESOLVED.name());
 		double radiusMeters = 5000.0; // 5 km
 
 		List<org.smalltech.hashtaglocal_backend.entity.IssueEntity> issueEntities = issueRepository
