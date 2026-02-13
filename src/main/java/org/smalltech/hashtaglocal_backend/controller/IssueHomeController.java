@@ -105,10 +105,34 @@ public class IssueHomeController {
 
 		// Fetch media items from database
 		List<org.smalltech.hashtaglocal_backend.entity.MediaEntity> mediaEntities = mediaRepository.findByIssue(entity);
-		List<Media> mediaList = mediaEntities.stream()
-				.map(mediaEntity -> Media.builder().location(location).type(mediaEntity.getType().name().toLowerCase())
-						.url(gcsService.generateSignedUrl(mediaEntity.getUrl())).build())
-				.toList();
+		List<Media> mediaList = mediaEntities.stream().map(mediaEntity -> {
+			String username = "admin";
+			double mediaLocLat = 0.0;
+			double mediaLocLng = 0.0;
+			String MediaLocName = "Unknown";
+			if (mediaEntity.getUser() != null && mediaEntity.getUser().getUsername() != null) {
+				username = mediaEntity.getUser().getUsername();
+			}
+			if (mediaEntity.getLocation() != null) {
+				if (mediaEntity.getLocation().getPoint() != null) {
+					mediaLocLat = mediaEntity.getLocation().getPoint().getY();
+					mediaLocLng = mediaEntity.getLocation().getPoint().getX();
+					System.out.println("DEBUG media location point: " + mediaEntity.getLocation().getPoint());
+				}
+				if (mediaEntity.getLocation().getName() != null) {
+					MediaLocName = mediaEntity.getLocation().getName();
+				}
+				System.out.println("DEBUG media location: " + mediaEntity.getLocation().getPoint().getY() + ", "
+						+ mediaEntity.getLocation().getPoint().getX() + " name: "
+						+ mediaEntity.getLocation().getName());
+			}
+
+			Location mediaLocation = Location.builder().lat(mediaLocLat).lng(mediaLocLng).locality(locality)
+					.address(MediaLocName).colloquialName(MediaLocName).build();
+
+			return Media.builder().location(mediaLocation).type(mediaEntity.getType().name().toLowerCase())
+					.url(gcsService.generateSignedUrl(mediaEntity.getUrl())).build();
+		}).toList();
 
 		int verifyCount = issueActionRepository.countDistinctUserByIssueAndAction(entity, IssueActionModel.VERIFY);
 
