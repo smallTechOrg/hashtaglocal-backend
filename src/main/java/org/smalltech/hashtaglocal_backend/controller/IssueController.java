@@ -150,6 +150,7 @@ public class IssueController {
 		}
 
 		String action = request.getIssueAction().getAction();
+		System.out.println("DEBUG: Action to perform: " + action);
 
 		IssueActionModel issueActionModel;
 		try {
@@ -176,10 +177,12 @@ public class IssueController {
 			}
 		}
 
+		var actionLocation = request.getIssueAction().getMediaUrls().get(0).getLocation();
+		System.out.println(
+				"DEBUG: Action location - lat: " + actionLocation.getLat() + ", lng: " + actionLocation.getLng());
+
 		// Enforce geo-fence for VERIFY / RESOLVE
 		if (issueActionModel == IssueActionModel.VERIFY || issueActionModel == IssueActionModel.RESOLVE) {
-
-			var actionLocation = request.getIssueAction().getMediaUrls().get(0).getLocation();
 
 			if (actionLocation == null || actionLocation.getLat() == null || actionLocation.getLng() == null) {
 				throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
@@ -207,6 +210,8 @@ public class IssueController {
 				org.smalltech.hashtaglocal_backend.entity.Location mediaLocation = locationService
 						.createAndSaveLocation(mediaLocReq.getLat(), mediaLocReq.getLng(), mediaLocReq.getMetaData(),
 								"Unknown");
+
+				System.out.println("DEBUG media url: " + mediaLocReq.getLat() + ", " + mediaLocReq.getLng());
 
 				var mediaEntity = org.smalltech.hashtaglocal_backend.entity.MediaEntity.builder().issue(issueEntity)
 						.type(parseMediaType(mediaRequest.getType())).url(mediaRequest.getUrl()).user(userEntity)
@@ -334,10 +339,29 @@ public class IssueController {
 		List<org.smalltech.hashtaglocal_backend.entity.MediaEntity> mediaEntities = mediaRepository.findByIssue(entity);
 		List<Media> mediaList = mediaEntities.stream().map(mediaEntity -> {
 			String username = "admin";
+			double mediaLocLat = 0.0;
+			double mediaLocLng = 0.0;
+			String MediaLocName = "Unknown";
 			if (mediaEntity.getUser() != null && mediaEntity.getUser().getUsername() != null) {
 				username = mediaEntity.getUser().getUsername();
 			}
-			return Media.builder().location(location).type(mediaEntity.getType().name().toLowerCase())
+			if (mediaEntity.getLocation() != null) {
+				if (mediaEntity.getLocation().getPoint() != null) {
+					mediaLocLat = mediaEntity.getLocation().getPoint().getY();
+					mediaLocLng = mediaEntity.getLocation().getPoint().getX();
+					System.out.println("DEBUG media location point: " + mediaEntity.getLocation().getPoint());
+				}
+				if (mediaEntity.getLocation().getName() != null) {
+					MediaLocName = mediaEntity.getLocation().getName();
+				}
+				System.out.println("DEBUG media location: " + mediaEntity.getLocation().getPoint().getY() + ", "
+						+ mediaEntity.getLocation().getPoint().getX() + " name: "
+						+ mediaEntity.getLocation().getName());
+			}
+
+			Location mediaLocation = Location.builder().lat(mediaLocLat).lng(mediaLocLng).locality(locality)
+					.address(MediaLocName).colloquialName(MediaLocName).build();
+			return Media.builder().location(mediaLocation).type(mediaEntity.getType().name().toLowerCase())
 					.url(gcsService.generateSignedUrl(mediaEntity.getUrl())).description(mediaEntity.getDescription())
 					.username(username).createdAt(mediaEntity.getCreatedAt()).build();
 		}).toList();
