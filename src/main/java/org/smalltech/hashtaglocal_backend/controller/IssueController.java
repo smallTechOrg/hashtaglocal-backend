@@ -177,27 +177,32 @@ public class IssueController {
 			}
 		}
 
-		var actionLocation = request.getIssueAction().getMediaUrls().get(0).getLocation();
-		System.out.println(
-				"DEBUG: Action location - lat: " + actionLocation.getLat() + ", lng: " + actionLocation.getLng());
-
 		// Enforce geo-fence for VERIFY / RESOLVE
 		if (issueActionModel == IssueActionModel.VERIFY || issueActionModel == IssueActionModel.RESOLVE) {
 
+			var mediaUrls = request.getIssueAction().getMediaUrls();
+
+			if (mediaUrls == null || mediaUrls.isEmpty()) {
+				throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+						"At least one media with location is required to verify or resolve an issue");
+			}
+
+			var actionLocation = mediaUrls.get(0).getLocation();
 			if (actionLocation == null || actionLocation.getLat() == null || actionLocation.getLng() == null) {
 				throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-						"Location is required to verify or resolve an issue");
+						"Location (lat, lng) is required to verify or resolve an issue");
 			}
+
+			System.out.println(
+					"DEBUG: Action location - lat: " + actionLocation.getLat() + ", lng: " + actionLocation.getLng());
 
 			geoFenceService.assertWithinRadius(issueEntity.getLocation(), // original issue location
 					actionLocation.getLat(), // user's current lat
 					actionLocation.getLng(), // user's current lng
 					customProperties.getVerifyRadiusMeters() // meters
 			);
-		}
 
-		// Process media URLs if provided
-		if (request.getIssueAction().getMediaUrls() != null && !request.getIssueAction().getMediaUrls().isEmpty()) {
+			// Process media URLs if provided
 			for (var mediaRequest : request.getIssueAction().getMediaUrls()) {
 
 				System.out.println("DEBUG media type: " + mediaRequest.getType());
