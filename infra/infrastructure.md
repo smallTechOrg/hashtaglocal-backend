@@ -374,7 +374,6 @@ curl -v https://staging.api.smalltech.in/local/actuator/health
 curl https://staging.api.smalltech.in/local/api/issues
 
 # Test with different endpoints
-curl https://staging.api.smalltech.in/local/api/news
 curl https://staging.api.smalltech.in/local/api/localities
 ```
 
@@ -431,7 +430,6 @@ https://staging.api.smalltech.in
 [Spring Boot Application]
   ├─ /actuator/health
   ├─ /api/issues
-  ├─ /api/news
   └─ /api/localities
 ```
 
