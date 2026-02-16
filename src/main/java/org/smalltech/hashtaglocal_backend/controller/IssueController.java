@@ -199,7 +199,7 @@ public class IssueController {
 			geoFenceService.assertWithinRadius(issueEntity.getLocation(), // original issue location
 					actionLocation.getLat(), // user's current lat
 					actionLocation.getLng(), // user's current lng
-					customProperties.getVerifyRadiusMeters() // meters
+					customProperties.getGeo().getVerifyRadiusMeters() // meters
 			);
 
 			// Process media URLs if provided
