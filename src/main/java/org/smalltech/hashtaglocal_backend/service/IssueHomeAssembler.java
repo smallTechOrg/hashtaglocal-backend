@@ -24,4 +24,14 @@ public class IssueHomeAssembler {
 
 		return APIResponse.builder().data(ResponseData.builder().issues(issues).build()).build();
 	}
+
+	public APIResponse getNearby(double lat, double lng) {
+		double radiusMeters = 5000.0;
+
+		var entities = issueHomeQueryService.findNearbyIssues(lat, lng, radiusMeters);
+
+		List<Issue> issues = entities.stream().map(issueViewMapper::map).toList();
+
+		return APIResponse.builder().data(ResponseData.builder().issues(issues).build()).build();
+	}
 }
