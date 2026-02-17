@@ -4,8 +4,8 @@ import java.net.URL;
 import org.smalltech.hashtaglocal_backend.config.CustomProperties;
 import org.smalltech.hashtaglocal_backend.infra.storage.SignedUrlGenerator;
 import org.smalltech.hashtaglocal_backend.model.SignedUrlResponse;
-import org.smalltech.hashtaglocal_backend.policy.FileNamingPolicy;
 import org.smalltech.hashtaglocal_backend.service.MediaService;
+import org.smalltech.hashtaglocal_backend.util.FileNamingPolicy;
 import org.smalltech.hashtaglocal_backend.util.MimeTypeMapper;
 import org.springframework.stereotype.Service;
 

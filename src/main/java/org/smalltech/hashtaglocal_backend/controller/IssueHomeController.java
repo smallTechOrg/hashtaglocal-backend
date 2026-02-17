@@ -6,7 +6,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.smalltech.hashtaglocal_backend.model.APIResponse;
-import org.smalltech.hashtaglocal_backend.service.IssueHomeAssembler;
+import org.smalltech.hashtaglocal_backend.service.IssueHomeService;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -19,9 +19,9 @@ import org.springframework.web.bind.annotation.RestController;
 @Transactional(readOnly = true)
 public class IssueHomeController {
 
-	private final IssueHomeAssembler issueHomeAssembler;
+	private final IssueHomeService issueHomeAssembler;
 
-	public IssueHomeController(IssueHomeAssembler issueHomeAssembler) {
+	public IssueHomeController(IssueHomeService issueHomeAssembler) {
 		this.issueHomeAssembler = issueHomeAssembler;
 	}
 

@@ -12,16 +12,16 @@ import org.mockito.Mockito;
 import org.smalltech.hashtaglocal_backend.model.APIResponse;
 import org.smalltech.hashtaglocal_backend.model.Issue;
 import org.smalltech.hashtaglocal_backend.model.ResponseData;
-import org.smalltech.hashtaglocal_backend.service.IssueHomeAssembler;
+import org.smalltech.hashtaglocal_backend.service.IssueHomeService;
 
 class IssueHomeControllerTests {
 
-	private IssueHomeAssembler issueHomeAssembler;
+	private IssueHomeService issueHomeAssembler;
 	private IssueHomeController controller;
 
 	@BeforeEach
 	void setup() {
-		issueHomeAssembler = Mockito.mock(IssueHomeAssembler.class);
+		issueHomeAssembler = Mockito.mock(IssueHomeService.class);
 		controller = new IssueHomeController(issueHomeAssembler);
 	}
 
