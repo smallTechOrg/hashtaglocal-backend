@@ -15,6 +15,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.concurrent.TimeUnit;
+import org.smalltech.hashtaglocal_backend.config.CustomProperties;
 import org.smalltech.hashtaglocal_backend.model.APIResponse;
 import org.smalltech.hashtaglocal_backend.model.ResponseData;
 import org.smalltech.hashtaglocal_backend.model.SignedUrlResponse;
@@ -29,12 +30,12 @@ import org.springframework.web.bind.annotation.RestController;
 @Tag(name = "Media", description = "Media upload and signed URL APIs")
 public class MediaController {
 
-	private static final String BUCKET_NAME = "hashtaglocalbucket";
-
 	private final Storage storage;
+	private final String bucketName;
 
-	public MediaController(Storage storage) {
+	public MediaController(Storage storage, CustomProperties.Google googleProperties) {
 		this.storage = storage;
+		this.bucketName = googleProperties.getStorage().getBucketName();
 	}
 
 	@GetMapping("/upload-url")
@@ -44,12 +45,12 @@ public class MediaController {
 	public APIResponse getSignedUrl(
 			@Parameter(description = "MIME type of the file to be uploaded (e.g. image/jpeg, image/png)", required = true, example = "image/jpeg") @RequestParam("content_type") String contentType) {
 
-		// 1. Generate time-based path
+		// 1. Generate time-based path under image/ folder
 		String extension = extractExtension(contentType);
 		String objectPath = generateTimeBasedPath(extension);
 
 		// 2. Create blob metadata
-		BlobInfo blobInfo = BlobInfo.newBuilder(BUCKET_NAME, objectPath).setContentType(contentType).build();
+		BlobInfo blobInfo = BlobInfo.newBuilder(bucketName, objectPath).setContentType(contentType).build();
 
 		// 3. Generate signed URL
 		URL signedUrl = storage.signUrl(blobInfo, 15, TimeUnit.MINUTES,
@@ -57,7 +58,7 @@ public class MediaController {
 
 		// 4. Build response
 		SignedUrlResponse mediaUrl = SignedUrlResponse.builder().signedUrl(signedUrl.toString())
-				.path("gs://" + BUCKET_NAME + "/" + objectPath).build();
+				.path("gs://" + bucketName + "/" + objectPath).build();
 
 		ResponseData data = ResponseData.builder().mediaUrl(mediaUrl).build();
 
@@ -67,7 +68,7 @@ public class MediaController {
 	private String generateTimeBasedPath(String extension) {
 		String timestamp = LocalDateTime.now(ZoneOffset.UTC)
 				.format(DateTimeFormatter.ofPattern("yyyy-MM-dd-HH-mm-ss-SSS"));
-		return String.format("%s.%s", timestamp, extension);
+		return String.format("image/%s.%s", timestamp, extension);
 	}
 
 	private String extractExtension(String contentType) {
