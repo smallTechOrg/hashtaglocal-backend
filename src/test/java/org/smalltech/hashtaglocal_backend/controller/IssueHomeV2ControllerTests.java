@@ -19,75 +19,62 @@ import org.smalltech.hashtaglocal_backend.service.IssueHomeAssembler;
 
 class IssueHomeV2ControllerTests {
 
-    private IssueHomeAssembler issueHomeAssembler;
-    private IssueHomeV2Controller controller;
+	private IssueHomeAssembler issueHomeAssembler;
+	private IssueHomeV2Controller controller;
 
-    @BeforeEach
-    void setup() {
-        issueHomeAssembler = Mockito.mock(IssueHomeAssembler.class);
-        controller = new IssueHomeV2Controller(issueHomeAssembler);
-    }
+	@BeforeEach
+	void setup() {
+		issueHomeAssembler = Mockito.mock(IssueHomeAssembler.class);
+		controller = new IssueHomeV2Controller(issueHomeAssembler);
+	}
 
-    @Test
-    void getIssuesNearby_shouldReturnIssues() {
-        // Arrange
-        double testLat = 26.9124;
-        double testLng = 75.8073;
+	@Test
+	void getIssuesNearby_shouldReturnIssues() {
+		// Arrange
+		double testLat = 26.9124;
+		double testLng = 75.8073;
 
-        Issue issue1 = Issue.builder()
-                .id(1L)
-                .type("pothole")
-                .description("Large pothole")
-                .user(User.builder().username("john_doe").build())
-                .location(Location.builder().lat(26.9124).lng(75.8073).build())
-                .viewerContext(ViewerContext.builder().upvote(false).build())
-                .createdAt(LocalDateTime.now())
-                .mediaUrls(List.of())
-                .build();
+		Issue issue1 = Issue.builder().id(1L).type("pothole").description("Large pothole")
+				.user(User.builder().username("john_doe").build())
+				.location(Location.builder().lat(26.9124).lng(75.8073).build())
+				.viewerContext(ViewerContext.builder().upvote(false).build()).createdAt(LocalDateTime.now())
+				.mediaUrls(List.of()).build();
 
-        Issue issue2 = Issue.builder()
-                .id(2L)
-                .type("waste")
-                .description("Blocked drainage")
-                .user(User.builder().username("john_doe").build())
-                .location(Location.builder().lat(26.9124).lng(75.8073).build())
-                .viewerContext(ViewerContext.builder().upvote(false).build())
-                .createdAt(LocalDateTime.now())
-                .mediaUrls(List.of())
-                .build();
+		Issue issue2 = Issue.builder().id(2L).type("waste").description("Blocked drainage")
+				.user(User.builder().username("john_doe").build())
+				.location(Location.builder().lat(26.9124).lng(75.8073).build())
+				.viewerContext(ViewerContext.builder().upvote(false).build()).createdAt(LocalDateTime.now())
+				.mediaUrls(List.of()).build();
 
-        APIResponse response = APIResponse.builder()
-                .data(ResponseData.builder().issues(List.of(issue2, issue1)).build())
-                .build();
+		APIResponse response = APIResponse.builder()
+				.data(ResponseData.builder().issues(List.of(issue2, issue1)).build()).build();
 
-        when(issueHomeAssembler.getNearby(testLat, testLng)).thenReturn(response);
+		when(issueHomeAssembler.getNearby(testLat, testLng)).thenReturn(response);
 
-        // Act
-        APIResponse actual = controller.getIssuesNearby(testLat, testLng);
+		// Act
+		APIResponse actual = controller.getIssuesNearby(testLat, testLng);
 
-        // Assert
-        assertNotNull(actual);
-        assertNotNull(actual.getData());
-        assertEquals(2, actual.getData().getIssues().size());
-        assertEquals(2L, actual.getData().getIssues().get(0).getId());
-        assertEquals(1L, actual.getData().getIssues().get(1).getId());
-    }
+		// Assert
+		assertNotNull(actual);
+		assertNotNull(actual.getData());
+		assertEquals(2, actual.getData().getIssues().size());
+		assertEquals(2L, actual.getData().getIssues().get(0).getId());
+		assertEquals(1L, actual.getData().getIssues().get(1).getId());
+	}
 
-    @Test
-    void getIssuesNearby_shouldReturnEmptyList() {
-        double testLat = 26.9124;
-        double testLng = 75.8073;
+	@Test
+	void getIssuesNearby_shouldReturnEmptyList() {
+		double testLat = 26.9124;
+		double testLng = 75.8073;
 
-        APIResponse response = APIResponse.builder()
-                .data(ResponseData.builder().issues(List.of()).build())
-                .build();
+		APIResponse response = APIResponse.builder().data(ResponseData.builder().issues(List.of()).build()).build();
 
-        when(issueHomeAssembler.getNearby(testLat, testLng)).thenReturn(response);
+		when(issueHomeAssembler.getNearby(testLat, testLng)).thenReturn(response);
 
-        APIResponse actual = controller.getIssuesNearby(testLat, testLng);
+		APIResponse actual = controller.getIssuesNearby(testLat, testLng);
 
-        assertNotNull(actual);
-        assertNotNull(actual.getData());
-        assertEquals(0, actual.getData().getIssues().size());
-    }
+		assertNotNull(actual);
+		assertNotNull(actual.getData());
+		assertEquals(0, actual.getData().getIssues().size());
+	}
 }
