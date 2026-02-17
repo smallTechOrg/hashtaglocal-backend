@@ -7,7 +7,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
-import org.smalltech.hashtaglocal_backend.mapper.IssueResponseMapper;
+import org.smalltech.hashtaglocal_backend.mapper.IssueViewMapper;
 import org.smalltech.hashtaglocal_backend.model.APIResponse;
 import org.smalltech.hashtaglocal_backend.model.ResponseData;
 import org.smalltech.hashtaglocal_backend.model.request.IssuePatchRequest;
@@ -36,14 +36,16 @@ public class IssueController {
 	private final IssueQueryService issueQueryService;
 	private final IssuePatchService issuePatchService;
 	private final IssueActionService issueActionService;
-	private final IssueResponseMapper issueResponseMapper;
+	private final IssueViewMapper issueViewMapper;
 
 	@GetMapping("/{issueId}")
 	@Operation(summary = "Get issue", description = "Returns a issue response with user, location, locality and viewer context.")
 	@ApiResponse(responseCode = "200", description = "Successful issue response", content = @Content(mediaType = "application/json", schema = @Schema(implementation = APIResponse.class)))
 	public APIResponse getIssue(@PathVariable Long issueId) {
 		var issueEntity = issueQueryService.get(issueId);
-		return issueResponseMapper.map(issueEntity);
+
+		var issue = issueViewMapper.map(issueEntity);
+		return APIResponse.builder().data(ResponseData.builder().issue(issue).build()).build();
 	}
 
 	@PatchMapping("/{issueId}")
@@ -52,7 +54,9 @@ public class IssueController {
 	@ApiResponse(responseCode = "200", description = "Issue patched successfully", content = @Content(mediaType = "application/json", schema = @Schema(implementation = APIResponse.class)))
 	public ResponseEntity<APIResponse> patchIssue(@PathVariable Long issueId, @RequestBody IssuePatchRequest request) {
 		var issueEntity = issuePatchService.patchIssue(issueId, request);
-		return ResponseEntity.ok(issueResponseMapper.map(issueEntity));
+
+		var issue = issueViewMapper.map(issueEntity);
+		return ResponseEntity.ok(APIResponse.builder().data(ResponseData.builder().issue(issue).build()).build());
 	}
 
 	@PutMapping("/{issueId}")

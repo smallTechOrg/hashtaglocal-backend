@@ -1,8 +1,6 @@
 package org.smalltech.hashtaglocal_backend.controller;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.times;
@@ -14,11 +12,11 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.smalltech.hashtaglocal_backend.entity.IssueEntity;
-import org.smalltech.hashtaglocal_backend.mapper.IssueResponseMapper;
+import org.smalltech.hashtaglocal_backend.mapper.IssueViewMapper;
 import org.smalltech.hashtaglocal_backend.model.APIResponse;
+import org.smalltech.hashtaglocal_backend.model.Issue;
 import org.smalltech.hashtaglocal_backend.model.IssueStatusModel;
 import org.smalltech.hashtaglocal_backend.model.IssueTypeModel;
-import org.smalltech.hashtaglocal_backend.model.ResponseData;
 import org.smalltech.hashtaglocal_backend.model.request.IssuePatchRequest;
 import org.smalltech.hashtaglocal_backend.model.request.IssueVerifyRequest;
 import org.smalltech.hashtaglocal_backend.service.IssueActionService;
@@ -32,7 +30,7 @@ class IssueControllerTests {
 	private IssueQueryService issueQueryService;
 	private IssuePatchService issuePatchService;
 	private IssueActionService issueActionService;
-	private IssueResponseMapper issueResponseMapper;
+	private IssueViewMapper issueViewMapper;
 	private IssueController controller;
 
 	@BeforeEach
@@ -40,33 +38,34 @@ class IssueControllerTests {
 		issueQueryService = Mockito.mock(IssueQueryService.class);
 		issuePatchService = Mockito.mock(IssuePatchService.class);
 		issueActionService = Mockito.mock(IssueActionService.class);
-		issueResponseMapper = Mockito.mock(IssueResponseMapper.class);
+		issueViewMapper = Mockito.mock(IssueViewMapper.class);
 
-		controller = new IssueController(issueQueryService, issuePatchService, issueActionService, issueResponseMapper);
+		controller = new IssueController(issueQueryService, issuePatchService, issueActionService, issueViewMapper);
 	}
 
 	@Test
 	void getIssue_shouldReturnValidApiResponse() {
 		Long issueId = 1L;
 
-		IssueEntity entity = IssueEntity.builder().id(issueId).key("JPR-001").type(IssueTypeModel.POTHOLE)
+		IssueEntity entity = IssueEntity.builder().id(issueId).type(IssueTypeModel.POTHOLE)
 				.status(IssueStatusModel.OPEN).description("Large pothole causing traffic issues")
 				.createdAt(LocalDateTime.parse("2025-12-26T18:00:00"))
 				.updatedAt(LocalDateTime.parse("2025-12-26T18:00:00")).build();
 
-		APIResponse mapped = APIResponse.builder().data(ResponseData.builder().issueId(issueId).build()).build();
+		Issue view = Issue.builder().id(issueId).build();
 
 		when(issueQueryService.get(issueId)).thenReturn(entity);
-		when(issueResponseMapper.map(entity)).thenReturn(mapped);
+		when(issueViewMapper.map(entity)).thenReturn(view);
 
 		APIResponse response = controller.getIssue(issueId);
 
 		assertNotNull(response);
 		assertNotNull(response.getData());
-		assertEquals(issueId, response.getData().getIssueId());
+		assertNotNull(response.getData().getIssue());
+		assertEquals(issueId, response.getData().getIssue().getId());
 
 		verify(issueQueryService, times(1)).get(issueId);
-		verify(issueResponseMapper, times(1)).map(entity);
+		verify(issueViewMapper, times(1)).map(entity);
 	}
 
 	@Test
@@ -77,11 +76,10 @@ class IssueControllerTests {
 				.status(IssueStatusModel.OPEN).description("Original description")
 				.createdAt(LocalDateTime.parse("2025-12-20T09:15:00")).build();
 
-		APIResponse mappedResponse = APIResponse.builder().data(ResponseData.builder().issueId(issueId).build())
-				.build();
+		Issue view = Issue.builder().id(issueId).build();
 
 		when(issuePatchService.patchIssue(eq(issueId), any(IssuePatchRequest.class))).thenReturn(entity);
-		when(issueResponseMapper.map(entity)).thenReturn(mappedResponse);
+		when(issueViewMapper.map(entity)).thenReturn(view);
 
 		IssuePatchRequest request = new IssuePatchRequest();
 		request.setStatus("RESOLVED");
@@ -93,10 +91,11 @@ class IssueControllerTests {
 		assertEquals(HttpStatus.OK, response.getStatusCode());
 		assertNotNull(response.getBody());
 		assertNotNull(response.getBody().getData());
-		assertEquals(issueId, response.getBody().getData().getIssueId());
+		assertNotNull(response.getBody().getData().getIssue());
+		assertEquals(issueId, response.getBody().getData().getIssue().getId());
 
 		verify(issuePatchService, times(1)).patchIssue(eq(issueId), any(IssuePatchRequest.class));
-		verify(issueResponseMapper, times(1)).map(entity);
+		verify(issueViewMapper, times(1)).map(entity);
 	}
 
 	@Test

@@ -5,13 +5,11 @@ import lombok.RequiredArgsConstructor;
 import org.smalltech.hashtaglocal_backend.entity.IssueEntity;
 import org.smalltech.hashtaglocal_backend.entity.MediaEntity;
 import org.smalltech.hashtaglocal_backend.entity.UserEntity;
-import org.smalltech.hashtaglocal_backend.model.APIResponse;
 import org.smalltech.hashtaglocal_backend.model.Issue;
 import org.smalltech.hashtaglocal_backend.model.IssueActionModel;
 import org.smalltech.hashtaglocal_backend.model.Locality;
 import org.smalltech.hashtaglocal_backend.model.Location;
 import org.smalltech.hashtaglocal_backend.model.Media;
-import org.smalltech.hashtaglocal_backend.model.ResponseData;
 import org.smalltech.hashtaglocal_backend.model.User;
 import org.smalltech.hashtaglocal_backend.model.ViewerContext;
 import org.smalltech.hashtaglocal_backend.repository.IssueActionRepository;
@@ -21,13 +19,13 @@ import org.springframework.stereotype.Component;
 
 @Component
 @RequiredArgsConstructor
-public class IssueResponseMapper {
+public class IssueViewMapper {
 
 	private final MediaRepository mediaRepository;
 	private final IssueActionRepository issueActionRepository;
 	private final GCSService gcsService;
 
-	public APIResponse map(IssueEntity entity) {
+	public Issue map(IssueEntity entity) {
 		// Get user from entity - IssueDataInitializer ensures all issues have user ID 1
 		UserEntity userEntity = entity.getUserEntity();
 		if (userEntity == null) {
@@ -98,13 +96,9 @@ public class IssueResponseMapper {
 
 		ViewerContext viewerContext = ViewerContext.builder().upvote(false).build();
 
-		Issue issue = Issue.builder().id(entity.getId()).user(user).location(location)
+		return Issue.builder().id(entity.getId()).user(user).location(location)
 				.type(entity.getType().name().toLowerCase()).description(entity.getDescription())
 				.createdAt(entity.getCreatedAt()).mediaUrls(mediaList).voteCount(0).verifyCount(verifyCount)
 				.status(entity.getStatus().name()).rank(1).viewerContext(viewerContext).build();
-
-		ResponseData data = ResponseData.builder().issue(issue).build();
-
-		return APIResponse.builder().data(data).build();
 	}
 }
