@@ -40,7 +40,7 @@ app:
   geo:
     verify-radius-meters: 50
   storage:
-    bucket-name: hashtaglocal-bucket
+    bucket-name: hashtaglocalbucket
 
 # Google Maps API configuration
 google:
