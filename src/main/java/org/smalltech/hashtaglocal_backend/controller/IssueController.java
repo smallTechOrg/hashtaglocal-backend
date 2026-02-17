@@ -6,35 +6,15 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Locale;
-import org.smalltech.hashtaglocal_backend.config.CustomProperties;
-import org.smalltech.hashtaglocal_backend.dto.LocationMetadataDTO;
-import org.smalltech.hashtaglocal_backend.entity.IssueActionEntity;
+import lombok.RequiredArgsConstructor;
+import org.smalltech.hashtaglocal_backend.mapper.IssueResponseMapper;
 import org.smalltech.hashtaglocal_backend.model.APIResponse;
-import org.smalltech.hashtaglocal_backend.model.Issue;
-import org.smalltech.hashtaglocal_backend.model.IssueActionModel;
-import org.smalltech.hashtaglocal_backend.model.IssueStatusModel;
-import org.smalltech.hashtaglocal_backend.model.IssueTypeModel;
-import org.smalltech.hashtaglocal_backend.model.Locality;
-import org.smalltech.hashtaglocal_backend.model.Location;
-import org.smalltech.hashtaglocal_backend.model.Media;
 import org.smalltech.hashtaglocal_backend.model.ResponseData;
-import org.smalltech.hashtaglocal_backend.model.User;
-import org.smalltech.hashtaglocal_backend.model.ViewerContext;
 import org.smalltech.hashtaglocal_backend.model.request.IssuePatchRequest;
 import org.smalltech.hashtaglocal_backend.model.request.IssueVerifyRequest;
-import org.smalltech.hashtaglocal_backend.repository.IssueActionRepository;
-import org.smalltech.hashtaglocal_backend.repository.IssueRepository;
-import org.smalltech.hashtaglocal_backend.repository.MediaRepository;
-import org.smalltech.hashtaglocal_backend.repository.UserRepository;
-import org.smalltech.hashtaglocal_backend.service.GCSService;
-import org.smalltech.hashtaglocal_backend.service.GeoFenceService;
-import org.smalltech.hashtaglocal_backend.service.GoogleMapsGeocodingService;
-import org.smalltech.hashtaglocal_backend.service.LocationService;
-import org.smalltech.hashtaglocal_backend.util.LocationUtil;
-import org.springframework.http.HttpStatus;
+import org.smalltech.hashtaglocal_backend.service.IssueActionService;
+import org.smalltech.hashtaglocal_backend.service.IssuePatchService;
+import org.smalltech.hashtaglocal_backend.service.IssueQueryService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.transaction.annotation.Transactional;
@@ -45,49 +25,25 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.server.ResponseStatusException;
 
 @RestController
 @RequestMapping("/api/v1/issue")
 @Tag(name = "Issue", description = "issue API")
+@RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class IssueController {
 
-	private final CustomProperties customProperties;
-	private final IssueActionRepository issueActionRepository;
-	private final IssueRepository issueRepository;
-	private final MediaRepository mediaRepository;
-	private final UserRepository userRepository;
-	private final GCSService gcsService;
-	private final GeoFenceService geoFenceService;
-	private final GoogleMapsGeocodingService googleMapsGeocodingService;
-	private final LocationService locationService;
-
-	public IssueController(CustomProperties customProperties, IssueActionRepository issueActionRepository,
-			IssueRepository issueRepository, MediaRepository mediaRepository, UserRepository userRepository,
-			GCSService gcsService, GeoFenceService geoFenceService,
-			GoogleMapsGeocodingService googleMapsGeocodingService, LocationService locationService) {
-		this.customProperties = customProperties;
-		this.issueActionRepository = issueActionRepository;
-		this.issueRepository = issueRepository;
-		this.mediaRepository = mediaRepository;
-		this.userRepository = userRepository;
-		this.gcsService = gcsService;
-		this.geoFenceService = geoFenceService;
-		this.googleMapsGeocodingService = googleMapsGeocodingService;
-		this.locationService = locationService;
-	}
+	private final IssueQueryService issueQueryService;
+	private final IssuePatchService issuePatchService;
+	private final IssueActionService issueActionService;
+	private final IssueResponseMapper issueResponseMapper;
 
 	@GetMapping("/{issueId}")
 	@Operation(summary = "Get issue", description = "Returns a issue response with user, location, locality and viewer context.")
 	@ApiResponse(responseCode = "200", description = "Successful issue response", content = @Content(mediaType = "application/json", schema = @Schema(implementation = APIResponse.class)))
 	public APIResponse getIssue(@PathVariable Long issueId) {
-		// Try fetching the requested issue
-		var issueEntity = issueRepository.findById(issueId)
-				// If not found, fetch issue with ID 1 as fallback
-				.orElseGet(() -> issueRepository.findById(1L)
-						.orElseThrow(() -> new RuntimeException("No issue available")));
-		return mapToAPIResponse(issueEntity);
+		var issueEntity = issueQueryService.get(issueId);
+		return issueResponseMapper.map(issueEntity);
 	}
 
 	@PatchMapping("/{issueId}")
@@ -95,41 +51,8 @@ public class IssueController {
 	@Operation(summary = "Update issue", description = "Patch issue fields like status, type, description, and coordinates.")
 	@ApiResponse(responseCode = "200", description = "Issue patched successfully", content = @Content(mediaType = "application/json", schema = @Schema(implementation = APIResponse.class)))
 	public ResponseEntity<APIResponse> patchIssue(@PathVariable Long issueId, @RequestBody IssuePatchRequest request) {
-		if (request == null) {
-			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Request body is required");
-		}
-
-		var issueEntity = issueRepository.findById(issueId)
-				.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Issue not found"));
-
-		boolean updated = false;
-
-		if (request.getStatus() != null) {
-			issueEntity.setStatus(parseStatus(request.getStatus()));
-			updated = true;
-		}
-
-		if (request.getType() != null) {
-			issueEntity.setType(parseType(request.getType()));
-			updated = true;
-		}
-
-		if (request.getDescription() != null) {
-			issueEntity.setDescription(request.getDescription());
-			updated = true;
-		}
-
-		if (request.getLat() != null && request.getLng() != null) {
-			updateLocationCoordinates(issueEntity, request.getLat(), request.getLng());
-			updated = true;
-		}
-
-		if (updated) {
-			issueEntity.setUpdatedAt(LocalDateTime.now());
-			issueRepository.save(issueEntity);
-		}
-
-		return ResponseEntity.ok(mapToAPIResponse(issueEntity));
+		var issueEntity = issuePatchService.patchIssue(issueId, request);
+		return ResponseEntity.ok(issueResponseMapper.map(issueEntity));
 	}
 
 	@PutMapping("/{issueId}")
@@ -139,251 +62,11 @@ public class IssueController {
 	@ApiResponse(responseCode = "200", description = "Issue verified successfully", content = @Content(mediaType = "application/json", schema = @Schema(implementation = APIResponse.class)))
 	public ResponseEntity<APIResponse> verifyIssue(@PathVariable Long issueId, @AuthenticationPrincipal Long userId,
 			@RequestBody IssueVerifyRequest request) {
+		Long updatedIssueId = issueActionService.handle(issueId, userId, request);
 
-		// 1. Debug the Raw Request Path
-		System.out.println("DEBUG: Received verify request for issueId: " + issueId);
-		System.out.println("DEBUG: Authenticated userId: " + userId);
-
-		if (request == null || request.getIssueAction() == null) {
-			System.out.println("DEBUG: ERROR - Request body is null");
-			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Request body with issueAction is required");
-		}
-
-		String action = request.getIssueAction().getAction();
-		System.out.println("DEBUG: Action to perform: " + action);
-
-		IssueActionModel issueActionModel;
-		try {
-			issueActionModel = IssueActionModel.valueOf(action.toUpperCase());
-		} catch (Exception e) {
-			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid action:" + action);
-		}
-
-		var issueEntity = issueRepository.findById(issueId)
-				.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Issue not found"));
-
-		// Resolve authenticated user from security context
-		if (userId == null) {
-			throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not authenticated");
-		}
-		var userEntity = userRepository.findById(userId)
-				.orElseThrow(() -> new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "User not found"));
-
-		// Reject issue
-		if (issueActionModel == IssueActionModel.REJECT) {
-			Long ownerId = issueEntity.getUserEntity() != null ? issueEntity.getUserEntity().getId() : null;
-			if (ownerId == null || !ownerId.equals(userId)) {
-				throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only the issue owner can reject the issue");
-			}
-		}
-
-		// Enforce geo-fence for VERIFY / RESOLVE
-		if (issueActionModel == IssueActionModel.VERIFY || issueActionModel == IssueActionModel.RESOLVE) {
-
-			var mediaUrls = request.getIssueAction().getMediaUrls();
-
-			if (mediaUrls == null || mediaUrls.isEmpty()) {
-				throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-						"At least one media with location is required to verify or resolve an issue");
-			}
-
-			var actionLocation = mediaUrls.get(0).getLocation();
-			if (actionLocation == null || actionLocation.getLat() == null || actionLocation.getLng() == null) {
-				throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-						"Location (lat, lng) is required to verify or resolve an issue");
-			}
-
-			System.out.println(
-					"DEBUG: Action location - lat: " + actionLocation.getLat() + ", lng: " + actionLocation.getLng());
-
-			geoFenceService.assertWithinRadius(issueEntity.getLocation(), // original issue location
-					actionLocation.getLat(), // user's current lat
-					actionLocation.getLng(), // user's current lng
-					customProperties.getGeo().getVerifyRadiusMeters() // meters
-			);
-
-			// Process media URLs if provided
-			for (var mediaRequest : request.getIssueAction().getMediaUrls()) {
-
-				System.out.println("DEBUG media type: " + mediaRequest.getType());
-				System.out.println("DEBUG media url: " + mediaRequest.getUrl());
-				System.out.println("DEBUG media desc: " + mediaRequest.getDescription());
-
-				var mediaLocReq = mediaRequest.getLocation();
-
-				// Save Media Location
-				org.smalltech.hashtaglocal_backend.entity.Location mediaLocation = locationService
-						.createAndSaveLocation(mediaLocReq.getLat(), mediaLocReq.getLng(), mediaLocReq.getMetaData(),
-								"Unknown");
-
-				System.out.println("DEBUG media url: " + mediaLocReq.getLat() + ", " + mediaLocReq.getLng());
-
-				var mediaEntity = org.smalltech.hashtaglocal_backend.entity.MediaEntity.builder().issue(issueEntity)
-						.type(parseMediaType(mediaRequest.getType())).url(mediaRequest.getUrl()).user(userEntity)
-						.description(mediaRequest.getDescription()).location(mediaLocation)
-						.createdAt(LocalDateTime.now()).build();
-				mediaRepository.save(mediaEntity);
-			}
-		}
-
-		// Save issue action record
-		IssueActionEntity issueActionEntity = IssueActionEntity.builder().issueEntity(issueEntity)
-				.userEntity(userEntity).action(issueActionModel).createdAt(LocalDateTime.now()).build();
-
-		issueActionRepository.save(issueActionEntity);
-
-		// Action-based status update
-		if (action.equalsIgnoreCase("REJECT")) {
-			issueEntity.setStatus(IssueStatusModel.REJECTED);
-
-		} else if (!IssueStatusModel.ONHOLD.equals(issueEntity.getStatus())) {
-
-			if (action.equalsIgnoreCase("VERIFY")) {
-				issueEntity.setStatus(IssueStatusModel.OPEN);
-
-			} else if (action.equalsIgnoreCase("RESOLVE")) {
-				issueEntity.setStatus(IssueStatusModel.PENDING);
-			}
-		}
-
-		issueEntity.setUpdatedAt(LocalDateTime.now());
-		issueRepository.save(issueEntity);
-
-		// Build response
-		APIResponse response = APIResponse.builder().data(ResponseData.builder().issueId(issueId).build()).build();
+		APIResponse response = APIResponse.builder().data(ResponseData.builder().issueId(updatedIssueId).build())
+				.build();
 
 		return ResponseEntity.ok(response);
 	}
-
-	private org.smalltech.hashtaglocal_backend.model.MediaTypeModel parseMediaType(String type) {
-		try {
-			return org.smalltech.hashtaglocal_backend.model.MediaTypeModel.valueOf(type.toUpperCase(Locale.ROOT));
-		} catch (IllegalArgumentException ex) {
-			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid media type: " + type, ex);
-		}
-	}
-
-	private IssueStatusModel parseStatus(String status) {
-		try {
-			return IssueStatusModel.valueOf(status.toUpperCase(Locale.ROOT));
-		} catch (IllegalArgumentException ex) {
-			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid status value: " + status, ex);
-		}
-	}
-
-	private IssueTypeModel parseType(String type) {
-		try {
-			return IssueTypeModel.valueOf(type.toUpperCase(Locale.ROOT));
-		} catch (IllegalArgumentException ex) {
-			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid type value: " + type, ex);
-		}
-	}
-
-	private void updateLocationCoordinates(org.smalltech.hashtaglocal_backend.entity.IssueEntity issueEntity,
-			Double lat, Double lng) {
-		org.smalltech.hashtaglocal_backend.entity.Location locEntity = issueEntity.getLocation();
-		if (locEntity != null) {
-			// Update point with new coordinates
-			locEntity.setPoint(LocationUtil.createPoint(lat, lng));
-
-			// Fetch latest location metadata from Google Maps
-			LocationMetadataDTO metadata = googleMapsGeocodingService.reverseGeocode(lat, lng);
-			if (metadata != null) {
-				// Update location metadata
-				java.util.Map<String, Object> metadataMap = googleMapsGeocodingService.metadataToMap(metadata);
-				locEntity.setMetaData(metadataMap);
-
-				// Update location name if we have a good one
-				if (metadata.getName() != null && !metadata.getName().isEmpty()) {
-					locEntity.setName(metadata.getName());
-				} else if (metadata.getCity() != null) {
-					locEntity.setName(metadata.getCity());
-				}
-			}
-		} else {
-			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Location data not found for issue");
-		}
-	}
-
-	private APIResponse mapToAPIResponse(org.smalltech.hashtaglocal_backend.entity.IssueEntity entity) {
-		// Get user from entity - IssueDataInitializer ensures all issues have user ID 1
-		org.smalltech.hashtaglocal_backend.entity.UserEntity userEntity = entity.getUserEntity();
-		if (userEntity == null) {
-			// Fallback: create a default user if data is corrupted
-			userEntity = new org.smalltech.hashtaglocal_backend.entity.UserEntity();
-			userEntity.setUsername("admin");
-			userEntity.setProfilePicture("https://example.com/default-profile.jpg");
-		}
-		User user = User.builder().username(userEntity.getUsername()).profilePhoto(userEntity.getProfilePicture())
-				.build();
-
-		// Map Locality from Location entity with robust null-safety
-		org.smalltech.hashtaglocal_backend.entity.Location locEntity = entity.getLocation();
-		String hashtag = "world";
-		if (locEntity != null && locEntity.getLocality() != null && locEntity.getLocality().getHashtag() != null) {
-			hashtag = locEntity.getLocality().getHashtag();
-		}
-		Locality locality = Locality.builder().hashtags(List.of(hashtag)).build();
-
-		double lat = 0.0;
-		double lng = 0.0;
-		String name = "Unknown";
-		if (locEntity != null) {
-			if (locEntity.getPoint() != null) {
-				lat = locEntity.getPoint().getY();
-				lng = locEntity.getPoint().getX();
-			}
-			if (locEntity.getName() != null) {
-				name = locEntity.getName();
-			}
-		}
-		Location location = Location.builder().lat(lat).lng(lng).locality(locality).address(name).colloquialName(name)
-				.build();
-
-		// Fetch media items from database
-		List<org.smalltech.hashtaglocal_backend.entity.MediaEntity> mediaEntities = mediaRepository.findByIssue(entity);
-		List<Media> mediaList = mediaEntities.stream().map(mediaEntity -> {
-			String username = "admin";
-			double mediaLocLat = 0.0;
-			double mediaLocLng = 0.0;
-			String MediaLocName = "Unknown";
-			if (mediaEntity.getUser() != null && mediaEntity.getUser().getUsername() != null) {
-				username = mediaEntity.getUser().getUsername();
-			}
-			if (mediaEntity.getLocation() != null) {
-				if (mediaEntity.getLocation().getPoint() != null) {
-					mediaLocLat = mediaEntity.getLocation().getPoint().getY();
-					mediaLocLng = mediaEntity.getLocation().getPoint().getX();
-					System.out.println("DEBUG media location point: " + mediaEntity.getLocation().getPoint());
-				}
-				if (mediaEntity.getLocation().getName() != null) {
-					MediaLocName = mediaEntity.getLocation().getName();
-				}
-				System.out.println("DEBUG media location: " + mediaEntity.getLocation().getPoint().getY() + ", "
-						+ mediaEntity.getLocation().getPoint().getX() + " name: "
-						+ mediaEntity.getLocation().getName());
-			}
-
-			Location mediaLocation = Location.builder().lat(mediaLocLat).lng(mediaLocLng).locality(locality)
-					.address(MediaLocName).colloquialName(MediaLocName).build();
-			return Media.builder().location(mediaLocation).type(mediaEntity.getType().name().toLowerCase())
-					.url(gcsService.generateSignedUrl(mediaEntity.getUrl())).description(mediaEntity.getDescription())
-					.username(username).createdAt(mediaEntity.getCreatedAt()).build();
-		}).toList();
-
-		int verifyCount = issueActionRepository.countDistinctUserByIssueAndAction(entity, IssueActionModel.VERIFY);
-
-		// Default viewer context (no upvote data in DB yet)
-		ViewerContext viewerContext = ViewerContext.builder().upvote(false).build();
-
-		Issue issue = Issue.builder().id(entity.getId()).user(user).location(location)
-				.type(entity.getType().name().toLowerCase()).description(entity.getDescription())
-				.createdAt(entity.getCreatedAt()).mediaUrls(mediaList).voteCount(0).verifyCount(verifyCount)
-				.status(entity.getStatus().name()).rank(1).viewerContext(viewerContext).build();
-
-		ResponseData data = ResponseData.builder().issue(issue).build();
-
-		return APIResponse.builder().data(data).build();
-	}
-
 }
