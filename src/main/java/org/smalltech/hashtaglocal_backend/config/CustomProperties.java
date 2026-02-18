@@ -15,6 +15,7 @@ public class CustomProperties {
 	@Data
 	public static class Geo {
 		private double verifyRadiusMeters;
+		private double viewRadiusMeters;
 	}
 
 	@Data

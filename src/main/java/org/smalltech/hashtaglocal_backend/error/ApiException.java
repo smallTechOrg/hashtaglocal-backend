@@ -10,7 +10,6 @@ public class ApiException extends RuntimeException {
 	private final HttpStatus status;
 	private final ErrorType type;
 	private final ErrorCode code;
-	private final String field;
 
 	@Builder
 	public ApiException(HttpStatus status, ErrorType type, ErrorCode code, String message) {
@@ -18,14 +17,5 @@ public class ApiException extends RuntimeException {
 		this.status = status;
 		this.type = type;
 		this.code = code;
-		this.field = null;
-	}
-
-	public ApiException(HttpStatus status, ErrorType type, ErrorCode code, String message, String field) {
-		super(message);
-		this.status = status;
-		this.type = type;
-		this.code = code;
-		this.field = field;
 	}
 }

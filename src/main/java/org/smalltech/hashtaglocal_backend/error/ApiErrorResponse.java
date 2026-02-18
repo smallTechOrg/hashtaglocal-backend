@@ -16,7 +16,6 @@ public class ApiErrorResponse {
 	public static class ErrorBody {
 		private String message;
 		private List<ErrorItem> errors;
-		private String requestId;
 		private Instant timestamp;
 	}
 
@@ -26,6 +25,5 @@ public class ApiErrorResponse {
 		private String type;
 		private String code;
 		private String message;
-		private String field;
 	}
 }

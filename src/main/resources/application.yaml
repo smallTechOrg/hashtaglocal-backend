@@ -39,6 +39,7 @@ logging:
 app:
   geo:
     verify-radius-meters: 50
+    view-radius-meters: 5000
   storage:
     bucket-name: hashtaglocalbucket
 
