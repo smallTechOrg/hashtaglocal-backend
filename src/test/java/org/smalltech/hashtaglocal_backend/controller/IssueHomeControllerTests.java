@@ -16,13 +16,13 @@ import org.smalltech.hashtaglocal_backend.service.IssueHomeService;
 
 class IssueHomeControllerTests {
 
-	private IssueHomeService issueHomeAssembler;
+	private IssueHomeService issueHomeService;
 	private IssueHomeController controller;
 
 	@BeforeEach
 	void setup() {
-		issueHomeAssembler = Mockito.mock(IssueHomeService.class);
-		controller = new IssueHomeController(issueHomeAssembler);
+		issueHomeService = Mockito.mock(IssueHomeService.class);
+		controller = new IssueHomeController(issueHomeService);
 	}
 
 	@Test

@@ -1,0 +1,5 @@
+package org.smalltech.hashtaglocal_backend.error;
+
+public enum ErrorCode {
+	INVALID_REFRESH_TOKEN, TOKEN_EXPIRED, UNAUTHORIZED, ISSUE_NOT_FOUND, NOT_WITHIN_RADIUS, VALIDATION_FAILED, INTERNAL_ERROR
+}
