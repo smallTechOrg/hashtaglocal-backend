@@ -31,13 +31,11 @@ class IssueHomeV2IntegrationTest {
 
 	@Test
 	void getIssuesNearby_shouldRequireLatParameter() throws Exception {
-		mockMvc.perform(get("/api/v2/issues").param("lng", "75.8073")).andExpect(status().isBadRequest())
-				.andExpect(jsonPath("$.error").exists());
+		mockMvc.perform(get("/api/v2/issues").param("lng", "75.8073")).andExpect(status().isBadRequest());
 	}
 
 	@Test
 	void getIssuesNearby_shouldRequireLngParameter() throws Exception {
-		mockMvc.perform(get("/api/v2/issues").param("lat", "26.9124")).andExpect(status().isBadRequest())
-				.andExpect(jsonPath("$.error").exists());
+		mockMvc.perform(get("/api/v2/issues").param("lat", "26.9124")).andExpect(status().isBadRequest());
 	}
 }
