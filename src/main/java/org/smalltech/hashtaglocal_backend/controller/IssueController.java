@@ -53,7 +53,7 @@ import org.springframework.web.server.ResponseStatusException;
 @Transactional(readOnly = true)
 public class IssueController {
 
-	private final CustomProperties customProperties;
+	private final CustomProperties.App appProperties;
 	private final IssueActionRepository issueActionRepository;
 	private final IssueRepository issueRepository;
 	private final MediaRepository mediaRepository;
@@ -63,11 +63,11 @@ public class IssueController {
 	private final GoogleMapsGeocodingService googleMapsGeocodingService;
 	private final LocationService locationService;
 
-	public IssueController(CustomProperties customProperties, IssueActionRepository issueActionRepository,
+	public IssueController(CustomProperties.App appProperties, IssueActionRepository issueActionRepository,
 			IssueRepository issueRepository, MediaRepository mediaRepository, UserRepository userRepository,
 			GCSService gcsService, GeoFenceService geoFenceService,
 			GoogleMapsGeocodingService googleMapsGeocodingService, LocationService locationService) {
-		this.customProperties = customProperties;
+		this.appProperties = appProperties;
 		this.issueActionRepository = issueActionRepository;
 		this.issueRepository = issueRepository;
 		this.mediaRepository = mediaRepository;
@@ -199,7 +199,7 @@ public class IssueController {
 			geoFenceService.assertWithinRadius(issueEntity.getLocation(), // original issue location
 					actionLocation.getLat(), // user's current lat
 					actionLocation.getLng(), // user's current lng
-					customProperties.getVerifyRadiusMeters() // meters
+					appProperties.getGeo().getVerifyRadiusMeters() // meters
 			);
 
 			// Process media URLs if provided
@@ -367,8 +367,10 @@ public class IssueController {
 			Location mediaLocation = Location.builder().lat(mediaLocLat).lng(mediaLocLng).locality(locality)
 					.address(MediaLocName).colloquialName(MediaLocName).build();
 			return Media.builder().location(mediaLocation).type(mediaEntity.getType().name().toLowerCase())
-					.url(gcsService.generateSignedUrl(mediaEntity.getUrl())).description(mediaEntity.getDescription())
-					.username(username).createdAt(mediaEntity.getCreatedAt()).build();
+					.url(gcsService.generateSignedUrl(mediaEntity.getUrl()))
+					.urlThumbnail(gcsService.generateThumbnailUrl(mediaEntity.getUrl()))
+					.description(mediaEntity.getDescription()).username(username).createdAt(mediaEntity.getCreatedAt())
+					.build();
 		}).toList();
 
 		int verifyCount = issueActionRepository.countDistinctUserByIssueAndAction(entity, IssueActionModel.VERIFY);

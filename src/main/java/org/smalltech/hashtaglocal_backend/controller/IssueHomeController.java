@@ -131,7 +131,8 @@ public class IssueHomeController {
 					.address(MediaLocName).colloquialName(MediaLocName).build();
 
 			return Media.builder().location(mediaLocation).type(mediaEntity.getType().name().toLowerCase())
-					.url(gcsService.generateSignedUrl(mediaEntity.getUrl())).build();
+					.url(gcsService.generateSignedUrl(mediaEntity.getUrl()))
+					.urlThumbnail(gcsService.generateThumbnailUrl(mediaEntity.getUrl())).build();
 		}).toList();
 
 		int verifyCount = issueActionRepository.countDistinctUserByIssueAndAction(entity, IssueActionModel.VERIFY);
