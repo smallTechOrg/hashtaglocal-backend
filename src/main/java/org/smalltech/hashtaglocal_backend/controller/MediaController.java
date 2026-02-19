@@ -68,7 +68,7 @@ public class MediaController {
 	private String generateTimeBasedPath(String extension) {
 		String timestamp = LocalDateTime.now(ZoneOffset.UTC)
 				.format(DateTimeFormatter.ofPattern("yyyy-MM-dd-HH-mm-ss-SSS"));
-		return String.format("image/%s.%s", timestamp, extension);
+		return String.format("images/%s.%s", timestamp, extension);
 	}
 
 	private String extractExtension(String contentType) {
