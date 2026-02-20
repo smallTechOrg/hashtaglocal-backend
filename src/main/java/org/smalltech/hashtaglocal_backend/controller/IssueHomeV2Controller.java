@@ -121,7 +121,7 @@ public class IssueHomeV2Controller {
 					.address(MediaLocName).colloquialName(MediaLocName).build();
 
 			return Media.builder().location(mediaLocation).type(mediaEntity.getType().name().toLowerCase())
-					.url(gcsService.generateSignedUrl(mediaEntity.getUrl()))
+					.url(gcsService.generateThumbnailUrl(mediaEntity.getUrl()))
 					.urlThumbnail(gcsService.generateThumbnailUrl(mediaEntity.getUrl())).build();
 		}).toList();
 
