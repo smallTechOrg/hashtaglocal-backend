@@ -6,6 +6,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.smalltech.hashtaglocal_backend.mapper.IssueViewMapper;
 import org.smalltech.hashtaglocal_backend.model.APIResponse;
@@ -65,7 +66,7 @@ public class IssueController {
 	@Operation(summary = "Verify or resolve issue", description = "Verify an issue with media attachments and create verification records.")
 	@ApiResponse(responseCode = "200", description = "Issue verified successfully", content = @Content(mediaType = "application/json", schema = @Schema(implementation = APIResponse.class)))
 	public ResponseEntity<APIResponse> verifyIssue(@PathVariable Long issueId, @AuthenticationPrincipal Long userId,
-			@RequestBody IssueVerifyRequest request) {
+			@Valid @RequestBody IssueVerifyRequest request) {
 		Long updatedIssueId = issueActionService.handle(issueId, userId, request);
 
 		APIResponse response = APIResponse.builder().data(ResponseData.builder().issueId(updatedIssueId).build())

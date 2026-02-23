@@ -1,6 +1,7 @@
 package org.smalltech.hashtaglocal_backend.controller;
 
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.smalltech.hashtaglocal_backend.model.APIResponse;
 import org.smalltech.hashtaglocal_backend.model.ResponseData;
@@ -23,7 +24,7 @@ public class IssueReportController {
 
 	@PostMapping
 	public ResponseEntity<APIResponse> createIssue(@AuthenticationPrincipal Long userId,
-			@RequestBody IssueReportRequest request) {
+			@Valid @RequestBody IssueReportRequest request) {
 		Long issueId = issueReportService.createIssue(userId, request);
 
 		APIResponse response = APIResponse.builder().data(ResponseData.builder().issueId(issueId).build()).build();
