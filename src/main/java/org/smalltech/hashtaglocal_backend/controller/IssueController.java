@@ -53,7 +53,8 @@ public class IssueController {
 	@Transactional
 	@Operation(summary = "Update issue", description = "Patch issue fields like status, type, description, and coordinates.")
 	@ApiResponse(responseCode = "200", description = "Issue patched successfully", content = @Content(mediaType = "application/json", schema = @Schema(implementation = APIResponse.class)))
-	public ResponseEntity<APIResponse> patchIssue(@PathVariable Long issueId, @RequestBody IssuePatchRequest request) {
+	public ResponseEntity<APIResponse> patchIssue(@PathVariable Long issueId,
+			@Valid @RequestBody IssuePatchRequest request) {
 		var issueEntity = issuePatchService.patchIssue(issueId, request);
 
 		var issue = issueViewMapper.map(issueEntity);
