@@ -89,8 +89,10 @@ public class IssueViewMapper {
 					.address(mediaLocName).colloquialName(mediaLocName).build();
 
 			return Media.builder().location(mediaLocation).type(mediaEntity.getType().name().toLowerCase())
-					.url(gcsService.generateSignedUrl(mediaEntity.getUrl())).description(mediaEntity.getDescription())
-					.username(username).createdAt(mediaEntity.getCreatedAt()).build();
+					.url(gcsService.generateSignedUrl(mediaEntity.getUrl()))
+					.urlThumbnail(gcsService.generateThumbnailUrl(mediaEntity.getUrl()))
+					.description(mediaEntity.getDescription()).username(username).createdAt(mediaEntity.getCreatedAt())
+					.build();
 		}).toList();
 
 		int verifyCount = issueActionRepository.countDistinctUserByIssueAndAction(entity, IssueActionModel.VERIFY);

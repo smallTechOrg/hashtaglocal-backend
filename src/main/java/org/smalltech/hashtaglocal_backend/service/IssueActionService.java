@@ -23,7 +23,7 @@ import org.springframework.web.server.ResponseStatusException;
 @Transactional
 public class IssueActionService {
 
-	private final CustomProperties customProperties;
+	private final CustomProperties.App appProperties;
 	private final IssueActionRepository issueActionRepository;
 	private final IssueRepository issueRepository;
 	private final MediaRepository mediaRepository;
@@ -82,7 +82,7 @@ public class IssueActionService {
 			}
 
 			geoFenceService.assertWithinRadius(issueEntity.getLocation(), actionLocation.getLat(),
-					actionLocation.getLng(), customProperties.getGeo().getVerifyRadiusMeters());
+					actionLocation.getLng(), appProperties.getGeo().getVerifyRadiusMeters());
 
 			// Process media URLs if provided
 			for (var mediaRequest : mediaUrls) {
