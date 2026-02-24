@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/admin/issues")
+@RequestMapping("/admin")
 @RequiredArgsConstructor
 @Slf4j
 public class IssueImportController {
@@ -26,7 +26,7 @@ public class IssueImportController {
 	private final IssueImportJobRepository jobRepository;
 	private final IssueImportStatusRepository statusRepository;
 
-	@PostMapping("/import")
+	@PostMapping("/issues/import")
 	public IssueImportJob importIssues(@RequestParam(defaultValue = "BLR_PAGES") IssueImportSource source) {
 		log.info("Starting issue import for source {}", source);
 		return switch (source) {
@@ -34,12 +34,12 @@ public class IssueImportController {
 		};
 	}
 
-	@GetMapping("/import/{jobId}")
+	@GetMapping("/issues/import/{jobId}")
 	public IssueImportJob getJob(@PathVariable Long jobId) {
 		return jobRepository.findById(jobId).orElseThrow(() -> new RuntimeException("Job not found: " + jobId));
 	}
 
-	@GetMapping("/import/{jobId}/status")
+	@GetMapping("/issues/import/{jobId}/status")
 	public List<IssueImportStatus> getStatuses(@PathVariable Long jobId) {
 		return statusRepository.findByJobId(jobId);
 	}

@@ -3,9 +3,8 @@ package org.smalltech.hashtaglocal_backend.service;
 import jakarta.transaction.Transactional;
 import java.util.Optional;
 import org.smalltech.hashtaglocal_backend.entity.UserAuthSessionEntity;
-import org.smalltech.hashtaglocal_backend.model.APIResponse;
-import org.smalltech.hashtaglocal_backend.model.ResponseData;
 import org.smalltech.hashtaglocal_backend.model.TokenResponse;
+import org.smalltech.hashtaglocal_backend.model.response.AuthTokenResponseData;
 import org.smalltech.hashtaglocal_backend.repository.UserAuthSessionRepository;
 import org.springframework.stereotype.Service;
 
@@ -21,7 +20,7 @@ public class AuthRefreshService {
 		this.tokenService = tokenService;
 	}
 
-	public APIResponse refreshTokens(String refreshToken) {
+	public AuthTokenResponseData refreshTokens(String refreshToken) {
 
 		System.out.println("Attempting to refresh tokens");
 
@@ -54,13 +53,11 @@ public class AuthRefreshService {
 		// Check access token expiry
 		if (session.getAccessTokenExpiryTs() > currentEpochSeconds) {
 			System.out.println(" Access token is still active, returning existing tokens");
-			return APIResponse.builder()
-					.data(ResponseData.builder()
-							.accessToken(TokenResponse.builder().value(session.getAccessToken())
-									.expiry(session.getAccessTokenExpiryTs()).build())
-							.refreshToken(TokenResponse.builder().value(session.getRefreshToken())
-									.expiry(session.getRefreshTokenExpiryTs()).build())
-							.build())
+			return AuthTokenResponseData.builder()
+					.accessToken(TokenResponse.builder().value(session.getAccessToken())
+							.expiry(session.getAccessTokenExpiryTs()).build())
+					.refreshToken(TokenResponse.builder().value(session.getRefreshToken())
+							.expiry(session.getRefreshTokenExpiryTs()).build())
 					.build();
 		}
 
@@ -81,12 +78,9 @@ public class AuthRefreshService {
 
 		System.out.println("Tokens refreshed | Session ID: " + session.getId());
 
-		return APIResponse.builder()
-				.data(ResponseData.builder()
-						.accessToken(TokenResponse.builder().value(newAccessToken).expiry(newAccessTokenExpiry).build())
-						.refreshToken(
-								TokenResponse.builder().value(newRefreshToken).expiry(newRefreshTokenExpiry).build())
-						.build())
+		return AuthTokenResponseData.builder()
+				.accessToken(TokenResponse.builder().value(newAccessToken).expiry(newAccessTokenExpiry).build())
+				.refreshToken(TokenResponse.builder().value(newRefreshToken).expiry(newRefreshTokenExpiry).build())
 				.build();
 	}
 }

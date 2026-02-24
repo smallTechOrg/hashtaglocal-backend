@@ -11,9 +11,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.smalltech.hashtaglocal_backend.entity.UserAuthSessionEntity;
-import org.smalltech.hashtaglocal_backend.model.APIResponse;
-import org.smalltech.hashtaglocal_backend.model.ResponseData;
 import org.smalltech.hashtaglocal_backend.model.TokenResponse;
+import org.smalltech.hashtaglocal_backend.model.response.AuthTokenResponseData;
 import org.smalltech.hashtaglocal_backend.repository.UserAuthSessionRepository;
 
 @ExtendWith(MockitoExtension.class)
@@ -70,15 +69,15 @@ class AuthRefreshServiceTest {
 		when(tokenService.refreshExpiryEpochSeconds()).thenReturn(newRefreshTokenExpiry);
 
 		// Act
-		APIResponse response = authRefreshService.refreshTokens(REFRESH_TOKEN);
+		AuthTokenResponseData response = authRefreshService.refreshTokens(REFRESH_TOKEN);
 
 		// Assert
 		assertNotNull(response);
-		assertNotNull(response.getData());
+		assertNotNull(response.getAccessToken());
+		assertNotNull(response.getRefreshToken());
 
-		ResponseData data = response.getData();
-		TokenResponse accessTokenResponse = data.getAccessToken();
-		TokenResponse refreshTokenResponse = data.getRefreshToken();
+		TokenResponse accessTokenResponse = response.getAccessToken();
+		TokenResponse refreshTokenResponse = response.getRefreshToken();
 
 		assertEquals(newAccessToken, accessTokenResponse.getValue());
 		assertEquals(newAccessTokenExpiry, accessTokenResponse.getExpiry());
@@ -102,15 +101,15 @@ class AuthRefreshServiceTest {
 		when(tokenService.nowEpochSeconds()).thenReturn(CURRENT_TIME);
 
 		// Act
-		APIResponse response = authRefreshService.refreshTokens(REFRESH_TOKEN);
+		AuthTokenResponseData response = authRefreshService.refreshTokens(REFRESH_TOKEN);
 
 		// Assert
 		assertNotNull(response);
-		assertNotNull(response.getData());
+		assertNotNull(response.getAccessToken());
+		assertNotNull(response.getRefreshToken());
 
-		ResponseData data = response.getData();
-		TokenResponse accessTokenResponse = data.getAccessToken();
-		TokenResponse refreshTokenResponse = data.getRefreshToken();
+		TokenResponse accessTokenResponse = response.getAccessToken();
+		TokenResponse refreshTokenResponse = response.getRefreshToken();
 
 		// Should return existing tokens, not new ones
 		assertEquals(ACCESS_TOKEN, accessTokenResponse.getValue());

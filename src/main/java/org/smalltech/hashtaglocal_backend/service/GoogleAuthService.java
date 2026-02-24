@@ -11,10 +11,9 @@ import java.util.Optional;
 import org.smalltech.hashtaglocal_backend.entity.UserAuthProviderEntity;
 import org.smalltech.hashtaglocal_backend.entity.UserAuthSessionEntity;
 import org.smalltech.hashtaglocal_backend.entity.UserEntity;
-import org.smalltech.hashtaglocal_backend.model.APIResponse;
 import org.smalltech.hashtaglocal_backend.model.GoogleUserResponse;
-import org.smalltech.hashtaglocal_backend.model.ResponseData;
 import org.smalltech.hashtaglocal_backend.model.TokenResponse;
+import org.smalltech.hashtaglocal_backend.model.response.AuthTokenResponseData;
 import org.smalltech.hashtaglocal_backend.repository.UserAuthProviderRepository;
 import org.smalltech.hashtaglocal_backend.repository.UserAuthSessionRepository;
 import org.smalltech.hashtaglocal_backend.repository.UserRepository;
@@ -59,7 +58,7 @@ public class GoogleAuthService {
 	 * ===============================
 	 */
 
-	public APIResponse handleAuthorizationCode(String code, String codeVerifier) {
+	public AuthTokenResponseData handleAuthorizationCode(String code, String codeVerifier) {
 
 		System.out.println("🔁 Exchanging auth code for Google tokens");
 
@@ -94,7 +93,7 @@ public class GoogleAuthService {
 	 * ===============================
 	 */
 
-	public APIResponse handleAccessToken(String accessToken) {
+	public AuthTokenResponseData handleAccessToken(String accessToken) {
 
 		System.out.println("🔁 Fetching Google user info");
 
@@ -111,7 +110,7 @@ public class GoogleAuthService {
 	 * ===============================
 	 */
 
-	private APIResponse loginOrSignup(String providerUserId, String email, String picture, String name) {
+	private AuthTokenResponseData loginOrSignup(String providerUserId, String email, String picture, String name) {
 
 		System.out.println("👤 Google userId: " + providerUserId);
 
@@ -153,7 +152,7 @@ public class GoogleAuthService {
 	 * ===============================
 	 */
 
-	private APIResponse createSession(UserEntity user, UserAuthProviderEntity provider) {
+	private AuthTokenResponseData createSession(UserEntity user, UserAuthProviderEntity provider) {
 
 		String accessToken = tokenService.generateToken();
 		String refreshToken = tokenService.generateToken();
@@ -165,12 +164,12 @@ public class GoogleAuthService {
 
 		System.out.println("✅ Session created | ID: " + session.getId());
 
-		return APIResponse.builder().data(ResponseData.builder()
+		return AuthTokenResponseData.builder()
 				.accessToken(
 						TokenResponse.builder().value(accessToken).expiry(session.getAccessTokenExpiryTs()).build())
 				.refreshToken(
 						TokenResponse.builder().value(refreshToken).expiry(session.getRefreshTokenExpiryTs()).build())
-				.build()).build();
+				.build();
 	}
 
 	/*
