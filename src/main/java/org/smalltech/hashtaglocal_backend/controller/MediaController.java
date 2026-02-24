@@ -2,9 +2,8 @@ package org.smalltech.hashtaglocal_backend.controller;
 
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import org.smalltech.hashtaglocal_backend.model.APIResponse;
-import org.smalltech.hashtaglocal_backend.model.ResponseData;
-import org.smalltech.hashtaglocal_backend.model.SignedUrlResponse;
+import org.smalltech.hashtaglocal_backend.model.NewAPIResponse;
+import org.smalltech.hashtaglocal_backend.model.response.MediaUploadResponseData;
 import org.smalltech.hashtaglocal_backend.service.MediaService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -25,8 +24,9 @@ public class MediaController {
 	}
 
 	@GetMapping("/upload-url")
-	public APIResponse getSignedUrl(@RequestParam("content_type") String contentType) {
-		SignedUrlResponse mediaUrl = mediaService.generateUploadUrl(contentType);
-		return APIResponse.builder().data(ResponseData.builder().mediaUrl(mediaUrl).build()).build();
+	public NewAPIResponse<MediaUploadResponseData> getSignedUrl(@RequestParam("content_type") String contentType) {
+		var mediaUrl = mediaService.generateUploadUrl(contentType);
+		return NewAPIResponse.<MediaUploadResponseData>builder()
+				.data(MediaUploadResponseData.builder().mediaUrl(mediaUrl).build()).build();
 	}
 }

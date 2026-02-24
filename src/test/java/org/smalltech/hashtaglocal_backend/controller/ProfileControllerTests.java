@@ -11,8 +11,9 @@ import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
-import org.smalltech.hashtaglocal_backend.model.APIResponse;
+import org.smalltech.hashtaglocal_backend.model.NewAPIResponse;
 import org.smalltech.hashtaglocal_backend.model.UserProfileModel;
+import org.smalltech.hashtaglocal_backend.model.response.UserProfileResponseData;
 import org.smalltech.hashtaglocal_backend.service.GetProfileService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -49,7 +50,8 @@ class ProfileControllerTests {
 			when(profileService.getMyProfile(token, null, null)).thenReturn(Optional.of(userProfile));
 
 			// Act
-			ResponseEntity<APIResponse> response = profileController.getMyProfile("Bearer " + token, null, null);
+			ResponseEntity<NewAPIResponse<UserProfileResponseData>> response = profileController
+					.getMyProfile("Bearer " + token, null, null);
 
 			// Assert
 			assertNotNull(response);
@@ -75,7 +77,8 @@ class ProfileControllerTests {
 			when(profileService.getMyProfile(token, lat, lng)).thenReturn(Optional.of(userProfile));
 
 			// Act
-			ResponseEntity<APIResponse> response = profileController.getMyProfile("Bearer " + token, lat, lng);
+			ResponseEntity<NewAPIResponse<UserProfileResponseData>> response = profileController
+					.getMyProfile("Bearer " + token, lat, lng);
 
 			// Assert
 			assertNotNull(response);
@@ -95,7 +98,8 @@ class ProfileControllerTests {
 			String invalidHeader = "InvalidHeader";
 
 			// Act
-			ResponseEntity<APIResponse> response = profileController.getMyProfile(invalidHeader, null, null);
+			ResponseEntity<NewAPIResponse<UserProfileResponseData>> response = profileController
+					.getMyProfile(invalidHeader, null, null);
 
 			// Assert
 			assertNotNull(response);
@@ -108,7 +112,8 @@ class ProfileControllerTests {
 		void testGetMyProfile_NullAuthHeader() {
 			// Arrange
 			// Act
-			ResponseEntity<APIResponse> response = profileController.getMyProfile(null, null, null);
+			ResponseEntity<NewAPIResponse<UserProfileResponseData>> response = profileController.getMyProfile(null,
+					null, null);
 
 			// Assert
 			assertNotNull(response);
@@ -124,7 +129,8 @@ class ProfileControllerTests {
 			when(profileService.getMyProfile(token, null, null)).thenReturn(Optional.empty());
 
 			// Act
-			ResponseEntity<APIResponse> response = profileController.getMyProfile("Bearer " + token, null, null);
+			ResponseEntity<NewAPIResponse<UserProfileResponseData>> response = profileController
+					.getMyProfile("Bearer " + token, null, null);
 
 			// Assert
 			assertNotNull(response);
@@ -143,7 +149,8 @@ class ProfileControllerTests {
 			when(profileService.getMyProfile(token, null, null)).thenReturn(Optional.of(userProfile));
 
 			// Act
-			ResponseEntity<APIResponse> response = profileController.getMyProfile("Bearer " + token, null, null);
+			ResponseEntity<NewAPIResponse<UserProfileResponseData>> response = profileController
+					.getMyProfile("Bearer " + token, null, null);
 
 			// Assert
 			assertNotNull(response);
@@ -163,7 +170,8 @@ class ProfileControllerTests {
 			when(profileService.getMyProfile(token, lat, null)).thenReturn(Optional.of(userProfile));
 
 			// Act
-			ResponseEntity<APIResponse> response = profileController.getMyProfile("Bearer " + token, lat, null);
+			ResponseEntity<NewAPIResponse<UserProfileResponseData>> response = profileController
+					.getMyProfile("Bearer " + token, lat, null);
 
 			// Assert
 			assertNotNull(response);
@@ -183,7 +191,8 @@ class ProfileControllerTests {
 			when(profileService.getMyProfile(token, null, lng)).thenReturn(Optional.of(userProfile));
 
 			// Act
-			ResponseEntity<APIResponse> response = profileController.getMyProfile("Bearer " + token, null, lng);
+			ResponseEntity<NewAPIResponse<UserProfileResponseData>> response = profileController
+					.getMyProfile("Bearer " + token, null, lng);
 
 			// Assert
 			assertNotNull(response);

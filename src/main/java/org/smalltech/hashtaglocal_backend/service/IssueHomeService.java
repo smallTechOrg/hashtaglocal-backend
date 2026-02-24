@@ -3,6 +3,7 @@ package org.smalltech.hashtaglocal_backend.service;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.smalltech.hashtaglocal_backend.mapper.IssueViewMapper;
+import org.smalltech.hashtaglocal_backend.model.Issue;
 import org.smalltech.hashtaglocal_backend.model.NewAPIResponse;
 import org.smalltech.hashtaglocal_backend.model.response.IssueListResponseData;
 import org.smalltech.hashtaglocal_backend.model.response.IssueResponseData;
@@ -20,7 +21,7 @@ public class IssueHomeService {
 	public NewAPIResponse<IssueListResponseData> getHome(String localityHashtag) {
 		var entities = issueHomeQueryService.findRecentIssues(localityHashtag);
 
-		List<IssueResponseData> issues = entities.stream().map(issueViewMapper::map).toList();
+		List<Issue> issues = entities.stream().map(issueViewMapper::map).map(IssueResponseData::getIssue).toList();
 
 		return NewAPIResponse.<IssueListResponseData>builder()
 				.data(IssueListResponseData.builder().issues(issues).build()).build();
@@ -31,7 +32,7 @@ public class IssueHomeService {
 
 		var entities = issueHomeQueryService.findNearbyIssues(lat, lng, radiusMeters);
 
-		List<IssueResponseData> issues = entities.stream().map(issueViewMapper::map).toList();
+		List<Issue> issues = entities.stream().map(issueViewMapper::map).map(IssueResponseData::getIssue).toList();
 
 		return NewAPIResponse.<IssueListResponseData>builder()
 				.data(IssueListResponseData.builder().issues(issues).build()).build();

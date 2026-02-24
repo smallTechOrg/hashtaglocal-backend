@@ -6,12 +6,11 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.smalltech.hashtaglocal_backend.mapper.IssueViewMapper;
-import org.smalltech.hashtaglocal_backend.model.APIResponse;
 import org.smalltech.hashtaglocal_backend.model.NewAPIResponse;
-import org.smalltech.hashtaglocal_backend.model.ResponseData;
 import org.smalltech.hashtaglocal_backend.model.request.IssuePatchRequest;
 import org.smalltech.hashtaglocal_backend.model.request.IssueReportRequest;
 import org.smalltech.hashtaglocal_backend.model.request.IssueVerifyRequest;
+import org.smalltech.hashtaglocal_backend.model.response.IssueActionResponseData;
 import org.smalltech.hashtaglocal_backend.model.response.IssueListResponseData;
 import org.smalltech.hashtaglocal_backend.model.response.IssueResponseData;
 import org.smalltech.hashtaglocal_backend.service.IssueActionService;
@@ -68,12 +67,12 @@ public class IssueController {
 	@PutMapping("/issue/{issueId}")
 	@SecurityRequirement(name = "bearerAuth")
 	@Operation(summary = "Verify or resolve issue", description = "Verify an issue with media attachments and create verification records.")
-	public ResponseEntity<APIResponse> verifyIssue(@PathVariable Long issueId, @AuthenticationPrincipal Long userId,
-			@Valid @RequestBody IssueVerifyRequest request) {
+	public ResponseEntity<NewAPIResponse<IssueActionResponseData>> verifyIssue(@PathVariable Long issueId,
+			@AuthenticationPrincipal Long userId, @Valid @RequestBody IssueVerifyRequest request) {
 		Long updatedIssueId = issueActionService.handle(issueId, userId, request);
 
-		APIResponse response = APIResponse.builder().data(ResponseData.builder().issueId(updatedIssueId).build())
-				.build();
+		NewAPIResponse<IssueActionResponseData> response = NewAPIResponse.<IssueActionResponseData>builder()
+				.data(IssueActionResponseData.builder().issueId(updatedIssueId).build()).build();
 
 		return ResponseEntity.ok(response);
 	}
@@ -88,11 +87,12 @@ public class IssueController {
 	@PostMapping("/issue")
 	@SecurityRequirement(name = "bearerAuth")
 	@Operation(summary = "Create issue", description = "Creates a new issue with the given details.")
-	public ResponseEntity<APIResponse> createIssue(@AuthenticationPrincipal Long userId,
+	public ResponseEntity<NewAPIResponse<IssueActionResponseData>> createIssue(@AuthenticationPrincipal Long userId,
 			@Valid @RequestBody IssueReportRequest request) {
 		Long issueId = issueReportService.createIssue(userId, request);
 
-		APIResponse response = APIResponse.builder().data(ResponseData.builder().issueId(issueId).build()).build();
+		NewAPIResponse<IssueActionResponseData> response = NewAPIResponse.<IssueActionResponseData>builder()
+				.data(IssueActionResponseData.builder().issueId(issueId).build()).build();
 
 		return ResponseEntity.ok(response);
 	}
