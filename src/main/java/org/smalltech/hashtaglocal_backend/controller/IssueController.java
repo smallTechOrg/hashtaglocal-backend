@@ -21,7 +21,6 @@ import org.smalltech.hashtaglocal_backend.service.IssueQueryService;
 import org.smalltech.hashtaglocal_backend.service.IssueReportService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -36,7 +35,6 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1")
 @Tag(name = "Issue", description = "issue APIs")
 @RequiredArgsConstructor
-@Transactional(readOnly = true)
 public class IssueController {
 
 	private final IssueActionService issueActionService;
@@ -57,7 +55,6 @@ public class IssueController {
 	}
 
 	@PatchMapping("/issue/{issueId}")
-	@Transactional
 	@Operation(summary = "Update issue", description = "Patch issue fields like status, type, description, and coordinates.")
 	@ApiResponse(responseCode = "200", description = "Issue patched successfully", content = @Content(mediaType = "application/json", schema = @Schema(implementation = APIResponse.class)))
 	public ResponseEntity<APIResponse> patchIssue(@PathVariable Long issueId,
