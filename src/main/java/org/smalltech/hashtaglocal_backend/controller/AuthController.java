@@ -62,7 +62,7 @@ public class AuthController {
 
 		System.out.println("/auth/refresh hit");
 
-		var tokenData = authRefreshService.refreshTokens(request.getRefreshToken());
+		AuthTokenResponseData tokenData = authRefreshService.refreshTokens(request.getRefreshToken());
 
 		return ResponseEntity.ok(NewAPIResponse.<AuthTokenResponseData>builder().data(tokenData).build());
 	}

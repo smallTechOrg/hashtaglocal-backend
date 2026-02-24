@@ -12,6 +12,7 @@ import org.smalltech.hashtaglocal_backend.model.Location;
 import org.smalltech.hashtaglocal_backend.model.Media;
 import org.smalltech.hashtaglocal_backend.model.User;
 import org.smalltech.hashtaglocal_backend.model.ViewerContext;
+import org.smalltech.hashtaglocal_backend.model.response.IssueResponseData;
 import org.smalltech.hashtaglocal_backend.repository.IssueActionRepository;
 import org.smalltech.hashtaglocal_backend.repository.MediaRepository;
 import org.smalltech.hashtaglocal_backend.service.GCSService;
@@ -25,7 +26,7 @@ public class IssueViewMapper {
 	private final IssueActionRepository issueActionRepository;
 	private final GCSService gcsService;
 
-	public Issue map(IssueEntity entity) {
+	public IssueResponseData map(IssueEntity entity) {
 		// Get user from entity - IssueDataInitializer ensures all issues have user ID 1
 		UserEntity userEntity = entity.getUserEntity();
 		if (userEntity == null) {
@@ -96,9 +97,11 @@ public class IssueViewMapper {
 
 		ViewerContext viewerContext = ViewerContext.builder().upvote(false).build();
 
-		return Issue.builder().id(entity.getId()).user(user).location(location)
+		Issue issue = Issue.builder().id(entity.getId()).user(user).location(location)
 				.type(entity.getType().name().toLowerCase()).description(entity.getDescription())
 				.createdAt(entity.getCreatedAt()).mediaUrls(mediaList).voteCount(0).verifyCount(verifyCount)
 				.status(entity.getStatus().name()).rank(1).viewerContext(viewerContext).build();
+
+		return IssueResponseData.builder().issue(issue).build();
 	}
 }
