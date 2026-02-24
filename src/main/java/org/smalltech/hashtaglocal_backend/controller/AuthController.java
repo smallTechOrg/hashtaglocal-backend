@@ -7,7 +7,9 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.smalltech.hashtaglocal_backend.model.APIResponse;
+import org.smalltech.hashtaglocal_backend.model.NewAPIResponse;
 import org.smalltech.hashtaglocal_backend.model.request.AuthRefreshRequest;
+import org.smalltech.hashtaglocal_backend.model.response.AuthTokenResponseData;
 import org.smalltech.hashtaglocal_backend.service.AuthRefreshService;
 import org.smalltech.hashtaglocal_backend.service.GoogleAuthService;
 import org.springframework.http.ResponseEntity;
@@ -54,11 +56,14 @@ public class AuthController {
 
 	@PostMapping("/refresh")
 	@Operation(summary = "Refresh access and refresh tokens")
-	@ApiResponse(responseCode = "200", description = "Tokens refreshed successfully", content = @Content(mediaType = "application/json", schema = @Schema(implementation = APIResponse.class)))
-	public ResponseEntity<APIResponse> refresh(@Valid @RequestBody AuthRefreshRequest request) {
+	@ApiResponse(responseCode = "200", description = "Tokens refreshed successfully", content = @Content(mediaType = "application/json", schema = @Schema(implementation = NewAPIResponse.class)))
+	public ResponseEntity<NewAPIResponse<AuthTokenResponseData>> refresh(
+			@Valid @RequestBody AuthRefreshRequest request) {
 
 		System.out.println("/auth/refresh hit");
 
-		return ResponseEntity.ok(authRefreshService.refreshTokens(request.getRefreshToken()));
+		var tokenData = authRefreshService.refreshTokens(request.getRefreshToken());
+
+		return ResponseEntity.ok(NewAPIResponse.<AuthTokenResponseData>builder().data(tokenData).build());
 	}
 }
