@@ -56,7 +56,6 @@ public class AuthController {
 
 	@PostMapping("/refresh")
 	@Operation(summary = "Refresh access and refresh tokens")
-	@ApiResponse(responseCode = "200", description = "Tokens refreshed successfully", content = @Content(mediaType = "application/json", schema = @Schema(implementation = NewAPIResponse.class)))
 	public ResponseEntity<NewAPIResponse<AuthTokenResponseData>> refresh(
 			@Valid @RequestBody AuthRefreshRequest request) {
 
