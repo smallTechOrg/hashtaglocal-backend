@@ -8,9 +8,9 @@ import static org.mockito.Mockito.when;
 import java.net.URL;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
-import org.smalltech.hashtaglocal_backend.model.APIResponse;
-import org.smalltech.hashtaglocal_backend.model.ResponseData;
+import org.smalltech.hashtaglocal_backend.model.NewAPIResponse;
 import org.smalltech.hashtaglocal_backend.model.SignedUrlResponse;
+import org.smalltech.hashtaglocal_backend.model.response.MediaUploadResponseData;
 import org.smalltech.hashtaglocal_backend.service.MediaService;
 
 class MediaControllerTests {
@@ -27,8 +27,8 @@ class MediaControllerTests {
 				.signedUrl(fakeSignedUrl.toString()).path("gs://hashtaglocalbucket/test.jpg").build());
 
 		// Act
-		APIResponse response = controller.getSignedUrl("image/jpeg");
-		ResponseData data = response.getData();
+		NewAPIResponse<MediaUploadResponseData> response = controller.getSignedUrl("image/jpeg");
+		MediaUploadResponseData data = response.getData();
 		SignedUrlResponse mediaUrl = data.getMediaUrl();
 
 		// Assert-structure

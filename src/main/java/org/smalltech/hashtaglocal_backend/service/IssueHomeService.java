@@ -3,9 +3,10 @@ package org.smalltech.hashtaglocal_backend.service;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.smalltech.hashtaglocal_backend.mapper.IssueViewMapper;
-import org.smalltech.hashtaglocal_backend.model.APIResponse;
 import org.smalltech.hashtaglocal_backend.model.Issue;
-import org.smalltech.hashtaglocal_backend.model.ResponseData;
+import org.smalltech.hashtaglocal_backend.model.NewAPIResponse;
+import org.smalltech.hashtaglocal_backend.model.response.IssueListResponseData;
+import org.smalltech.hashtaglocal_backend.model.response.IssueResponseData;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,21 +18,23 @@ public class IssueHomeService {
 	private final IssueHomeQueryService issueHomeQueryService;
 	private final IssueViewMapper issueViewMapper;
 
-	public APIResponse getHome(String localityHashtag) {
+	public NewAPIResponse<IssueListResponseData> getHome(String localityHashtag) {
 		var entities = issueHomeQueryService.findRecentIssues(localityHashtag);
 
-		List<Issue> issues = entities.stream().map(issueViewMapper::map).toList();
+		List<Issue> issues = entities.stream().map(issueViewMapper::map).map(IssueResponseData::getIssue).toList();
 
-		return APIResponse.builder().data(ResponseData.builder().issues(issues).build()).build();
+		return NewAPIResponse.<IssueListResponseData>builder()
+				.data(IssueListResponseData.builder().issues(issues).build()).build();
 	}
 
-	public APIResponse getNearby(double lat, double lng) {
+	public NewAPIResponse<IssueListResponseData> getNearby(double lat, double lng) {
 		double radiusMeters = 5000.0;
 
 		var entities = issueHomeQueryService.findNearbyIssues(lat, lng, radiusMeters);
 
-		List<Issue> issues = entities.stream().map(issueViewMapper::map).toList();
+		List<Issue> issues = entities.stream().map(issueViewMapper::map).map(IssueResponseData::getIssue).toList();
 
-		return APIResponse.builder().data(ResponseData.builder().issues(issues).build()).build();
+		return NewAPIResponse.<IssueListResponseData>builder()
+				.data(IssueListResponseData.builder().issues(issues).build()).build();
 	}
 }

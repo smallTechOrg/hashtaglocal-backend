@@ -1,9 +1,9 @@
 package org.smalltech.hashtaglocal_backend.controller;
 
 import java.util.Optional;
-import org.smalltech.hashtaglocal_backend.model.APIResponse;
-import org.smalltech.hashtaglocal_backend.model.ResponseData;
+import org.smalltech.hashtaglocal_backend.model.NewAPIResponse;
 import org.smalltech.hashtaglocal_backend.model.UserProfileModel;
+import org.smalltech.hashtaglocal_backend.model.response.UserProfileResponseData;
 import org.smalltech.hashtaglocal_backend.service.GetProfileService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -35,7 +35,8 @@ public class ProfileController {
 	 * @return User's own profile information
 	 */
 	@GetMapping()
-	public ResponseEntity<APIResponse> getMyProfile(@RequestHeader(value = "Authorization") String authorization,
+	public ResponseEntity<NewAPIResponse<UserProfileResponseData>> getMyProfile(
+			@RequestHeader(value = "Authorization") String authorization,
 			@RequestParam(value = "lat", required = false) Double latitude,
 			@RequestParam(value = "lng", required = false) Double longitude) {
 
@@ -46,18 +47,21 @@ public class ProfileController {
 		String accessToken = extractBearerToken(authorization);
 
 		if (accessToken == null) {
-			return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(APIResponse.builder().data(null).build());
+			return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+					.body(NewAPIResponse.<UserProfileResponseData>builder().data(null).build());
 		}
 
 		Optional<UserProfileModel> profile = profileService.getMyProfile(accessToken, latitude, longitude);
 
 		if (profile.isEmpty()) {
-			return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(APIResponse.builder().data(null).build());
+			return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+					.body(NewAPIResponse.<UserProfileResponseData>builder().data(null).build());
 		}
 
-		ResponseData responseData = ResponseData.builder().user(profile.get()).build();
+		UserProfileResponseData responseData = UserProfileResponseData.builder().user(profile.get()).build();
 
-		APIResponse response = APIResponse.builder().data(responseData).build();
+		NewAPIResponse<UserProfileResponseData> response = NewAPIResponse.<UserProfileResponseData>builder()
+				.data(responseData).build();
 
 		return ResponseEntity.ok(response);
 	}

@@ -1,13 +1,11 @@
 package org.smalltech.hashtaglocal_backend.controller;
 
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.media.Content;
-import io.swagger.v3.oas.annotations.media.Schema;
-import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import org.smalltech.hashtaglocal_backend.model.APIResponse;
+import org.smalltech.hashtaglocal_backend.model.NewAPIResponse;
 import org.smalltech.hashtaglocal_backend.model.request.LocationRequest;
+import org.smalltech.hashtaglocal_backend.model.response.IssueListResponseData;
 import org.smalltech.hashtaglocal_backend.service.IssueHomeService;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -28,8 +26,7 @@ public class IssueHomeV2Controller {
 
 	@GetMapping
 	@Operation(summary = "Get issue Home", description = "Returns a List of issues with user, location, locality and viewer context. Optionally filter by locality hashtag.")
-	@ApiResponse(responseCode = "200", description = "Successful issue response", content = @Content(mediaType = "application/json", schema = @Schema(implementation = APIResponse.class)))
-	public APIResponse getIssuesNearby(@Valid LocationRequest locationRequest) {
+	public NewAPIResponse<IssueListResponseData> getIssuesNearby(@Valid LocationRequest locationRequest) {
 
 		return issueHomeAssembler.getNearby(locationRequest.getLat(), locationRequest.getLng());
 	}
