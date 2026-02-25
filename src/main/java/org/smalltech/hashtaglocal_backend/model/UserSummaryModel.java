@@ -9,10 +9,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class UserProfileModel {
+public class UserSummaryModel {
 
-  private String username;
-  private String picture;
-  private String hashtag;
-  private UserSummaryModel userSummary;
+  private IssueCountModel issueCount;
 }

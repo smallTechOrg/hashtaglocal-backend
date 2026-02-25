@@ -58,4 +58,17 @@ public interface IssueRepository extends JpaRepository<IssueEntity, Long> {
       @Param("lat") double lat,
       @Param("lng") double lng,
       @Param("radiusMeters") double radiusMeters);
+
+  @Query(
+      "SELECT COUNT(i) FROM IssueEntity i WHERE i.userEntity.id = :userId AND i.status <> org.smalltech.hashtaglocal_backend.model.IssueStatusModel.REJECTED")
+  long countByUserExcludingRejected(@Param("userId") Long userId);
+
+  @Query(
+      "SELECT COUNT(i) FROM IssueEntity i WHERE i.userEntity.id = :userId AND i.status = :status")
+  long countByUserAndStatus(@Param("userId") Long userId, @Param("status") IssueStatusModel status);
+
+  @Query(
+      "SELECT COUNT(i) FROM IssueEntity i WHERE i.userEntity.id = :userId AND i.status IN :statuses")
+  long countByUserAndStatusIn(
+      @Param("userId") Long userId, @Param("statuses") List<IssueStatusModel> statuses);
 }
