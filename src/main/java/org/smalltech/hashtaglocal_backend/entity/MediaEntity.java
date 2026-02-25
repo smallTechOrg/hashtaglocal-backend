@@ -16,6 +16,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.smalltech.hashtaglocal_backend.model.MediaStatusModel;
 import org.smalltech.hashtaglocal_backend.model.MediaTypeModel;
 
 @Entity
@@ -52,6 +53,11 @@ public class MediaEntity {
 
   @Column(length = 500)
   private String description;
+
+  @Enumerated(EnumType.STRING)
+  @Column(nullable = false, length = 20, columnDefinition = "varchar(20) default 'APPROVED'")
+  @Builder.Default
+  private MediaStatusModel status = MediaStatusModel.ONHOLD;
 
   @Column(nullable = false, updatable = false)
   private LocalDateTime createdAt;
