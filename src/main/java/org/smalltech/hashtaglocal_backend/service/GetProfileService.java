@@ -3,7 +3,13 @@ package org.smalltech.hashtaglocal_backend.service;
 import java.util.Optional;
 import org.smalltech.hashtaglocal_backend.entity.UserAuthSessionEntity;
 import org.smalltech.hashtaglocal_backend.entity.UserEntity;
+import org.smalltech.hashtaglocal_backend.model.IssueActionModel;
+import org.smalltech.hashtaglocal_backend.model.IssueCountModel;
+import org.smalltech.hashtaglocal_backend.model.IssueStatusModel;
 import org.smalltech.hashtaglocal_backend.model.UserProfileModel;
+import org.smalltech.hashtaglocal_backend.model.UserSummaryModel;
+import org.smalltech.hashtaglocal_backend.repository.IssueActionRepository;
+import org.smalltech.hashtaglocal_backend.repository.IssueRepository;
 import org.smalltech.hashtaglocal_backend.repository.LocalityRepository;
 import org.smalltech.hashtaglocal_backend.repository.UserAuthSessionRepository;
 import org.smalltech.hashtaglocal_backend.repository.UserRepository;
@@ -14,14 +20,20 @@ public class GetProfileService {
 
   private final UserAuthSessionRepository userAuthSessionRepository;
   private final LocalityRepository localityRepository;
+  private final IssueRepository issueRepository;
+  private final IssueActionRepository issueActionRepository;
   private static final String DEFAULT_HASHTAG = "#local";
 
   public GetProfileService(
       UserRepository userRepository,
       UserAuthSessionRepository userAuthSessionRepository,
-      LocalityRepository localityRepository) {
+      LocalityRepository localityRepository,
+      IssueRepository issueRepository,
+      IssueActionRepository issueActionRepository) {
     this.userAuthSessionRepository = userAuthSessionRepository;
     this.localityRepository = localityRepository;
+    this.issueRepository = issueRepository;
+    this.issueActionRepository = issueActionRepository;
   }
 
   /**
@@ -75,10 +87,39 @@ public class GetProfileService {
       }
     }
 
+    UserSummaryModel userSummary = buildUserSummary(user.getId());
+
     return UserProfileModel.builder()
         .username(user.getUsername())
         .picture(user.getProfilePicture())
         .hashtag(hashtag)
+        .userSummary(userSummary)
         .build();
+  }
+
+  /** Build user summary with issue counts */
+  private UserSummaryModel buildUserSummary(Long userId) {
+    long total = issueRepository.countByUserExcludingRejected(userId);
+    long onhold = issueRepository.countByUserAndStatus(userId, IssueStatusModel.ONHOLD);
+    long open = issueRepository.countByUserAndStatus(userId, IssueStatusModel.OPEN);
+    long resolved = issueRepository.countByUserAndStatus(userId, IssueStatusModel.RESOLVED);
+    long verify =
+        issueActionRepository.countDistinctIssuesByUserAndActionExcludingOwnIssues(
+            userId, IssueActionModel.VERIFY);
+    long resolvedOthers =
+        issueActionRepository.countDistinctIssuesByUserAndActionExcludingOwnIssues(
+            userId, IssueActionModel.RESOLVE);
+
+    IssueCountModel issueCount =
+        IssueCountModel.builder()
+            .total(total)
+            .onhold(onhold)
+            .open(open)
+            .resolved(resolved)
+            .verify(verify)
+            .resolvedOthers(resolvedOthers)
+            .build();
+
+    return UserSummaryModel.builder().issueCount(issueCount).build();
   }
 }

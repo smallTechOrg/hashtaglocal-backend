@@ -11,8 +11,10 @@ import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import org.smalltech.hashtaglocal_backend.model.IssueCountModel;
 import org.smalltech.hashtaglocal_backend.model.NewAPIResponse;
 import org.smalltech.hashtaglocal_backend.model.UserProfileModel;
+import org.smalltech.hashtaglocal_backend.model.UserSummaryModel;
 import org.smalltech.hashtaglocal_backend.model.response.UserProfileResponseData;
 import org.smalltech.hashtaglocal_backend.service.GetProfileService;
 import org.springframework.http.HttpStatus;
@@ -214,6 +216,48 @@ class ProfileControllerTests {
       assertNotNull(response);
       assertEquals(HttpStatus.OK, response.getStatusCode());
       verify(profileService, times(1)).getMyProfile(token, null, lng);
+    }
+
+    @Test
+    @DisplayName("Should include user summary in response when present")
+    void testGetMyProfile_IncludesUserSummary() {
+      // Arrange
+      String token = "valid-token";
+      IssueCountModel issueCount =
+          IssueCountModel.builder()
+              .total(12)
+              .onhold(3)
+              .open(7)
+              .resolved(1)
+              .verify(34)
+              .resolvedOthers(4)
+              .build();
+      UserSummaryModel userSummary = UserSummaryModel.builder().issueCount(issueCount).build();
+      UserProfileModel userProfile =
+          UserProfileModel.builder()
+              .username("testuser")
+              .picture("http://example.com/pic.jpg")
+              .hashtag("#local")
+              .userSummary(userSummary)
+              .build();
+
+      when(profileService.getMyProfile(token, null, null)).thenReturn(Optional.of(userProfile));
+
+      // Act
+      ResponseEntity<NewAPIResponse<UserProfileResponseData>> response =
+          profileController.getMyProfile("Bearer " + token, null, null);
+
+      // Assert
+      assertNotNull(response);
+      assertEquals(HttpStatus.OK, response.getStatusCode());
+      var returnedProfile = response.getBody().getData().getUser();
+      assertNotNull(returnedProfile.getUserSummary());
+      assertEquals(12, returnedProfile.getUserSummary().getIssueCount().getTotal());
+      assertEquals(3, returnedProfile.getUserSummary().getIssueCount().getOnhold());
+      assertEquals(7, returnedProfile.getUserSummary().getIssueCount().getOpen());
+      assertEquals(1, returnedProfile.getUserSummary().getIssueCount().getResolved());
+      assertEquals(34, returnedProfile.getUserSummary().getIssueCount().getVerify());
+      assertEquals(4, returnedProfile.getUserSummary().getIssueCount().getResolvedOthers());
     }
   }
 }

@@ -9,10 +9,12 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class UserProfileModel {
+public class IssueCountModel {
 
-  private String username;
-  private String picture;
-  private String hashtag;
-  private UserSummaryModel userSummary;
+  private long total;
+  private long onhold;
+  private long open;
+  private long resolved;
+  private long verify;
+  private long resolvedOthers;
 }

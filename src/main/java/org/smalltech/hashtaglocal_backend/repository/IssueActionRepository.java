@@ -17,4 +17,13 @@ public interface IssueActionRepository extends JpaRepository<IssueActionEntity, 
           + "WHERE ia.issueEntity = :issue AND ia.action = :action")
   int countDistinctUserByIssueAndAction(
       @Param("issue") IssueEntity issueEntity, @Param("action") IssueActionModel action);
+
+  @Query(
+      "SELECT COUNT(DISTINCT ia.issueEntity.id) "
+          + "FROM IssueActionEntity ia "
+          + "WHERE ia.userEntity.id = :userId "
+          + "AND ia.action = :action "
+          + "AND ia.issueEntity.userEntity.id <> :userId")
+  long countDistinctIssuesByUserAndActionExcludingOwnIssues(
+      @Param("userId") Long userId, @Param("action") IssueActionModel action);
 }

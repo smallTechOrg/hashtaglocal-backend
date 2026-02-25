@@ -14,7 +14,11 @@ import org.mockito.MockitoAnnotations;
 import org.smalltech.hashtaglocal_backend.entity.Locality;
 import org.smalltech.hashtaglocal_backend.entity.UserAuthSessionEntity;
 import org.smalltech.hashtaglocal_backend.entity.UserEntity;
+import org.smalltech.hashtaglocal_backend.model.IssueActionModel;
+import org.smalltech.hashtaglocal_backend.model.IssueStatusModel;
 import org.smalltech.hashtaglocal_backend.model.UserProfileModel;
+import org.smalltech.hashtaglocal_backend.repository.IssueActionRepository;
+import org.smalltech.hashtaglocal_backend.repository.IssueRepository;
 import org.smalltech.hashtaglocal_backend.repository.LocalityRepository;
 import org.smalltech.hashtaglocal_backend.repository.UserAuthSessionRepository;
 
@@ -25,6 +29,10 @@ class GetProfileServiceTest {
   @Mock private UserAuthSessionRepository userAuthSessionRepository;
 
   @Mock private LocalityRepository localityRepository;
+
+  @Mock private IssueRepository issueRepository;
+
+  @Mock private IssueActionRepository issueActionRepository;
 
   @InjectMocks private GetProfileService profileService;
 
@@ -134,6 +142,9 @@ class GetProfileServiceTest {
       assertEquals("testuser", profile.getUsername());
       assertEquals("pic.jpg", profile.getPicture());
       assertEquals("#local", profile.getHashtag());
+      assertNotNull(profile.getUserSummary());
+      assertNotNull(profile.getUserSummary().getIssueCount());
+      assertEquals(0, profile.getUserSummary().getIssueCount().getTotal());
 
       verify(userAuthSessionRepository, times(1)).findByAccessToken(accessToken);
       verify(localityRepository, never()).findContainingLocality(anyDouble(), anyDouble());
@@ -402,6 +413,178 @@ class GetProfileServiceTest {
 
       verify(userAuthSessionRepository, times(1)).findByAccessToken(accessToken);
       verify(localityRepository, never()).findContainingLocality(anyDouble(), anyDouble());
+    }
+  }
+
+  @Nested
+  @DisplayName("User Summary")
+  class UserSummary {
+
+    private UserAuthSessionEntity createValidSession(UserEntity user, String accessToken) {
+      long validExpiryTime = System.currentTimeMillis() / 1000 + 3600;
+      return UserAuthSessionEntity.builder()
+          .user(user)
+          .accessToken(accessToken)
+          .isActive(true)
+          .accessTokenExpiryTs(validExpiryTime)
+          .build();
+    }
+
+    @Test
+    @DisplayName("Should return correct issue counts for user's own issues")
+    void testUserSummary_OwnIssueCounts() {
+      // Arrange
+      String accessToken = "valid-token";
+      UserEntity user =
+          UserEntity.builder().id(1L).username("testuser").profilePicture("pic.jpg").build();
+      UserAuthSessionEntity session = createValidSession(user, accessToken);
+
+      when(userAuthSessionRepository.findByAccessToken(accessToken))
+          .thenReturn(Optional.of(session));
+      when(issueRepository.countByUserExcludingRejected(1L)).thenReturn(12L);
+      when(issueRepository.countByUserAndStatus(1L, IssueStatusModel.ONHOLD)).thenReturn(3L);
+      when(issueRepository.countByUserAndStatus(1L, IssueStatusModel.OPEN)).thenReturn(7L);
+      when(issueRepository.countByUserAndStatus(1L, IssueStatusModel.RESOLVED)).thenReturn(2L);
+      when(issueActionRepository.countDistinctIssuesByUserAndActionExcludingOwnIssues(
+              1L, IssueActionModel.VERIFY))
+          .thenReturn(5L);
+      when(issueActionRepository.countDistinctIssuesByUserAndActionExcludingOwnIssues(
+              1L, IssueActionModel.RESOLVE))
+          .thenReturn(4L);
+
+      // Act
+      Optional<UserProfileModel> result = profileService.getMyProfile(accessToken, null, null);
+
+      // Assert
+      assertTrue(result.isPresent());
+      var issueCount = result.get().getUserSummary().getIssueCount();
+      assertEquals(12, issueCount.getTotal());
+      assertEquals(3, issueCount.getOnhold());
+      assertEquals(7, issueCount.getOpen());
+      assertEquals(2, issueCount.getResolved());
+      assertEquals(5, issueCount.getVerify());
+      assertEquals(4, issueCount.getResolvedOthers());
+    }
+
+    @Test
+    @DisplayName("Should return zero counts when user has no issues")
+    void testUserSummary_NoIssues() {
+      // Arrange
+      String accessToken = "valid-token";
+      UserEntity user =
+          UserEntity.builder().id(2L).username("newuser").profilePicture("pic.jpg").build();
+      UserAuthSessionEntity session = createValidSession(user, accessToken);
+
+      when(userAuthSessionRepository.findByAccessToken(accessToken))
+          .thenReturn(Optional.of(session));
+      when(issueRepository.countByUserExcludingRejected(2L)).thenReturn(0L);
+      when(issueRepository.countByUserAndStatus(2L, IssueStatusModel.ONHOLD)).thenReturn(0L);
+      when(issueRepository.countByUserAndStatus(2L, IssueStatusModel.OPEN)).thenReturn(0L);
+      when(issueRepository.countByUserAndStatus(2L, IssueStatusModel.RESOLVED)).thenReturn(0L);
+      when(issueActionRepository.countDistinctIssuesByUserAndActionExcludingOwnIssues(
+              2L, IssueActionModel.VERIFY))
+          .thenReturn(0L);
+      when(issueActionRepository.countDistinctIssuesByUserAndActionExcludingOwnIssues(
+              2L, IssueActionModel.RESOLVE))
+          .thenReturn(0L);
+
+      // Act
+      Optional<UserProfileModel> result = profileService.getMyProfile(accessToken, null, null);
+
+      // Assert
+      assertTrue(result.isPresent());
+      var issueCount = result.get().getUserSummary().getIssueCount();
+      assertEquals(0, issueCount.getTotal());
+      assertEquals(0, issueCount.getOnhold());
+      assertEquals(0, issueCount.getOpen());
+      assertEquals(0, issueCount.getResolved());
+      assertEquals(0, issueCount.getVerify());
+      assertEquals(0, issueCount.getResolvedOthers());
+    }
+
+    @Test
+    @DisplayName("Should count verify and resolved_others only for other users' issues")
+    void testUserSummary_VerifyAndResolvedOthersExcludeOwnIssues() {
+      // Arrange
+      String accessToken = "valid-token";
+      UserEntity user =
+          UserEntity.builder().id(3L).username("active-user").profilePicture("pic.jpg").build();
+      UserAuthSessionEntity session = createValidSession(user, accessToken);
+
+      when(userAuthSessionRepository.findByAccessToken(accessToken))
+          .thenReturn(Optional.of(session));
+      when(issueRepository.countByUserExcludingRejected(3L)).thenReturn(5L);
+      when(issueRepository.countByUserAndStatus(3L, IssueStatusModel.ONHOLD)).thenReturn(0L);
+      when(issueRepository.countByUserAndStatus(3L, IssueStatusModel.OPEN)).thenReturn(5L);
+      when(issueRepository.countByUserAndStatus(3L, IssueStatusModel.RESOLVED)).thenReturn(0L);
+      when(issueActionRepository.countDistinctIssuesByUserAndActionExcludingOwnIssues(
+              3L, IssueActionModel.VERIFY))
+          .thenReturn(10L);
+      when(issueActionRepository.countDistinctIssuesByUserAndActionExcludingOwnIssues(
+              3L, IssueActionModel.RESOLVE))
+          .thenReturn(3L);
+
+      // Act
+      Optional<UserProfileModel> result = profileService.getMyProfile(accessToken, null, null);
+
+      // Assert
+      assertTrue(result.isPresent());
+      var issueCount = result.get().getUserSummary().getIssueCount();
+      assertEquals(5, issueCount.getTotal());
+      assertEquals(0, issueCount.getOnhold());
+      assertEquals(5, issueCount.getOpen());
+      assertEquals(0, issueCount.getResolved());
+      assertEquals(10, issueCount.getVerify());
+      assertEquals(3, issueCount.getResolvedOthers());
+
+      verify(issueActionRepository)
+          .countDistinctIssuesByUserAndActionExcludingOwnIssues(3L, IssueActionModel.VERIFY);
+      verify(issueActionRepository)
+          .countDistinctIssuesByUserAndActionExcludingOwnIssues(3L, IssueActionModel.RESOLVE);
+    }
+
+    @Test
+    @DisplayName("Should include user summary alongside profile and hashtag")
+    void testUserSummary_IncludedWithProfileData() {
+      // Arrange
+      String accessToken = "valid-token";
+      Double latitude = 12.9716;
+      Double longitude = 77.5946;
+      UserEntity user =
+          UserEntity.builder().id(1L).username("testuser").profilePicture("pic.jpg").build();
+      UserAuthSessionEntity session = createValidSession(user, accessToken);
+
+      Locality locality = Locality.builder().id(1L).hashtag("#bangalore").name("Bangalore").build();
+
+      when(userAuthSessionRepository.findByAccessToken(accessToken))
+          .thenReturn(Optional.of(session));
+      when(localityRepository.findContainingLocality(latitude, longitude))
+          .thenReturn(Optional.of(locality));
+      when(issueRepository.countByUserExcludingRejected(1L)).thenReturn(3L);
+      when(issueRepository.countByUserAndStatus(1L, IssueStatusModel.ONHOLD)).thenReturn(1L);
+      when(issueRepository.countByUserAndStatus(1L, IssueStatusModel.OPEN)).thenReturn(2L);
+      when(issueRepository.countByUserAndStatus(1L, IssueStatusModel.RESOLVED)).thenReturn(0L);
+      when(issueActionRepository.countDistinctIssuesByUserAndActionExcludingOwnIssues(
+              1L, IssueActionModel.VERIFY))
+          .thenReturn(0L);
+      when(issueActionRepository.countDistinctIssuesByUserAndActionExcludingOwnIssues(
+              1L, IssueActionModel.RESOLVE))
+          .thenReturn(0L);
+
+      // Act
+      Optional<UserProfileModel> result =
+          profileService.getMyProfile(accessToken, latitude, longitude);
+
+      // Assert
+      assertTrue(result.isPresent());
+      UserProfileModel profile = result.get();
+      assertEquals("testuser", profile.getUsername());
+      assertEquals("pic.jpg", profile.getPicture());
+      assertEquals("#bangalore", profile.getHashtag());
+      assertNotNull(profile.getUserSummary());
+      assertEquals(3, profile.getUserSummary().getIssueCount().getTotal());
+      assertEquals(1, profile.getUserSummary().getIssueCount().getOnhold());
+      assertEquals(2, profile.getUserSummary().getIssueCount().getOpen());
     }
   }
 }
