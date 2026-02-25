@@ -11,10 +11,15 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class IssueQueryService {
 
-	private final IssueRepository issueRepository;
+  private final IssueRepository issueRepository;
 
-	public IssueEntity get(Long issueId) {
-		return issueRepository.findById(issueId).orElseGet(
-				() -> issueRepository.findById(1L).orElseThrow(() -> new RuntimeException("No issue available")));
-	}
+  public IssueEntity get(Long issueId) {
+    return issueRepository
+        .findById(issueId)
+        .orElseGet(
+            () ->
+                issueRepository
+                    .findById(1L)
+                    .orElseThrow(() -> new RuntimeException("No issue available")));
+  }
 }

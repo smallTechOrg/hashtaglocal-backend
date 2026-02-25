@@ -24,45 +24,64 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 public class DefaultIssueReportService implements IssueReportService {
 
-	private final IssueRepository issueRepository;
-	private final MediaRepository mediaRepository;
-	private final UserRepository userRepository;
-	private final LocationService locationService;
+  private final IssueRepository issueRepository;
+  private final MediaRepository mediaRepository;
+  private final UserRepository userRepository;
+  private final LocationService locationService;
 
-	@Override
-	public Long createIssue(Long userId, IssueReportRequest request) {
-		var issueReq = request.getIssue();
+  @Override
+  public Long createIssue(Long userId, IssueReportRequest request) {
+    var issueReq = request.getIssue();
 
-		UserEntity user = userRepository.findById(userId).orElseThrow(() -> new RuntimeException("User not found"));
+    UserEntity user =
+        userRepository.findById(userId).orElseThrow(() -> new RuntimeException("User not found"));
 
-		// Save issue location
-		Location issueLocation = locationService.createAndSaveLocation(issueReq.getLocation().getLat(),
-				issueReq.getLocation().getLng(), issueReq.getLocation().getMetaData(), "Unknown");
+    // Save issue location
+    Location issueLocation =
+        locationService.createAndSaveLocation(
+            issueReq.getLocation().getLat(),
+            issueReq.getLocation().getLng(),
+            issueReq.getLocation().getMetaData(),
+            "Unknown");
 
-		// Create issue
-		IssueEntity issue = IssueEntity.builder().type(IssueTypeModel.valueOf(issueReq.getType()))
-				.description(issueReq.getDescription()).status(IssueStatusModel.ONHOLD).createdAt(LocalDateTime.now())
-				.updatedAt(LocalDateTime.now()).location(issueLocation).userEntity(user).build();
+    // Create issue
+    IssueEntity issue =
+        IssueEntity.builder()
+            .type(IssueTypeModel.valueOf(issueReq.getType()))
+            .description(issueReq.getDescription())
+            .status(IssueStatusModel.ONHOLD)
+            .createdAt(LocalDateTime.now())
+            .updatedAt(LocalDateTime.now())
+            .location(issueLocation)
+            .userEntity(user)
+            .build();
 
-		issue = issueRepository.save(issue);
+    issue = issueRepository.save(issue);
 
-		// Save media
-		if (issueReq.getMediaUrls() != null && !issueReq.getMediaUrls().isEmpty()) {
-			for (MediaRequest mediaReq : issueReq.getMediaUrls()) {
+    // Save media
+    if (issueReq.getMediaUrls() != null && !issueReq.getMediaUrls().isEmpty()) {
+      for (MediaRequest mediaReq : issueReq.getMediaUrls()) {
 
-				var mediaLocReq = mediaReq.getLocation();
+        var mediaLocReq = mediaReq.getLocation();
 
-				Location mediaLocation = locationService.createAndSaveLocation(mediaLocReq.getLat(),
-						mediaLocReq.getLng(), mediaLocReq.getMetaData(), "Unknown");
+        Location mediaLocation =
+            locationService.createAndSaveLocation(
+                mediaLocReq.getLat(), mediaLocReq.getLng(), mediaLocReq.getMetaData(), "Unknown");
 
-				MediaEntity media = MediaEntity.builder().issue(issue).type(MediaTypeModel.valueOf(mediaReq.getType()))
-						.url(mediaReq.getUrl()).user(user).location(mediaLocation).createdAt(LocalDateTime.now())
-						.build();
+        MediaEntity media =
+            MediaEntity.builder()
+                .issue(issue)
+                .type(MediaTypeModel.valueOf(mediaReq.getType()))
+                .url(mediaReq.getUrl())
+                .user(user)
+                .location(mediaLocation)
+                .createdAt(LocalDateTime.now())
+                .build();
 
-				mediaRepository.save(media);
-			}
-		}
+        mediaRepository.save(media);
+      }
+    }
 
-		return issue.getId();
-	}
+    return issue.getId();
+  }
 }

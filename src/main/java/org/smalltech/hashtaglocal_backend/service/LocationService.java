@@ -14,22 +14,28 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class LocationService {
 
-	private final LocationRepository locationRepository;
-	private final LocalityRepository localityRepository;
-	private final LocalityResolver localityResolver;
+  private final LocationRepository locationRepository;
+  private final LocalityRepository localityRepository;
+  private final LocalityResolver localityResolver;
 
-	public Location createAndSaveLocation(Double lat, Double lng, Map<String, Object> metaData, String fallbackName) {
-		if (lat == null || lng == null) {
-			return null;
-		}
+  public Location createAndSaveLocation(
+      Double lat, Double lng, Map<String, Object> metaData, String fallbackName) {
+    if (lat == null || lng == null) {
+      return null;
+    }
 
-		var defaultLocality = localityRepository.findById(1L).orElse(null);
-		var locality = localityResolver.resolve(lat, lng, defaultLocality);
-		var name = LocationNameExtractor.extract(metaData);
+    var defaultLocality = localityRepository.findById(1L).orElse(null);
+    var locality = localityResolver.resolve(lat, lng, defaultLocality);
+    var name = LocationNameExtractor.extract(metaData);
 
-		Location location = Location.builder().point(LocationUtil.createPoint(lat, lng))
-				.name(name != null ? name : locality.getName()).locality(locality).metaData(metaData).build();
+    Location location =
+        Location.builder()
+            .point(LocationUtil.createPoint(lat, lng))
+            .name(name != null ? name : locality.getName())
+            .locality(locality)
+            .metaData(metaData)
+            .build();
 
-		return locationRepository.save(location);
-	}
+    return locationRepository.save(location);
+  }
 }

@@ -11,17 +11,17 @@ import lombok.Data;
 @Data
 public class IssueRequest {
 
-	@NotBlank(message = "type is required")
-	private String type;
+  @NotBlank(message = "type is required")
+  private String type;
 
-	private String description;
+  private String description;
 
-	@Valid
-	@NotNull(message = "location is required")
-	private LocationRequest location;
+  @Valid
+  @NotNull(message = "location is required")
+  private LocationRequest location;
 
-	@Valid
-	@JsonProperty("media_urls")
-	@NotNull(message = "media_urls is required")
-	private List<MediaRequest> mediaUrls = new ArrayList<>();
+  @Valid
+  @JsonProperty("media_urls")
+  @NotNull(message = "media_urls is required")
+  private List<MediaRequest> mediaUrls = new ArrayList<>();
 }

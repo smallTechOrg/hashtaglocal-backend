@@ -13,27 +13,26 @@ import org.junit.jupiter.params.provider.MethodSource;
 
 class LocationNameExtractorTest {
 
-	private static final ObjectMapper objectMapper = new ObjectMapper();
+  private static final ObjectMapper objectMapper = new ObjectMapper();
 
-	static Stream<Map<String, Object>> metaDataProvider() throws Exception {
-		InputStream inputStream = LocationNameExtractorTest.class.getClassLoader()
-				.getResourceAsStream("meta-data.json");
+  static Stream<Map<String, Object>> metaDataProvider() throws Exception {
+    InputStream inputStream =
+        LocationNameExtractorTest.class.getClassLoader().getResourceAsStream("meta-data.json");
 
-		List<Map<String, Object>> entries = objectMapper.readValue(inputStream,
-				new TypeReference<List<Map<String, Object>>>() {
-				});
+    List<Map<String, Object>> entries =
+        objectMapper.readValue(inputStream, new TypeReference<List<Map<String, Object>>>() {});
 
-		return entries.stream();
-	}
+    return entries.stream();
+  }
 
-	@ParameterizedTest(name = "{0}")
-	@MethodSource("metaDataProvider")
-	void extract_shouldReturnExpectedName(Map<String, Object> metaData) {
-		String expected = (String) metaData.get("expected");
-		String description = (String) metaData.get("description");
+  @ParameterizedTest(name = "{0}")
+  @MethodSource("metaDataProvider")
+  void extract_shouldReturnExpectedName(Map<String, Object> metaData) {
+    String expected = (String) metaData.get("expected");
+    String description = (String) metaData.get("description");
 
-		String result = LocationNameExtractor.extract(metaData);
+    String result = LocationNameExtractor.extract(metaData);
 
-		assertEquals(expected, result, description);
-	}
+    assertEquals(expected, result, description);
+  }
 }

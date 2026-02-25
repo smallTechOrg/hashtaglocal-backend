@@ -8,5 +8,5 @@ import lombok.*;
 @AllArgsConstructor
 @Builder
 public class Locality {
-	private List<String> hashtags;
+  private List<String> hashtags;
 }

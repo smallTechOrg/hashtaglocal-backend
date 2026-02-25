@@ -25,112 +25,162 @@ import org.smalltech.hashtaglocal_backend.repository.RawLocalityDiscoveryReposit
 /**
  * Test LocalityDiscoveryOrchestrator.
  *
- * Verifies: 1. Discovery run created and tracked 2. All sources queried
- * (GeoNames, OSM, IndiaPost) 3. Raw discoveries saved to database 4.
- * Deduplication logic (same locality from multiple sources) 5. Confidence score
- * calculated 6. Final results saved to discovered_localities table
+ * <p>Verifies: 1. Discovery run created and tracked 2. All sources queried (GeoNames, OSM,
+ * IndiaPost) 3. Raw discoveries saved to database 4. Deduplication logic (same locality from
+ * multiple sources) 5. Confidence score calculated 6. Final results saved to discovered_localities
+ * table
  */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 @DisplayName("Locality Discovery Orchestrator")
 class LocalityDiscoveryOrchestratorTest {
 
-	@Mock
-	private LocalityDiscoveryRunRepository discoveryRunRepository;
+  @Mock private LocalityDiscoveryRunRepository discoveryRunRepository;
 
-	@Mock
-	private RawLocalityDiscoveryRepository rawDiscoveryRepository;
+  @Mock private RawLocalityDiscoveryRepository rawDiscoveryRepository;
 
-	@Mock
-	private DiscoveredLocalityRepository discoveredLocalityRepository;
+  @Mock private DiscoveredLocalityRepository discoveredLocalityRepository;
 
-	@Mock
-	private GeoNamesDiscoveryService geonamesService;
+  @Mock private GeoNamesDiscoveryService geonamesService;
 
-	@Mock
-	private OSMDiscoveryService osmService;
+  @Mock private OSMDiscoveryService osmService;
 
-	private LocalityDiscoveryOrchestrator orchestrator;
+  private LocalityDiscoveryOrchestrator orchestrator;
 
-	@BeforeEach
-	void setUp() {
-		orchestrator = new LocalityDiscoveryOrchestrator(discoveryRunRepository, rawDiscoveryRepository,
-				discoveredLocalityRepository, geonamesService, osmService);
-	}
+  @BeforeEach
+  void setUp() {
+    orchestrator =
+        new LocalityDiscoveryOrchestrator(
+            discoveryRunRepository,
+            rawDiscoveryRepository,
+            discoveredLocalityRepository,
+            geonamesService,
+            osmService);
+  }
 
-	@Test
-	@DisplayName("Should orchestrate complete discovery from multiple sources")
-	void completeDiscoveryWorkflow() {
-		// Arrange: Create discovery run
-		LocalityDiscoveryRun run = LocalityDiscoveryRun.builder().countryCode("IN")
-				.status(LocalityDiscoveryRun.DiscoveryStatus.IN_PROGRESS).startedAt(LocalDateTime.now())
-				.totalRawDiscoveries(0).geonamesCount(0).osmCount(0).indiaPostCount(0).build();
+  @Test
+  @DisplayName("Should orchestrate complete discovery from multiple sources")
+  void completeDiscoveryWorkflow() {
+    // Arrange: Create discovery run
+    LocalityDiscoveryRun run =
+        LocalityDiscoveryRun.builder()
+            .countryCode("IN")
+            .status(LocalityDiscoveryRun.DiscoveryStatus.IN_PROGRESS)
+            .startedAt(LocalDateTime.now())
+            .totalRawDiscoveries(0)
+            .geonamesCount(0)
+            .osmCount(0)
+            .indiaPostCount(0)
+            .build();
 
-		when(discoveryRunRepository.save(any(LocalityDiscoveryRun.class))).thenReturn(run);
+    when(discoveryRunRepository.save(any(LocalityDiscoveryRun.class))).thenReturn(run);
 
-		// GeoNames returns 2 cities
-		List<RawDiscoveryDTO> geonamesResults = Arrays.asList(
-				RawDiscoveryDTO.builder().name("Bengaluru").state("Karnataka").countryCode("IN").localityType("CITY")
-						.source("GEONAMES").sourceMetadata("{}").build(),
-				RawDiscoveryDTO.builder().name("Mumbai").state("Maharashtra").countryCode("IN").localityType("CITY")
-						.source("GEONAMES").sourceMetadata("{}").build());
+    // GeoNames returns 2 cities
+    List<RawDiscoveryDTO> geonamesResults =
+        Arrays.asList(
+            RawDiscoveryDTO.builder()
+                .name("Bengaluru")
+                .state("Karnataka")
+                .countryCode("IN")
+                .localityType("CITY")
+                .source("GEONAMES")
+                .sourceMetadata("{}")
+                .build(),
+            RawDiscoveryDTO.builder()
+                .name("Mumbai")
+                .state("Maharashtra")
+                .countryCode("IN")
+                .localityType("CITY")
+                .source("GEONAMES")
+                .sourceMetadata("{}")
+                .build());
 
-		// OSM also finds Mumbai (variant name) and another city
-		List<RawDiscoveryDTO> osmResults = Arrays.asList(
-				RawDiscoveryDTO.builder().name("Bombay").state("Maharashtra").countryCode("IN").localityType("CITY")
-						.source("OSM").sourceMetadata("{}").build(),
-				RawDiscoveryDTO.builder().name("Pune").state("Maharashtra").countryCode("IN").localityType("CITY")
-						.source("OSM").sourceMetadata("{}").build());
+    // OSM also finds Mumbai (variant name) and another city
+    List<RawDiscoveryDTO> osmResults =
+        Arrays.asList(
+            RawDiscoveryDTO.builder()
+                .name("Bombay")
+                .state("Maharashtra")
+                .countryCode("IN")
+                .localityType("CITY")
+                .source("OSM")
+                .sourceMetadata("{}")
+                .build(),
+            RawDiscoveryDTO.builder()
+                .name("Pune")
+                .state("Maharashtra")
+                .countryCode("IN")
+                .localityType("CITY")
+                .source("OSM")
+                .sourceMetadata("{}")
+                .build());
 
-		when(geonamesService.discoverCities("IN")).thenReturn(geonamesResults);
-		when(osmService.discoverCities("IN")).thenReturn(osmResults);
+    when(geonamesService.discoverCities("IN")).thenReturn(geonamesResults);
+    when(osmService.discoverCities("IN")).thenReturn(osmResults);
 
-		when(rawDiscoveryRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-		when(discoveredLocalityRepository.save(any(DiscoveredLocality.class))).thenAnswer(inv -> inv.getArgument(0));
+    when(rawDiscoveryRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+    when(discoveredLocalityRepository.save(any(DiscoveredLocality.class)))
+        .thenAnswer(inv -> inv.getArgument(0));
 
-		// Act
-		LocalityDiscoveryRun result = orchestrator.discoverCities("IN");
+    // Act
+    LocalityDiscoveryRun result = orchestrator.discoverCities("IN");
 
-		// Assert
-		assertNotNull(result);
-		assertEquals(LocalityDiscoveryRun.DiscoveryStatus.COMPLETED, result.getStatus());
-		assertEquals(2, result.getGeonamesCount());
-		assertEquals(2, result.getOsmCount());
-		assertEquals(4, result.getTotalRawDiscoveries());
+    // Assert
+    assertNotNull(result);
+    assertEquals(LocalityDiscoveryRun.DiscoveryStatus.COMPLETED, result.getStatus());
+    assertEquals(2, result.getGeonamesCount());
+    assertEquals(2, result.getOsmCount());
+    assertEquals(4, result.getTotalRawDiscoveries());
 
-		// Verify raw discoveries saved (4 total: 2 from GeoNames, 2 from OSM)
-		verify(rawDiscoveryRepository, times(4)).save(any());
-	}
+    // Verify raw discoveries saved (4 total: 2 from GeoNames, 2 from OSM)
+    verify(rawDiscoveryRepository, times(4)).save(any());
+  }
 
-	@Test
-	@DisplayName("Should handle discovery source failures gracefully")
-	void handleServiceFailures() {
-		LocalityDiscoveryRun run = LocalityDiscoveryRun.builder().countryCode("IN")
-				.status(LocalityDiscoveryRun.DiscoveryStatus.IN_PROGRESS).startedAt(LocalDateTime.now())
-				.totalRawDiscoveries(0).geonamesCount(0).osmCount(0).indiaPostCount(0).build();
+  @Test
+  @DisplayName("Should handle discovery source failures gracefully")
+  void handleServiceFailures() {
+    LocalityDiscoveryRun run =
+        LocalityDiscoveryRun.builder()
+            .countryCode("IN")
+            .status(LocalityDiscoveryRun.DiscoveryStatus.IN_PROGRESS)
+            .startedAt(LocalDateTime.now())
+            .totalRawDiscoveries(0)
+            .geonamesCount(0)
+            .osmCount(0)
+            .indiaPostCount(0)
+            .build();
 
-		when(discoveryRunRepository.save(any(LocalityDiscoveryRun.class))).thenReturn(run);
+    when(discoveryRunRepository.save(any(LocalityDiscoveryRun.class))).thenReturn(run);
 
-		// GeoNames fails
-		when(geonamesService.discoverCities("IN")).thenThrow(new RuntimeException("API error"));
+    // GeoNames fails
+    when(geonamesService.discoverCities("IN")).thenThrow(new RuntimeException("API error"));
 
-		// OSM succeeds
-		List<RawDiscoveryDTO> osmResults = Arrays.asList(RawDiscoveryDTO.builder().name("Delhi").state("Delhi")
-				.countryCode("IN").localityType("CITY").source("OSM").sourceMetadata("{}").build());
+    // OSM succeeds
+    List<RawDiscoveryDTO> osmResults =
+        Arrays.asList(
+            RawDiscoveryDTO.builder()
+                .name("Delhi")
+                .state("Delhi")
+                .countryCode("IN")
+                .localityType("CITY")
+                .source("OSM")
+                .sourceMetadata("{}")
+                .build());
 
-		when(osmService.discoverCities("IN")).thenReturn(osmResults);
+    when(osmService.discoverCities("IN")).thenReturn(osmResults);
 
-		when(rawDiscoveryRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-		when(discoveredLocalityRepository.save(any(DiscoveredLocality.class))).thenAnswer(inv -> inv.getArgument(0));
+    when(rawDiscoveryRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+    when(discoveredLocalityRepository.save(any(DiscoveredLocality.class)))
+        .thenAnswer(inv -> inv.getArgument(0));
 
-		// Act: Should not throw, should complete with partial results
-		LocalityDiscoveryRun result = orchestrator.discoverCities("IN");
+    // Act: Should not throw, should complete with partial results
+    LocalityDiscoveryRun result = orchestrator.discoverCities("IN");
 
-		// Assert
-		assertNotNull(result);
-		assertEquals(LocalityDiscoveryRun.DiscoveryStatus.COMPLETED, result.getStatus());
-		assertEquals(0, result.getGeonamesCount()); // Failed, count is 0
-		assertEquals(1, result.getOsmCount()); // Succeeded
-		assertEquals(1, result.getTotalRawDiscoveries());
-	}
+    // Assert
+    assertNotNull(result);
+    assertEquals(LocalityDiscoveryRun.DiscoveryStatus.COMPLETED, result.getStatus());
+    assertEquals(0, result.getGeonamesCount()); // Failed, count is 0
+    assertEquals(1, result.getOsmCount()); // Succeeded
+    assertEquals(1, result.getTotalRawDiscoveries());
+  }
 }

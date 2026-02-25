@@ -7,6 +7,6 @@ import lombok.*;
 @AllArgsConstructor
 @Builder
 public class SignedUrlResponse {
-	private String signedUrl;
-	private String path;
+  private String signedUrl;
+  private String path;
 }

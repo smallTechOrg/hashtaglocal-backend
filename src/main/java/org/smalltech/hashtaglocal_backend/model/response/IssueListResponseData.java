@@ -8,5 +8,5 @@ import org.smalltech.hashtaglocal_backend.model.Issue;
 @Data
 @Builder
 public class IssueListResponseData {
-	private List<Issue> issues;
+  private List<Issue> issues;
 }

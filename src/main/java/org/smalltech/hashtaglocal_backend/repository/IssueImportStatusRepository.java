@@ -8,9 +8,10 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface IssueImportStatusRepository extends JpaRepository<IssueImportStatus, Long> {
-	boolean existsBySourceAndSourceIssueId(IssueImportSource source, String sourceIssueId);
+  boolean existsBySourceAndSourceIssueId(IssueImportSource source, String sourceIssueId);
 
-	Optional<IssueImportStatus> findBySourceAndSourceIssueId(IssueImportSource source, String sourceIssueId);
+  Optional<IssueImportStatus> findBySourceAndSourceIssueId(
+      IssueImportSource source, String sourceIssueId);
 
-	java.util.List<IssueImportStatus> findByJobId(Long jobId);
+  java.util.List<IssueImportStatus> findByJobId(Long jobId);
 }

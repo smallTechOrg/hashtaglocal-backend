@@ -13,11 +13,10 @@ import org.springframework.transaction.annotation.Transactional;
 @Profile("!test")
 public class IssueDataInitializer implements CommandLineRunner {
 
-	private final LocalityRepository localityRepository;
-	private final LocationRepository locationRepository;
+  private final LocalityRepository localityRepository;
+  private final LocationRepository locationRepository;
 
-	@Override
-	@Transactional
-	public void run(String... args) {
-	}
+  @Override
+  @Transactional
+  public void run(String... args) {}
 }

@@ -9,11 +9,11 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface RawLocalityDiscoveryRepository extends JpaRepository<RawLocalityDiscovery, Long> {
-	List<RawLocalityDiscovery> findByDiscoveryRun(LocalityDiscoveryRun discoveryRun);
+  List<RawLocalityDiscovery> findByDiscoveryRun(LocalityDiscoveryRun discoveryRun);
 
-	List<RawLocalityDiscovery> findBySource(DiscoverySource source);
+  List<RawLocalityDiscovery> findBySource(DiscoverySource source);
 
-	List<RawLocalityDiscovery> findByLocalityType(RawLocalityDiscovery.LocalityType localityType);
+  List<RawLocalityDiscovery> findByLocalityType(RawLocalityDiscovery.LocalityType localityType);
 
-	List<RawLocalityDiscovery> findByState(String state);
+  List<RawLocalityDiscovery> findByState(String state);
 }

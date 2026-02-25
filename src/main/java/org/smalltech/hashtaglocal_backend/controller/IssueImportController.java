@@ -22,25 +22,28 @@ import org.springframework.web.bind.annotation.RestController;
 @Slf4j
 public class IssueImportController {
 
-	private final IssueImportService issueImportService;
-	private final IssueImportJobRepository jobRepository;
-	private final IssueImportStatusRepository statusRepository;
+  private final IssueImportService issueImportService;
+  private final IssueImportJobRepository jobRepository;
+  private final IssueImportStatusRepository statusRepository;
 
-	@PostMapping("/issues/import")
-	public IssueImportJob importIssues(@RequestParam(defaultValue = "BLR_PAGES") IssueImportSource source) {
-		log.info("Starting issue import for source {}", source);
-		return switch (source) {
-			case BLR_PAGES -> issueImportService.importBlrPages();
-		};
-	}
+  @PostMapping("/issues/import")
+  public IssueImportJob importIssues(
+      @RequestParam(defaultValue = "BLR_PAGES") IssueImportSource source) {
+    log.info("Starting issue import for source {}", source);
+    return switch (source) {
+      case BLR_PAGES -> issueImportService.importBlrPages();
+    };
+  }
 
-	@GetMapping("/issues/import/{jobId}")
-	public IssueImportJob getJob(@PathVariable Long jobId) {
-		return jobRepository.findById(jobId).orElseThrow(() -> new RuntimeException("Job not found: " + jobId));
-	}
+  @GetMapping("/issues/import/{jobId}")
+  public IssueImportJob getJob(@PathVariable Long jobId) {
+    return jobRepository
+        .findById(jobId)
+        .orElseThrow(() -> new RuntimeException("Job not found: " + jobId));
+  }
 
-	@GetMapping("/issues/import/{jobId}/status")
-	public List<IssueImportStatus> getStatuses(@PathVariable Long jobId) {
-		return statusRepository.findByJobId(jobId);
-	}
+  @GetMapping("/issues/import/{jobId}/status")
+  public List<IssueImportStatus> getStatuses(@PathVariable Long jobId) {
+    return statusRepository.findByJobId(jobId);
+  }
 }

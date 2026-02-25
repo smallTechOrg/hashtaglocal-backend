@@ -13,11 +13,11 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @Builder
 public class Media {
-	private Location location;
-	private String type;
-	private String url;
-	private String urlThumbnail;
-	private String description;
-	private String username;
-	private LocalDateTime createdAt;
+  private Location location;
+  private String type;
+  private String url;
+  private String urlThumbnail;
+  private String description;
+  private String username;
+  private LocalDateTime createdAt;
 }

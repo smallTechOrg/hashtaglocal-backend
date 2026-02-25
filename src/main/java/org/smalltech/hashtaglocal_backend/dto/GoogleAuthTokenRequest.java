@@ -10,6 +10,6 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @Builder
 public class GoogleAuthTokenRequest {
-	private String accessToken;
-	private String redirectUrl;
+  private String accessToken;
+  private String redirectUrl;
 }

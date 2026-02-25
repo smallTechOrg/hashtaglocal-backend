@@ -7,9 +7,9 @@ import lombok.*;
 @AllArgsConstructor
 @Builder(toBuilder = true)
 public class Location {
-	private Double lat;
-	private Double lng;
-	private Locality locality;
-	private String address;
-	private String colloquialName;
+  private Double lat;
+  private Double lng;
+  private Locality locality;
+  private String address;
+  private String colloquialName;
 }

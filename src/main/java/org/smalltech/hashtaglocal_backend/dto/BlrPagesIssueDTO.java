@@ -11,14 +11,19 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @Builder
 public class BlrPagesIssueDTO {
-	private String uuid;
-	private Double lat;
-	@JsonProperty("long")
-	private Double lng;
-	private String image;
-	@JsonProperty("image_thumb")
-	private String imageThumb;
-	private Integer category;
-	@JsonProperty("created_at")
-	private String createdAt;
+  private String uuid;
+  private Double lat;
+
+  @JsonProperty("long")
+  private Double lng;
+
+  private String image;
+
+  @JsonProperty("image_thumb")
+  private String imageThumb;
+
+  private Integer category;
+
+  @JsonProperty("created_at")
+  private String createdAt;
 }

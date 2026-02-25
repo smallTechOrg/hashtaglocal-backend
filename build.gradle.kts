@@ -55,7 +55,7 @@ spotless {
     lineEndings = com.diffplug.spotless.LineEnding.UNIX
 
     java {
-        eclipse()
+        googleJavaFormat()
         importOrder()
         removeUnusedImports()
         trimTrailingWhitespace()

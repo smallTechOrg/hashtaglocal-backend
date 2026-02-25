@@ -23,82 +23,97 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class SwaggerConfig {
 
-	@Bean
-	public OpenAPI customOpenAPI() {
-		return new OpenAPI()
-				.info(new Info().title("Hashtag Local Backend API").version("0.0.1-SNAPSHOT")
-						.description("API documentation for Hashtag Local Backend")
-						.contact(new Contact().name("Hashtag Local").email("contact@smalltech.in"))
-						.license(new License().name("Apache 2.0")
-								.url("https://www.apache.org/licenses/LICENSE-2.0.html")))
+  @Bean
+  public OpenAPI customOpenAPI() {
+    return new OpenAPI()
+        .info(
+            new Info()
+                .title("Hashtag Local Backend API")
+                .version("0.0.1-SNAPSHOT")
+                .description("API documentation for Hashtag Local Backend")
+                .contact(new Contact().name("Hashtag Local").email("contact@smalltech.in"))
+                .license(
+                    new License()
+                        .name("Apache 2.0")
+                        .url("https://www.apache.org/licenses/LICENSE-2.0.html")))
+        .components(
+            new Components()
+                .addSecuritySchemes(
+                    "bearerAuth",
+                    new SecurityScheme()
+                        .type(SecurityScheme.Type.HTTP)
+                        .scheme("bearer")
+                        .bearerFormat("JWT")))
+        .addSecurityItem(new SecurityRequirement().addList("BearerAuth"))
+        .tags(List.of(new Tag().name("Actuator").description("Spring Boot Actuator endpoints")));
+  }
 
-				.components(new Components().addSecuritySchemes("bearerAuth",
-						new SecurityScheme().type(SecurityScheme.Type.HTTP).scheme("bearer").bearerFormat("JWT")))
+  @Bean
+  public GroupedOpenApi actuatorApi() {
+    return GroupedOpenApi.builder()
+        .group("actuator")
+        .pathsToMatch("/actuator/**")
+        .addOperationCustomizer(actuatorOperationCustomizer())
+        .build();
+  }
 
-				.addSecurityItem(new SecurityRequirement().addList("BearerAuth"))
+  @Bean
+  public GroupedOpenApi publicApi() {
+    return GroupedOpenApi.builder()
+        .group("public-api")
+        .pathsToExclude("/actuator/**")
+        .addOperationCustomizer(publicApiOperationCustomizer())
+        .build();
+  }
 
-				.tags(List.of(new Tag().name("Actuator").description("Spring Boot Actuator endpoints")));
-	}
+  @Bean
+  public OperationCustomizer actuatorOperationCustomizer() {
+    return (operation, handlerMethod) -> {
+      if (operation.getOperationId() != null && operation.getOperationId().contains("health")) {
+        enhanceHealthEndpointExamples(operation);
+      }
+      return operation;
+    };
+  }
 
-	@Bean
-	public GroupedOpenApi actuatorApi() {
-		return GroupedOpenApi.builder().group("actuator").pathsToMatch("/actuator/**")
-				.addOperationCustomizer(actuatorOperationCustomizer()).build();
-	}
+  @Bean
+  public OperationCustomizer publicApiOperationCustomizer() {
+    return (operation, handlerMethod) -> {
+      // Enhance examples for all public API endpoints
+      enhanceResponseExamples(operation);
+      return operation;
+    };
+  }
 
-	@Bean
-	public GroupedOpenApi publicApi() {
-		return GroupedOpenApi.builder().group("public-api").pathsToExclude("/actuator/**")
-				.addOperationCustomizer(publicApiOperationCustomizer()).build();
-	}
+  private void enhanceHealthEndpointExamples(io.swagger.v3.oas.models.Operation operation) {
+    ApiResponses responses = operation.getResponses();
+    if (responses == null) {
+      responses = new ApiResponses();
+      operation.setResponses(responses);
+    }
 
-	@Bean
-	public OperationCustomizer actuatorOperationCustomizer() {
-		return (operation, handlerMethod) -> {
-			if (operation.getOperationId() != null && operation.getOperationId().contains("health")) {
-				enhanceHealthEndpointExamples(operation);
-			}
-			return operation;
-		};
-	}
+    ApiResponse healthResponse = responses.get("200");
+    if (healthResponse == null) {
+      healthResponse = new ApiResponse();
+      responses.addApiResponse("200", healthResponse);
+    }
 
-	@Bean
-	public OperationCustomizer publicApiOperationCustomizer() {
-		return (operation, handlerMethod) -> {
-			// Enhance examples for all public API endpoints
-			enhanceResponseExamples(operation);
-			return operation;
-		};
-	}
+    Content content = healthResponse.getContent();
+    if (content == null) {
+      content = new Content();
+      healthResponse.setContent(content);
+    }
 
-	private void enhanceHealthEndpointExamples(io.swagger.v3.oas.models.Operation operation) {
-		ApiResponses responses = operation.getResponses();
-		if (responses == null) {
-			responses = new ApiResponses();
-			operation.setResponses(responses);
-		}
+    MediaType jsonMediaType = content.get("application/json");
+    if (jsonMediaType == null) {
+      jsonMediaType = new MediaType();
+      content.addMediaType("application/json", jsonMediaType);
+    }
 
-		ApiResponse healthResponse = responses.get("200");
-		if (healthResponse == null) {
-			healthResponse = new ApiResponse();
-			responses.addApiResponse("200", healthResponse);
-		}
-
-		Content content = healthResponse.getContent();
-		if (content == null) {
-			content = new Content();
-			healthResponse.setContent(content);
-		}
-
-		MediaType jsonMediaType = content.get("application/json");
-		if (jsonMediaType == null) {
-			jsonMediaType = new MediaType();
-			content.addMediaType("application/json", jsonMediaType);
-		}
-
-		// Add realistic example for health check response
-		Example healthExample = new Example();
-		healthExample.setValue("""
+    // Add realistic example for health check response
+    Example healthExample = new Example();
+    healthExample.setValue(
+        """
 				{
 				  "status": "UP",
 				  "components": {
@@ -116,16 +131,16 @@ public class SwaggerConfig {
 				}
 				""");
 
-		if (jsonMediaType.getExamples() == null) {
-			jsonMediaType.setExamples(Map.of("default", healthExample));
-		} else {
-			jsonMediaType.getExamples().put("default", healthExample);
-		}
-	}
+    if (jsonMediaType.getExamples() == null) {
+      jsonMediaType.setExamples(Map.of("default", healthExample));
+    } else {
+      jsonMediaType.getExamples().put("default", healthExample);
+    }
+  }
 
-	private void enhanceResponseExamples(io.swagger.v3.oas.models.Operation operation) {
-		// This method can be used to enhance examples for all public API endpoints
-		// SpringDoc will automatically generate examples from response schemas,
-		// but we can add custom examples here if needed
-	}
+  private void enhanceResponseExamples(io.swagger.v3.oas.models.Operation operation) {
+    // This method can be used to enhance examples for all public API endpoints
+    // SpringDoc will automatically generate examples from response schemas,
+    // but we can add custom examples here if needed
+  }
 }

@@ -7,5 +7,5 @@ import org.smalltech.hashtaglocal_backend.model.SignedUrlResponse;
 @Data
 @Builder
 public class MediaUploadResponseData {
-	private SignedUrlResponse mediaUrl;
+  private SignedUrlResponse mediaUrl;
 }

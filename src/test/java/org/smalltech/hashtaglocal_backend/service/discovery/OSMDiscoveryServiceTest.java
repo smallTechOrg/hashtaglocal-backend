@@ -17,28 +17,28 @@ import org.springframework.web.client.RestTemplate;
 /**
  * Test OpenStreetMap discovery service.
  *
- * Verifies that the service correctly queries OSM Overpass API, parses
- * responses, and returns raw discoveries.
+ * <p>Verifies that the service correctly queries OSM Overpass API, parses responses, and returns
+ * raw discoveries.
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("OpenStreetMap Discovery Service")
 class OSMDiscoveryServiceTest {
 
-	@Mock
-	private RestTemplate restTemplate;
+  @Mock private RestTemplate restTemplate;
 
-	private OSMDiscoveryService service;
+  private OSMDiscoveryService service;
 
-	@BeforeEach
-	void setUp() {
-		service = new OSMDiscoveryService(restTemplate);
-	}
+  @BeforeEach
+  void setUp() {
+    service = new OSMDiscoveryService(restTemplate);
+  }
 
-	@Test
-	@DisplayName("Should query OSM Overpass API for Indian cities")
-	void discoverCitiesFromOSM() {
-		// Arrange: Mock Overpass API response
-		String mockResponse = """
+  @Test
+  @DisplayName("Should query OSM Overpass API for Indian cities")
+  void discoverCitiesFromOSM() {
+    // Arrange: Mock Overpass API response
+    String mockResponse =
+        """
 				{
 				  "elements": [
 				    {
@@ -67,26 +67,27 @@ class OSMDiscoveryServiceTest {
 				}
 				""";
 
-		when(restTemplate.postForObject(anyString(), any(), eq(String.class))).thenReturn(mockResponse);
+    when(restTemplate.postForObject(anyString(), any(), eq(String.class))).thenReturn(mockResponse);
 
-		// Act
-		List<RawDiscoveryDTO> discoveries = service.discoverCities("IN");
+    // Act
+    List<RawDiscoveryDTO> discoveries = service.discoverCities("IN");
 
-		// Assert
-		assertNotNull(discoveries);
-		assertEquals(2, discoveries.size());
+    // Assert
+    assertNotNull(discoveries);
+    assertEquals(2, discoveries.size());
 
-		RawDiscoveryDTO first = discoveries.get(0);
-		assertEquals("Bengaluru", first.getName());
-		assertEquals("CITY", first.getLocalityType());
-		assertEquals("OSM", first.getSource());
-		assertNotNull(first.getSourceMetadata());
-	}
+    RawDiscoveryDTO first = discoveries.get(0);
+    assertEquals("Bengaluru", first.getName());
+    assertEquals("CITY", first.getLocalityType());
+    assertEquals("OSM", first.getSource());
+    assertNotNull(first.getSourceMetadata());
+  }
 
-	@Test
-	@DisplayName("Should query OSM for towns (admin_level 6)")
-	void discoverTownsFromOSM() {
-		String mockResponse = """
+  @Test
+  @DisplayName("Should query OSM for towns (admin_level 6)")
+  void discoverTownsFromOSM() {
+    String mockResponse =
+        """
 				{
 				  "elements": [
 				    {
@@ -104,21 +105,22 @@ class OSMDiscoveryServiceTest {
 				}
 				""";
 
-		when(restTemplate.postForObject(anyString(), any(), eq(String.class))).thenReturn(mockResponse);
+    when(restTemplate.postForObject(anyString(), any(), eq(String.class))).thenReturn(mockResponse);
 
-		// Act
-		List<RawDiscoveryDTO> discoveries = service.discoverTowns("IN");
+    // Act
+    List<RawDiscoveryDTO> discoveries = service.discoverTowns("IN");
 
-		// Assert
-		assertEquals(1, discoveries.size());
-		assertEquals("Nashik", discoveries.get(0).getName());
-		assertEquals("TOWN", discoveries.get(0).getLocalityType());
-	}
+    // Assert
+    assertEquals(1, discoveries.size());
+    assertEquals("Nashik", discoveries.get(0).getName());
+    assertEquals("TOWN", discoveries.get(0).getLocalityType());
+  }
 
-	@Test
-	@DisplayName("Should extract state from OSM tags")
-	void extractStateFromOSMTags() {
-		String mockResponse = """
+  @Test
+  @DisplayName("Should extract state from OSM tags")
+  void extractStateFromOSMTags() {
+    String mockResponse =
+        """
 				{
 				  "elements": [
 				    {
@@ -135,46 +137,48 @@ class OSMDiscoveryServiceTest {
 				}
 				""";
 
-		when(restTemplate.postForObject(anyString(), any(), eq(String.class))).thenReturn(mockResponse);
+    when(restTemplate.postForObject(anyString(), any(), eq(String.class))).thenReturn(mockResponse);
 
-		// Act
-		List<RawDiscoveryDTO> discoveries = service.discoverTowns("IN");
+    // Act
+    List<RawDiscoveryDTO> discoveries = service.discoverTowns("IN");
 
-		// Assert
-		assertEquals(1, discoveries.size());
-		assertEquals("Maharashtra", discoveries.get(0).getState());
-	}
+    // Assert
+    assertEquals(1, discoveries.size());
+    assertEquals("Maharashtra", discoveries.get(0).getState());
+  }
 
-	@Test
-	@DisplayName("Should handle empty OSM response")
-	void handleEmptyResponse() {
-		String emptyResponse = """
+  @Test
+  @DisplayName("Should handle empty OSM response")
+  void handleEmptyResponse() {
+    String emptyResponse =
+        """
 				{
 				  "elements": []
 				}
 				""";
 
-		when(restTemplate.postForObject(anyString(), any(), eq(String.class))).thenReturn(emptyResponse);
+    when(restTemplate.postForObject(anyString(), any(), eq(String.class)))
+        .thenReturn(emptyResponse);
 
-		// Act
-		List<RawDiscoveryDTO> discoveries = service.discoverCities("IN");
+    // Act
+    List<RawDiscoveryDTO> discoveries = service.discoverCities("IN");
 
-		// Assert
-		assertNotNull(discoveries);
-		assertTrue(discoveries.isEmpty());
-	}
+    // Assert
+    assertNotNull(discoveries);
+    assertTrue(discoveries.isEmpty());
+  }
 
-	@Test
-	@DisplayName("Should handle API error gracefully")
-	void handleAPIError() {
-		when(restTemplate.postForObject(anyString(), any(), eq(String.class)))
-				.thenThrow(new RuntimeException("API timeout"));
+  @Test
+  @DisplayName("Should handle API error gracefully")
+  void handleAPIError() {
+    when(restTemplate.postForObject(anyString(), any(), eq(String.class)))
+        .thenThrow(new RuntimeException("API timeout"));
 
-		// Act
-		List<RawDiscoveryDTO> discoveries = service.discoverCities("IN");
+    // Act
+    List<RawDiscoveryDTO> discoveries = service.discoverCities("IN");
 
-		// Assert
-		assertNotNull(discoveries);
-		assertTrue(discoveries.isEmpty());
-	}
+    // Assert
+    assertNotNull(discoveries);
+    assertTrue(discoveries.isEmpty());
+  }
 }

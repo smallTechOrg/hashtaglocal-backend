@@ -7,5 +7,5 @@ import lombok.*;
 @AllArgsConstructor
 @Builder
 public class ViewerContext {
-	private boolean upvote;
+  private boolean upvote;
 }

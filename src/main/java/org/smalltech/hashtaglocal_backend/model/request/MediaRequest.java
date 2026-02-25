@@ -10,15 +10,15 @@ import lombok.Data;
 @Data
 public class MediaRequest {
 
-	@NotBlank(message = "type is required")
-	private String type; // PHOTO / VIDEO
+  @NotBlank(message = "type is required")
+  private String type; // PHOTO / VIDEO
 
-	@NotBlank(message = "url is required")
-	private String url;
+  @NotBlank(message = "url is required")
+  private String url;
 
-	@Valid
-	@NotNull(message = "location is required")
-	private LocationRequest location;
+  @Valid
+  @NotNull(message = "location is required")
+  private LocationRequest location;
 
-	private String description;
+  private String description;
 }

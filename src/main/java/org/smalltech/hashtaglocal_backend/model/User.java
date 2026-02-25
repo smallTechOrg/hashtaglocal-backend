@@ -7,6 +7,6 @@ import lombok.*;
 @AllArgsConstructor
 @Builder
 public class User {
-	private String username;
-	private String profilePhoto;
+  private String username;
+  private String profilePhoto;
 }

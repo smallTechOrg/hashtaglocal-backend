@@ -10,30 +10,33 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/**
- * Controller for managing location metadata update jobs.
- */
+/** Controller for managing location metadata update jobs. */
 @RestController
 @RequestMapping("/api/v1/admin/location-metadata")
 @RequiredArgsConstructor
-@Tag(name = "Location Metadata", description = "Endpoints for updating location metadata using Google Maps API")
+@Tag(
+    name = "Location Metadata",
+    description = "Endpoints for updating location metadata using Google Maps API")
 public class LocationMetadataController {
 
-	private final LocationMetadataUpdateJob locationMetadataUpdateJob;
+  private final LocationMetadataUpdateJob locationMetadataUpdateJob;
 
-	@PostMapping("/update")
-	@Operation(summary = "Update location metadata", description = "Triggers a job to update location metadata and names using Google Maps Geocoding API. Use 'partial=true' to update only locations with missing metadata.")
-	public ResponseEntity<LocationMetadataUpdateJob.LocationUpdateJobResult> updateLocationMetadata(
-			@RequestParam(defaultValue = "false") boolean partial) {
+  @PostMapping("/update")
+  @Operation(
+      summary = "Update location metadata",
+      description =
+          "Triggers a job to update location metadata and names using Google Maps Geocoding API. Use 'partial=true' to update only locations with missing metadata.")
+  public ResponseEntity<LocationMetadataUpdateJob.LocationUpdateJobResult> updateLocationMetadata(
+      @RequestParam(defaultValue = "false") boolean partial) {
 
-		LocationMetadataUpdateJob.LocationUpdateJobResult result;
+    LocationMetadataUpdateJob.LocationUpdateJobResult result;
 
-		if (partial) {
-			result = locationMetadataUpdateJob.runPartialUpdate();
-		} else {
-			result = locationMetadataUpdateJob.runFullUpdate();
-		}
+    if (partial) {
+      result = locationMetadataUpdateJob.runPartialUpdate();
+    } else {
+      result = locationMetadataUpdateJob.runFullUpdate();
+    }
 
-		return ResponseEntity.ok(result);
-	}
+    return ResponseEntity.ok(result);
+  }
 }

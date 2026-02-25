@@ -7,7 +7,7 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface ImportJobRepository extends JpaRepository<ImportJob, Long> {
-	List<ImportJob> findAllByOrderByStartedAtDesc();
+  List<ImportJob> findAllByOrderByStartedAtDesc();
 
-	List<ImportJob> findByStatus(ImportJob.ImportJobStatus status);
+  List<ImportJob> findByStatus(ImportJob.ImportJobStatus status);
 }

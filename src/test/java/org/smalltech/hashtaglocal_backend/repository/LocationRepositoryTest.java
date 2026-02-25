@@ -19,36 +19,40 @@ import org.springframework.test.context.ActiveProfiles;
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @ActiveProfiles("test")
 public class LocationRepositoryTest {
-	@Autowired
-	private LocationRepository locationRepository;
-	@Autowired
-	private LocalityRepository localityRepository;
+  @Autowired private LocationRepository locationRepository;
 
-	@Test
-	public void testSaveAndFindLocation() {
-		GeometryFactory geometryFactory = new GeometryFactory();
-		Coordinate[] coordinates = new Coordinate[]{new Coordinate(12.9716, 77.5946), new Coordinate(12.9717, 77.5947),
-				new Coordinate(12.9718, 77.5948), new Coordinate(12.9716, 77.5946) // close the polygon
-		};
-		Polygon polygon = geometryFactory.createPolygon(coordinates);
+  @Autowired private LocalityRepository localityRepository;
 
-		Locality locality = Locality.builder().hashtag("#TestCity").geoBoundary(polygon).name("Test City").build();
-		localityRepository.save(locality);
+  @Test
+  public void testSaveAndFindLocation() {
+    GeometryFactory geometryFactory = new GeometryFactory();
+    Coordinate[] coordinates =
+        new Coordinate[] {
+          new Coordinate(12.9716, 77.5946),
+          new Coordinate(12.9717, 77.5947),
+          new Coordinate(12.9718, 77.5948),
+          new Coordinate(12.9716, 77.5946) // close the polygon
+        };
+    Polygon polygon = geometryFactory.createPolygon(coordinates);
 
-		Location location = new Location();
-		location.setPoint(LocationUtil.createPoint(12.34, 56.78));
-		location.setName("Test Location");
-		Map<String, Object> metaData = new HashMap<>();
-		metaData.put("foo", "bar");
-		location.setMetaData(metaData);
-		location.setLocality(locality);
-		Location saved = locationRepository.save(location);
+    Locality locality =
+        Locality.builder().hashtag("#TestCity").geoBoundary(polygon).name("Test City").build();
+    localityRepository.save(locality);
 
-		Location found = locationRepository.findById(saved.getId()).orElse(null);
-		Assertions.assertNotNull(found);
-		Assertions.assertEquals("Test Location", found.getName());
-		Assertions.assertNotNull(found.getMetaData());
-		Assertions.assertEquals("bar", found.getMetaData().get("foo"));
-		Assertions.assertEquals(locality.getId(), found.getLocality().getId());
-	}
+    Location location = new Location();
+    location.setPoint(LocationUtil.createPoint(12.34, 56.78));
+    location.setName("Test Location");
+    Map<String, Object> metaData = new HashMap<>();
+    metaData.put("foo", "bar");
+    location.setMetaData(metaData);
+    location.setLocality(locality);
+    Location saved = locationRepository.save(location);
+
+    Location found = locationRepository.findById(saved.getId()).orElse(null);
+    Assertions.assertNotNull(found);
+    Assertions.assertEquals("Test Location", found.getName());
+    Assertions.assertNotNull(found.getMetaData());
+    Assertions.assertEquals("bar", found.getMetaData().get("foo"));
+    Assertions.assertEquals(locality.getId(), found.getLocality().getId());
+  }
 }

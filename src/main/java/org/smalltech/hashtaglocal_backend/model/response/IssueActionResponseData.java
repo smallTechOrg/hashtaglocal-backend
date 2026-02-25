@@ -6,5 +6,5 @@ import lombok.Data;
 @Data
 @Builder
 public class IssueActionResponseData {
-	private Long issueId;
+  private Long issueId;
 }

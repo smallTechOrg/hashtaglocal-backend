@@ -8,5 +8,5 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface MediaRepository extends JpaRepository<MediaEntity, Long> {
-	List<MediaEntity> findByIssue(IssueEntity issue);
+  List<MediaEntity> findByIssue(IssueEntity issue);
 }
