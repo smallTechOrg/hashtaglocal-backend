@@ -1,0 +1,646 @@
+{
+  "config": {
+    "lat": 26.9124,
+    "lng": 75.8073
+  },
+  "scenarios": [
+    {
+      "name": "happy_path_full_lifecycle",
+      "description": "Full lifecycle: report → approve → verify → approve → resolve → approve",
+      "steps": [
+        {
+          "description": "Report an issue",
+          "action": "REPORT_ISSUE",
+          "actor": "reporter",
+          "input": {
+            "type": "POTHOLE",
+            "description": "Workflow test pothole",
+            "mediaType": "PHOTO",
+            "mediaUrl": "https://example.com/report-photo.jpg"
+          },
+          "expect": {
+            "httpStatus": 200,
+            "issueStatus": "ONHOLD"
+          }
+        },
+        {
+          "description": "Anonymous cannot see ONHOLD issue",
+          "action": "GET_ISSUE",
+          "actor": "anonymous",
+          "expect": { "httpStatus": 404 }
+        },
+        {
+          "description": "Other user cannot see ONHOLD issue",
+          "action": "GET_ISSUE",
+          "actor": "other",
+          "expect": { "httpStatus": 404 }
+        },
+        {
+          "description": "Owner sees own ONHOLD issue with media",
+          "action": "GET_ISSUE",
+          "actor": "reporter",
+          "expect": {
+            "httpStatus": 200,
+            "status": "ONHOLD",
+            "mediaCount": 1
+          }
+        },
+        {
+          "description": "ONHOLD issue not in public feed",
+          "action": "GET_FEED",
+          "expect": {
+            "httpStatus": 200,
+            "issueCount": 0
+          }
+        },
+        {
+          "description": "Admin approves REPORT → issue transitions to OPEN",
+          "action": "APPROVE_ACTION",
+          "input": { "pendingActionType": "REPORT" },
+          "expect": {
+            "httpStatus": 200,
+            "issueStatus": "OPEN"
+          }
+        },
+        {
+          "description": "Everyone can now see the OPEN issue",
+          "action": "GET_ISSUE",
+          "actor": "anonymous",
+          "expect": {
+            "httpStatus": 200,
+            "status": "OPEN",
+            "mediaCount": 1,
+            "verifyCount": 0
+          }
+        },
+        {
+          "description": "OPEN issue appears in public feed",
+          "action": "GET_FEED",
+          "expect": {
+            "httpStatus": 200,
+            "issueCount": 1,
+            "firstIssueStatus": "OPEN"
+          }
+        },
+        {
+          "description": "Reporter verifies with media",
+          "action": "VERIFY_ISSUE",
+          "actor": "reporter",
+          "input": {
+            "mediaType": "PHOTO",
+            "mediaUrl": "https://example.com/verify-photo.jpg"
+          },
+          "expect": {
+            "httpStatus": 200,
+            "issueStatus": "OPEN"
+          }
+        },
+        {
+          "description": "Other user cannot see pending verify media or count",
+          "action": "GET_ISSUE",
+          "actor": "other",
+          "expect": {
+            "httpStatus": 200,
+            "mediaCount": 1,
+            "verifyCount": 0
+          }
+        },
+        {
+          "description": "Owner sees both REPORT and pending VERIFY media",
+          "action": "GET_ISSUE",
+          "actor": "reporter",
+          "expect": {
+            "httpStatus": 200,
+            "mediaCount": 2,
+            "verifyCount": 0
+          }
+        },
+        {
+          "description": "Admin approves VERIFY → verifyCount increments",
+          "action": "APPROVE_ACTION",
+          "input": { "pendingActionType": "VERIFY" },
+          "expect": {
+            "httpStatus": 200,
+            "issueStatus": "OPEN"
+          }
+        },
+        {
+          "description": "Everyone sees 2 media and verifyCount=1",
+          "action": "GET_ISSUE",
+          "actor": "anonymous",
+          "expect": {
+            "httpStatus": 200,
+            "status": "OPEN",
+            "mediaCount": 2,
+            "verifyCount": 1
+          }
+        },
+        {
+          "description": "Reporter resolves with media",
+          "action": "RESOLVE_ISSUE",
+          "actor": "reporter",
+          "input": {
+            "mediaType": "PHOTO",
+            "mediaUrl": "https://example.com/resolve-photo.jpg"
+          },
+          "expect": {
+            "httpStatus": 200,
+            "issueStatus": "PENDING"
+          }
+        },
+        {
+          "description": "Everyone sees status PENDING",
+          "action": "GET_ISSUE",
+          "actor": "anonymous",
+          "expect": {
+            "httpStatus": 200,
+            "status": "PENDING"
+          }
+        },
+        {
+          "description": "Other user sees 2 media (no pending RESOLVE media)",
+          "action": "GET_ISSUE",
+          "actor": "other",
+          "expect": {
+            "httpStatus": 200,
+            "mediaCount": 2
+          }
+        },
+        {
+          "description": "Owner sees all 3 media including pending RESOLVE",
+          "action": "GET_ISSUE",
+          "actor": "reporter",
+          "expect": {
+            "httpStatus": 200,
+            "mediaCount": 3
+          }
+        },
+        {
+          "description": "PENDING issue still in public feed",
+          "action": "GET_FEED",
+          "expect": {
+            "httpStatus": 200,
+            "issueCount": 1,
+            "firstIssueStatus": "PENDING"
+          }
+        },
+        {
+          "description": "Admin approves RESOLVE → issue transitions to RESOLVED",
+          "action": "APPROVE_ACTION",
+          "input": { "pendingActionType": "RESOLVE" },
+          "expect": {
+            "httpStatus": 200,
+            "issueStatus": "RESOLVED"
+          }
+        },
+        {
+          "description": "Everyone sees RESOLVED with all 3 media",
+          "action": "GET_ISSUE",
+          "actor": "anonymous",
+          "expect": {
+            "httpStatus": 200,
+            "status": "RESOLVED",
+            "mediaCount": 3,
+            "verifyCount": 1
+          }
+        },
+        {
+          "description": "RESOLVED issue still in public feed",
+          "action": "GET_FEED",
+          "expect": {
+            "httpStatus": 200,
+            "issueCount": 1,
+            "firstIssueStatus": "RESOLVED"
+          }
+        }
+      ]
+    },
+    {
+      "name": "reject_report",
+      "description": "Rejecting REPORT action transitions issue to REJECTED",
+      "steps": [
+        {
+          "description": "Report an issue",
+          "action": "REPORT_ISSUE",
+          "actor": "reporter",
+          "input": {
+            "type": "POTHOLE",
+            "description": "Test rejection",
+            "mediaType": "PHOTO",
+            "mediaUrl": "https://example.com/report.jpg"
+          },
+          "expect": { "httpStatus": 200, "issueStatus": "ONHOLD" }
+        },
+        {
+          "description": "Admin rejects REPORT → issue becomes REJECTED",
+          "action": "REJECT_ACTION",
+          "input": { "pendingActionType": "REPORT" },
+          "expect": { "httpStatus": 200, "issueStatus": "REJECTED" }
+        },
+        {
+          "description": "REJECTED issue not in public feed",
+          "action": "GET_FEED",
+          "expect": { "httpStatus": 200, "issueCount": 0 }
+        },
+        {
+          "description": "REJECTED issue returns 404",
+          "action": "GET_ISSUE",
+          "actor": "anonymous",
+          "expect": { "httpStatus": 404 }
+        }
+      ]
+    },
+    {
+      "name": "reject_verify",
+      "description": "Rejecting VERIFY: issue stays OPEN, verify media/count not visible",
+      "steps": [
+        {
+          "description": "Report an issue",
+          "action": "REPORT_ISSUE",
+          "actor": "reporter",
+          "input": {
+            "type": "POTHOLE",
+            "description": "Test verify rejection",
+            "mediaType": "PHOTO",
+            "mediaUrl": "https://example.com/report.jpg"
+          },
+          "expect": { "httpStatus": 200 }
+        },
+        {
+          "description": "Approve REPORT to open the issue",
+          "action": "APPROVE_ACTION",
+          "input": { "pendingActionType": "REPORT" },
+          "expect": { "httpStatus": 200, "issueStatus": "OPEN" }
+        },
+        {
+          "description": "User verifies the issue",
+          "action": "VERIFY_ISSUE",
+          "actor": "reporter",
+          "input": {
+            "mediaType": "PHOTO",
+            "mediaUrl": "https://example.com/verify.jpg"
+          },
+          "expect": { "httpStatus": 200, "issueStatus": "OPEN" }
+        },
+        {
+          "description": "Admin rejects VERIFY → issue stays OPEN",
+          "action": "REJECT_ACTION",
+          "input": { "pendingActionType": "VERIFY" },
+          "expect": { "httpStatus": 200, "issueStatus": "OPEN" }
+        },
+        {
+          "description": "Public sees no verify media/count",
+          "action": "GET_ISSUE",
+          "actor": "anonymous",
+          "expect": { "httpStatus": 200, "verifyCount": 0, "mediaCount": 1 }
+        },
+        {
+          "description": "Owner also sees no rejected verify media",
+          "action": "GET_ISSUE",
+          "actor": "reporter",
+          "expect": { "httpStatus": 200, "verifyCount": 0, "mediaCount": 1 }
+        }
+      ]
+    },
+    {
+      "name": "reject_resolve",
+      "description": "Rejecting RESOLVE: issue reverts to OPEN, resolve media hidden",
+      "steps": [
+        {
+          "description": "Report an issue",
+          "action": "REPORT_ISSUE",
+          "actor": "reporter",
+          "input": {
+            "type": "POTHOLE",
+            "description": "Test resolve rejection",
+            "mediaType": "PHOTO",
+            "mediaUrl": "https://example.com/report.jpg"
+          },
+          "expect": { "httpStatus": 200 }
+        },
+        {
+          "description": "Approve REPORT to open the issue",
+          "action": "APPROVE_ACTION",
+          "input": { "pendingActionType": "REPORT" },
+          "expect": { "httpStatus": 200, "issueStatus": "OPEN" }
+        },
+        {
+          "description": "User resolves the issue",
+          "action": "RESOLVE_ISSUE",
+          "actor": "reporter",
+          "input": {
+            "mediaType": "PHOTO",
+            "mediaUrl": "https://example.com/resolve.jpg"
+          },
+          "expect": { "httpStatus": 200, "issueStatus": "PENDING" }
+        },
+        {
+          "description": "Admin rejects RESOLVE → issue reverts to OPEN",
+          "action": "REJECT_ACTION",
+          "input": { "pendingActionType": "RESOLVE" },
+          "expect": { "httpStatus": 200, "issueStatus": "OPEN" }
+        },
+        {
+          "description": "Public sees OPEN with only report media",
+          "action": "GET_ISSUE",
+          "actor": "anonymous",
+          "expect": { "httpStatus": 200, "status": "OPEN", "mediaCount": 1 }
+        },
+        {
+          "description": "Owner also sees no resolve media",
+          "action": "GET_ISSUE",
+          "actor": "reporter",
+          "expect": { "httpStatus": 200, "mediaCount": 1 }
+        }
+      ]
+    },
+    {
+      "name": "verify_onhold_blocked",
+      "description": "VERIFY on ONHOLD issue is blocked (400)",
+      "steps": [
+        {
+          "description": "Report an issue (stays ONHOLD)",
+          "action": "REPORT_ISSUE",
+          "actor": "reporter",
+          "input": {
+            "type": "POTHOLE",
+            "description": "ONHOLD issue",
+            "mediaType": "PHOTO",
+            "mediaUrl": "https://example.com/report.jpg"
+          },
+          "expect": { "httpStatus": 200, "issueStatus": "ONHOLD" }
+        },
+        {
+          "description": "Verify on ONHOLD issue → blocked with 400",
+          "action": "VERIFY_ISSUE",
+          "actor": "reporter",
+          "input": {
+            "mediaType": "PHOTO",
+            "mediaUrl": "https://example.com/verify.jpg"
+          },
+          "expect": { "httpStatus": 400 }
+        }
+      ]
+    },
+    {
+      "name": "approve_report_reject_verify",
+      "description": "Admin approves REPORT but rejects VERIFY — selective approval",
+      "steps": [
+        {
+          "description": "Report an issue",
+          "action": "REPORT_ISSUE",
+          "actor": "reporter",
+          "input": {
+            "type": "POTHOLE",
+            "description": "Selective approval",
+            "mediaType": "PHOTO",
+            "mediaUrl": "https://example.com/report.jpg"
+          },
+          "expect": { "httpStatus": 200 }
+        },
+        {
+          "description": "Verify blocked while issue is ONHOLD",
+          "action": "VERIFY_ISSUE",
+          "actor": "reporter",
+          "input": {
+            "mediaType": "PHOTO",
+            "mediaUrl": "https://example.com/blocked-verify.jpg"
+          },
+          "expect": { "httpStatus": 400 }
+        },
+        {
+          "description": "Approve REPORT → issue opens",
+          "action": "APPROVE_ACTION",
+          "input": { "pendingActionType": "REPORT" },
+          "expect": { "httpStatus": 200, "issueStatus": "OPEN" }
+        },
+        {
+          "description": "Now verify succeeds",
+          "action": "VERIFY_ISSUE",
+          "actor": "reporter",
+          "input": {
+            "mediaType": "PHOTO",
+            "mediaUrl": "https://example.com/verify.jpg"
+          },
+          "expect": { "httpStatus": 200 }
+        },
+        {
+          "description": "Admin rejects VERIFY",
+          "action": "REJECT_ACTION",
+          "input": { "pendingActionType": "VERIFY" },
+          "expect": { "httpStatus": 200 }
+        },
+        {
+          "description": "Issue OPEN, no verify count, only report media",
+          "action": "GET_ISSUE",
+          "actor": "anonymous",
+          "expect": { "httpStatus": 200, "status": "OPEN", "verifyCount": 0, "mediaCount": 1 }
+        }
+      ]
+    },
+    {
+      "name": "unauthenticated_cannot_create",
+      "description": "Unauthenticated user cannot create an issue (403)",
+      "steps": [
+        {
+          "description": "Unauthenticated POST → 403",
+          "action": "REPORT_ISSUE",
+          "actor": "anonymous",
+          "input": {
+            "type": "POTHOLE",
+            "description": "Should fail",
+            "mediaType": "PHOTO",
+            "mediaUrl": "https://example.com/report.jpg"
+          },
+          "expect": { "httpStatus": 403 }
+        }
+      ]
+    },
+    {
+      "name": "non_admin_cannot_approve",
+      "description": "Non-admin cannot access admin endpoints (403)",
+      "steps": [
+        {
+          "description": "Report an issue",
+          "action": "REPORT_ISSUE",
+          "actor": "reporter",
+          "input": {
+            "type": "POTHOLE",
+            "description": "Admin test",
+            "mediaType": "PHOTO",
+            "mediaUrl": "https://example.com/report.jpg"
+          },
+          "expect": { "httpStatus": 200 }
+        },
+        {
+          "description": "Non-admin tries to approve → 403",
+          "action": "APPROVE_ACTION",
+          "actor": "reporter",
+          "input": { "pendingActionType": "REPORT" },
+          "expect": { "httpStatus": 403 }
+        }
+      ]
+    },
+    {
+      "name": "double_approval_blocked",
+      "description": "Approving an already-approved action returns 400",
+      "steps": [
+        {
+          "description": "Report an issue",
+          "action": "REPORT_ISSUE",
+          "actor": "reporter",
+          "input": {
+            "type": "POTHOLE",
+            "description": "Double approval test",
+            "mediaType": "PHOTO",
+            "mediaUrl": "https://example.com/report.jpg"
+          },
+          "expect": { "httpStatus": 200 }
+        },
+        {
+          "description": "First approval succeeds",
+          "action": "APPROVE_ACTION",
+          "input": { "pendingActionType": "REPORT" },
+          "expect": { "httpStatus": 200 }
+        },
+        {
+          "description": "Second approval on same action → 400",
+          "action": "RE_APPROVE_LAST_ACTION",
+          "expect": { "httpStatus": 400 }
+        }
+      ]
+    },
+    {
+      "name": "rejected_issue_not_visible",
+      "description": "REJECTED issue is not visible via GET /issue/{id}",
+      "steps": [
+        {
+          "description": "Report an issue",
+          "action": "REPORT_ISSUE",
+          "actor": "reporter",
+          "input": {
+            "type": "POTHOLE",
+            "description": "To be rejected",
+            "mediaType": "PHOTO",
+            "mediaUrl": "https://example.com/report.jpg"
+          },
+          "expect": { "httpStatus": 200 }
+        },
+        {
+          "description": "Reject REPORT → REJECTED",
+          "action": "REJECT_ACTION",
+          "input": { "pendingActionType": "REPORT" },
+          "expect": { "httpStatus": 200, "issueStatus": "REJECTED" }
+        },
+        {
+          "description": "Anonymous cannot see rejected issue",
+          "action": "GET_ISSUE",
+          "actor": "anonymous",
+          "expect": { "httpStatus": 404 }
+        },
+        {
+          "description": "Other user cannot see rejected issue",
+          "action": "GET_ISSUE",
+          "actor": "other",
+          "expect": { "httpStatus": 404 }
+        }
+      ]
+    },
+    {
+      "name": "admin_pending_queue",
+      "description": "Admin pending queue contains only PENDING actions",
+      "steps": [
+        {
+          "description": "Report an issue → creates PENDING REPORT action",
+          "action": "REPORT_ISSUE",
+          "actor": "reporter",
+          "input": {
+            "type": "POTHOLE",
+            "description": "Queue test",
+            "mediaType": "PHOTO",
+            "mediaUrl": "https://example.com/report.jpg"
+          },
+          "expect": { "httpStatus": 200 }
+        },
+        {
+          "description": "Pending queue has 1 REPORT action",
+          "action": "GET_PENDING",
+          "expect": {
+            "httpStatus": 200,
+            "pendingCount": 1,
+            "pendingActions": [
+              { "action": "REPORT", "approvalStatus": "PENDING" }
+            ]
+          }
+        },
+        {
+          "description": "Approve REPORT → pending queue empties",
+          "action": "APPROVE_ACTION",
+          "input": { "pendingActionType": "REPORT" },
+          "expect": { "httpStatus": 200 }
+        },
+        {
+          "description": "Pending queue is now empty",
+          "action": "GET_PENDING",
+          "expect": { "httpStatus": 200, "pendingCount": 0 }
+        }
+      ]
+    },
+    {
+      "name": "multiple_verifications_only_approved_count",
+      "description": "Multiple verifications: only approved ones count toward verify_count",
+      "steps": [
+        {
+          "description": "Report an issue",
+          "action": "REPORT_ISSUE",
+          "actor": "reporter",
+          "input": {
+            "type": "POTHOLE",
+            "description": "Multi-verify test",
+            "mediaType": "PHOTO",
+            "mediaUrl": "https://example.com/report.jpg"
+          },
+          "expect": { "httpStatus": 200 }
+        },
+        {
+          "description": "Approve REPORT to open the issue",
+          "action": "APPROVE_ACTION",
+          "input": { "pendingActionType": "REPORT" },
+          "expect": { "httpStatus": 200 }
+        },
+        {
+          "description": "Reporter verifies",
+          "action": "VERIFY_ISSUE",
+          "actor": "reporter",
+          "input": {
+            "mediaType": "PHOTO",
+            "mediaUrl": "https://example.com/verify1.jpg"
+          },
+          "expect": { "httpStatus": 200 }
+        },
+        {
+          "description": "Approve reporter's VERIFY",
+          "action": "APPROVE_ACTION",
+          "input": { "pendingActionType": "VERIFY" },
+          "expect": { "httpStatus": 200 }
+        },
+        {
+          "description": "Other user verifies (left pending)",
+          "action": "VERIFY_ISSUE",
+          "actor": "other",
+          "input": {
+            "mediaType": "PHOTO",
+            "mediaUrl": "https://example.com/verify2.jpg"
+          },
+          "expect": { "httpStatus": 200 }
+        },
+        {
+          "description": "Public sees verifyCount=1 and 2 media (pending not visible)",
+          "action": "GET_ISSUE",
+          "actor": "anonymous",
+          "expect": { "httpStatus": 200, "verifyCount": 1, "mediaCount": 2 }
+        }
+      ]
+    }
+  ]
+}

@@ -23,7 +23,9 @@ public class SecurityConfig {
     http.csrf(csrf -> csrf.disable())
         .authorizeHttpRequests(
             auth ->
-                auth.requestMatchers(HttpMethod.POST, "/api/v1/issue")
+                auth.requestMatchers("/admin/**")
+                    .hasRole("ADMIN")
+                    .requestMatchers(HttpMethod.POST, "/api/v1/issue")
                     .authenticated()
                     .requestMatchers(HttpMethod.GET, "/api/v1/media/upload-url")
                     .authenticated()

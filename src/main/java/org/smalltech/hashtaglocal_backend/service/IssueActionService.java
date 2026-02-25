@@ -5,6 +5,7 @@ import java.util.Locale;
 import lombok.RequiredArgsConstructor;
 import org.smalltech.hashtaglocal_backend.config.CustomProperties;
 import org.smalltech.hashtaglocal_backend.entity.IssueActionEntity;
+import org.smalltech.hashtaglocal_backend.model.IssueActionApprovalStatus;
 import org.smalltech.hashtaglocal_backend.model.IssueActionModel;
 import org.smalltech.hashtaglocal_backend.model.IssueStatusModel;
 import org.smalltech.hashtaglocal_backend.model.request.IssueVerifyRequest;
@@ -65,6 +66,11 @@ public class IssueActionService {
                     new ResponseStatusException(
                         HttpStatus.INTERNAL_SERVER_ERROR, "User not found"));
 
+    // APPROVE is reserved for the admin endpoint — block public callers
+    if (issueActionModel == IssueActionModel.APPROVE) {
+      throw new ResponseStatusException(HttpStatus.FORBIDDEN, "APPROVE is an admin-only action");
+    }
+
     // Reject issue: only owner can reject
     if (issueActionModel == IssueActionModel.REJECT) {
       Long ownerId =
@@ -74,6 +80,14 @@ public class IssueActionService {
         throw new ResponseStatusException(
             HttpStatus.FORBIDDEN, "Only the issue owner can reject the issue");
       }
+    }
+
+    // VERIFY is not allowed while the issue is still ONHOLD (awaiting its own approval)
+    if (issueActionModel == IssueActionModel.VERIFY
+        && IssueStatusModel.ONHOLD.equals(issueEntity.getStatus())) {
+      throw new ResponseStatusException(
+          HttpStatus.BAD_REQUEST,
+          "Cannot verify an issue that is still ONHOLD. Wait for admin approval first.");
     }
 
     // Enforce geo-fence for VERIFY / RESOLVE
@@ -103,7 +117,7 @@ public class IssueActionService {
           actionLocation.getLng(),
           appProperties.getGeo().getVerifyRadiusMeters());
 
-      // Process media URLs if provided
+      // Create one action per media item. Each action links to exactly one media entity.
       for (var mediaRequest : mediaUrls) {
 
         var mediaLocReq = mediaRequest.getLocation();
@@ -112,44 +126,59 @@ public class IssueActionService {
             locationService.createAndSaveLocation(
                 mediaLocReq.getLat(), mediaLocReq.getLng(), mediaLocReq.getMetaData(), "Unknown");
 
+        // Media submitted as part of a VERIFY/RESOLVE action; visibility is controlled
+        // by the parent action's approvalStatus (starts as PENDING until admin approves)
         var mediaEntity =
             org.smalltech.hashtaglocal_backend.entity.MediaEntity.builder()
-                .issue(issueEntity)
                 .type(EnumParsers.parseMediaType(mediaRequest.getType()))
                 .url(mediaRequest.getUrl())
-                .user(userEntity)
                 .description(mediaRequest.getDescription())
                 .location(mediaLocation)
                 .createdAt(LocalDateTime.now())
                 .build();
 
-        mediaRepository.save(mediaEntity);
+        var savedMedia = mediaRepository.save(mediaEntity);
+
+        IssueActionEntity actionEntity =
+            IssueActionEntity.builder()
+                .issueEntity(issueEntity)
+                .userEntity(userEntity)
+                .action(issueActionModel)
+                .approvalStatus(IssueActionApprovalStatus.PENDING)
+                .media(savedMedia)
+                .createdAt(LocalDateTime.now())
+                .build();
+        issueActionRepository.save(actionEntity);
       }
+    } else {
+      // Non-media actions (REJECT, UPDATE): single action, no media
+      IssueActionApprovalStatus approvalStatus =
+          (issueActionModel == IssueActionModel.REJECT
+                  || issueActionModel == IssueActionModel.UPDATE)
+              ? IssueActionApprovalStatus.NOT_REQUIRED
+              : IssueActionApprovalStatus.PENDING;
+
+      IssueActionEntity issueActionEntity =
+          IssueActionEntity.builder()
+              .issueEntity(issueEntity)
+              .userEntity(userEntity)
+              .action(issueActionModel)
+              .approvalStatus(approvalStatus)
+              .createdAt(LocalDateTime.now())
+              .build();
+      issueActionRepository.save(issueActionEntity);
     }
 
-    // Save issue action record
-    IssueActionEntity issueActionEntity =
-        IssueActionEntity.builder()
-            .issueEntity(issueEntity)
-            .userEntity(userEntity)
-            .action(issueActionModel)
-            .createdAt(LocalDateTime.now())
-            .build();
-
-    issueActionRepository.save(issueActionEntity);
-
     // Action-based status update
+    // REJECT: owner withdraws the issue immediately
+    // RESOLVE: sets PENDING so admin sees it in the approval queue
+    // VERIFY: no status change — status is driven entirely by admin REPORT approval
     if (issueActionModel == IssueActionModel.REJECT) {
       issueEntity.setStatus(IssueStatusModel.REJECTED);
 
-    } else if (!IssueStatusModel.ONHOLD.equals(issueEntity.getStatus())) {
-
-      if (issueActionModel == IssueActionModel.VERIFY) {
-        issueEntity.setStatus(IssueStatusModel.OPEN);
-
-      } else if (issueActionModel == IssueActionModel.RESOLVE) {
-        issueEntity.setStatus(IssueStatusModel.PENDING);
-      }
+    } else if (issueActionModel == IssueActionModel.RESOLVE
+        && !IssueStatusModel.ONHOLD.equals(issueEntity.getStatus())) {
+      issueEntity.setStatus(IssueStatusModel.PENDING);
     }
 
     issueEntity.setUpdatedAt(LocalDateTime.now());

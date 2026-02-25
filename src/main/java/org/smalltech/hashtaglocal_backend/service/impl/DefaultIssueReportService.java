@@ -2,15 +2,19 @@ package org.smalltech.hashtaglocal_backend.service.impl;
 
 import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
+import org.smalltech.hashtaglocal_backend.entity.IssueActionEntity;
 import org.smalltech.hashtaglocal_backend.entity.IssueEntity;
 import org.smalltech.hashtaglocal_backend.entity.Location;
 import org.smalltech.hashtaglocal_backend.entity.MediaEntity;
 import org.smalltech.hashtaglocal_backend.entity.UserEntity;
+import org.smalltech.hashtaglocal_backend.model.IssueActionApprovalStatus;
+import org.smalltech.hashtaglocal_backend.model.IssueActionModel;
 import org.smalltech.hashtaglocal_backend.model.IssueStatusModel;
 import org.smalltech.hashtaglocal_backend.model.IssueTypeModel;
 import org.smalltech.hashtaglocal_backend.model.MediaTypeModel;
 import org.smalltech.hashtaglocal_backend.model.request.IssueReportRequest;
 import org.smalltech.hashtaglocal_backend.model.request.MediaRequest;
+import org.smalltech.hashtaglocal_backend.repository.IssueActionRepository;
 import org.smalltech.hashtaglocal_backend.repository.IssueRepository;
 import org.smalltech.hashtaglocal_backend.repository.MediaRepository;
 import org.smalltech.hashtaglocal_backend.repository.UserRepository;
@@ -28,6 +32,7 @@ public class DefaultIssueReportService implements IssueReportService {
   private final MediaRepository mediaRepository;
   private final UserRepository userRepository;
   private final LocationService locationService;
+  private final IssueActionRepository issueActionRepository;
 
   @Override
   public Long createIssue(Long userId, IssueReportRequest request) {
@@ -58,7 +63,10 @@ public class DefaultIssueReportService implements IssueReportService {
 
     issue = issueRepository.save(issue);
 
-    // Save media
+    // Create one REPORT action per media item. The first action carries PENDING approval
+    // (governs issue ONHOLD → OPEN transition); additional actions are NOT_REQUIRED (pure
+    // media carriers).
+    boolean firstMedia = true;
     if (issueReq.getMediaUrls() != null && !issueReq.getMediaUrls().isEmpty()) {
       for (MediaRequest mediaReq : issueReq.getMediaUrls()) {
 
@@ -70,16 +78,40 @@ public class DefaultIssueReportService implements IssueReportService {
 
         MediaEntity media =
             MediaEntity.builder()
-                .issue(issue)
                 .type(MediaTypeModel.valueOf(mediaReq.getType()))
                 .url(mediaReq.getUrl())
-                .user(user)
                 .location(mediaLocation)
                 .createdAt(LocalDateTime.now())
                 .build();
 
-        mediaRepository.save(media);
+        media = mediaRepository.save(media);
+
+        IssueActionEntity reportAction =
+            IssueActionEntity.builder()
+                .issueEntity(issue)
+                .userEntity(user)
+                .action(IssueActionModel.REPORT)
+                .approvalStatus(
+                    firstMedia
+                        ? IssueActionApprovalStatus.PENDING
+                        : IssueActionApprovalStatus.NOT_REQUIRED)
+                .media(media)
+                .createdAt(LocalDateTime.now())
+                .build();
+        issueActionRepository.save(reportAction);
+        firstMedia = false;
       }
+    } else {
+      // No media — still create a single REPORT action for admin approval
+      IssueActionEntity reportAction =
+          IssueActionEntity.builder()
+              .issueEntity(issue)
+              .userEntity(user)
+              .action(IssueActionModel.REPORT)
+              .approvalStatus(IssueActionApprovalStatus.PENDING)
+              .createdAt(LocalDateTime.now())
+              .build();
+      issueActionRepository.save(reportAction);
     }
 
     return issue.getId();

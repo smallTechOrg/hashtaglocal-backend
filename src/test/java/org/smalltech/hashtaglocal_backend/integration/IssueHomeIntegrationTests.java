@@ -17,6 +17,8 @@ class IssueHomeIntegrationTests {
 
   @Test
   void shouldReturnIssuesResponse() throws Exception {
+    // ONHOLD issues are excluded from the public feed; only OPEN/PENDING/RESOLVED ones appear.
+    // Test data has 4 issues: 3 OPEN (IDs 1, 2, 4) + 1 ONHOLD (ID 3).
     webTestClient
         .get()
         .uri(ISSUES_API_URL)
@@ -25,7 +27,7 @@ class IssueHomeIntegrationTests {
         .isOk()
         .expectBody()
         .jsonPath("$.data.issues.length()")
-        .isEqualTo(4)
+        .isEqualTo(3)
         .jsonPath("$.data.issues[0].user.username")
         .isEqualTo("john_doe")
         .jsonPath("$.data.issues[0].vote_count")
@@ -35,9 +37,10 @@ class IssueHomeIntegrationTests {
   }
 
   @Test
-  void shouldReturnBothOpenAndOnholdIssues() throws Exception {
-    // Should return 4 issues: issue 4 (OPEN, Jaipur, newest), issue 3 (ONHOLD),
-    // issue 2 (OPEN), issue 1 (OPEN, oldest)
+  void shouldExcludeOnholdIssuesFromPublicFeed() throws Exception {
+    // ONHOLD issues must not appear in the public /issues feed.
+    // Test data: issue 4 (OPEN, Jaipur), issue 3 (ONHOLD — excluded), issue 2 (OPEN), issue 1
+    // (OPEN).
     webTestClient
         .get()
         .uri(ISSUES_API_URL)
@@ -46,39 +49,27 @@ class IssueHomeIntegrationTests {
         .isOk()
         .expectBody()
         .jsonPath("$.data.issues.length()")
-        .isEqualTo(4)
-        // First issue should be issue 4 (OPEN, Jaipur, newest - ID 4)
+        .isEqualTo(3)
+        // First should be issue 4 (newest OPEN, Jaipur)
         .jsonPath("$.data.issues[0].id")
         .isEqualTo(4)
         .jsonPath("$.data.issues[0].status")
         .isEqualTo("OPEN")
-        .jsonPath("$.data.issues[0].created_at")
-        .isEqualTo("2025-12-28T09:00:00")
-        // Second issue should be issue 3 (ONHOLD - ID 3)
+        // Second should be issue 2
         .jsonPath("$.data.issues[1].id")
-        .isEqualTo(3)
-        .jsonPath("$.data.issues[1].status")
-        .isEqualTo("ONHOLD")
-        .jsonPath("$.data.issues[1].created_at")
-        .isEqualTo("2025-12-27T12:00:00")
-        // Third issue should be issue 2 (OPEN - ID 2)
-        .jsonPath("$.data.issues[2].id")
         .isEqualTo(2)
-        .jsonPath("$.data.issues[2].status")
+        .jsonPath("$.data.issues[1].status")
         .isEqualTo("OPEN")
-        .jsonPath("$.data.issues[2].created_at")
-        .isEqualTo("2025-12-26T18:00:00")
-        // Fourth issue should be issue 1 (OPEN, oldest - ID 1)
-        .jsonPath("$.data.issues[3].id")
+        // Third should be issue 1 (oldest)
+        .jsonPath("$.data.issues[2].id")
         .isEqualTo(1)
-        .jsonPath("$.data.issues[3].status")
-        .isEqualTo("OPEN")
-        .jsonPath("$.data.issues[3].created_at")
-        .isEqualTo("2025-12-25T10:00:00");
+        .jsonPath("$.data.issues[2].status")
+        .isEqualTo("OPEN");
   }
 
   @Test
   void shouldReturnIssuesInReverseChronologicalOrder() throws Exception {
+    // ONHOLD issues are excluded; only 3 OPEN issues should appear, newest first.
     webTestClient
         .get()
         .uri(ISSUES_API_URL)
@@ -87,22 +78,18 @@ class IssueHomeIntegrationTests {
         .isOk()
         .expectBody()
         .jsonPath("$.data.issues.length()")
-        .isEqualTo(4)
+        .isEqualTo(3)
         .jsonPath("$.data.issues[0].id")
         .isEqualTo(4)
         .jsonPath("$.data.issues[0].created_at")
         .isEqualTo("2025-12-28T09:00:00")
         .jsonPath("$.data.issues[1].id")
-        .isEqualTo(3)
-        .jsonPath("$.data.issues[1].created_at")
-        .isEqualTo("2025-12-27T12:00:00")
-        .jsonPath("$.data.issues[2].id")
         .isEqualTo(2)
-        .jsonPath("$.data.issues[2].created_at")
+        .jsonPath("$.data.issues[1].created_at")
         .isEqualTo("2025-12-26T18:00:00")
-        .jsonPath("$.data.issues[3].id")
+        .jsonPath("$.data.issues[2].id")
         .isEqualTo(1)
-        .jsonPath("$.data.issues[3].created_at")
+        .jsonPath("$.data.issues[2].created_at")
         .isEqualTo("2025-12-25T10:00:00");
   }
 

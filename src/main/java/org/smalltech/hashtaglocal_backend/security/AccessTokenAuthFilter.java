@@ -6,10 +6,13 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.time.Instant;
-import java.util.Collections;
+import java.util.List;
 import org.smalltech.hashtaglocal_backend.entity.UserAuthSessionEntity;
+import org.smalltech.hashtaglocal_backend.model.UserRole;
 import org.smalltech.hashtaglocal_backend.repository.UserAuthSessionRepository;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -30,8 +33,11 @@ public class AccessTokenAuthFilter extends OncePerRequestFilter {
 
     String authHeader = request.getHeader("Authorization");
 
+    // If no Bearer token is present, continue without setting auth context.
+    // Spring Security's authorizeHttpRequests rules will reject unauthenticated
+    // access to protected endpoints; public endpoints proceed normally.
     if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-      response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+      filterChain.doFilter(request, response);
       return;
     }
 
@@ -59,29 +65,16 @@ public class AccessTokenAuthFilter extends OncePerRequestFilter {
     System.out.println("   expiry  = " + session.getAccessTokenExpiryTs());
     System.out.println("   now     = " + Instant.now().getEpochSecond());
 
+    // Build role-based authorities so Spring Security can enforce hasRole("ADMIN") etc.
+    UserRole role =
+        session.getUser().getRole() != null ? session.getUser().getRole() : UserRole.USER;
+    List<GrantedAuthority> authorities = List.of(new SimpleGrantedAuthority("ROLE_" + role.name()));
+
     UsernamePasswordAuthenticationToken authentication =
-        new UsernamePasswordAuthenticationToken(
-            session.getUser().getId(), null, Collections.emptyList());
+        new UsernamePasswordAuthenticationToken(session.getUser().getId(), null, authorities);
 
     SecurityContextHolder.getContext().setAuthentication(authentication);
 
     filterChain.doFilter(request, response);
-  }
-
-  @Override
-  protected boolean shouldNotFilter(HttpServletRequest request) {
-    // Apply security ONLY to protected APIs
-    String uri = request.getRequestURI();
-    String method = request.getMethod();
-    if ("POST".equals(method) && "/api/v1/issue".equals(uri)) {
-      return false; // Apply filter
-    }
-    if ("GET".equals(method) && "/api/v1/media/upload-url".equals(uri)) {
-      return false; // Apply filter
-    }
-    if ("PUT".equals(method) && uri.startsWith("/api/v1/issue/")) {
-      return false; // Apply filter
-    }
-    return true; // Do not apply filter
   }
 }

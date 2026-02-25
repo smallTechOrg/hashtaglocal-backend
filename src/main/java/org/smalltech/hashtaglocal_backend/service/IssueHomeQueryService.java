@@ -19,12 +19,10 @@ public class IssueHomeQueryService {
   public List<IssueEntity> findRecentIssues(String localityHashtag) {
     LocalDateTime since = LocalDateTime.now().minusMonths(6);
 
+    // ONHOLD issues are not shown in the public feed — they are only visible to their
+    // owner via the single-issue endpoint (GET /api/v1/issue/{issueId}).
     List<IssueStatusModel> statuses =
-        List.of(
-            IssueStatusModel.OPEN,
-            IssueStatusModel.ONHOLD,
-            IssueStatusModel.PENDING,
-            IssueStatusModel.RESOLVED);
+        List.of(IssueStatusModel.OPEN, IssueStatusModel.PENDING, IssueStatusModel.RESOLVED);
 
     if (localityHashtag != null && !localityHashtag.isBlank()) {
       return issueRepository.findByStatusInAndCreatedAtAfterAndLocalityHashtagOrderByCreatedAtDesc(
@@ -37,10 +35,10 @@ public class IssueHomeQueryService {
   public List<IssueEntity> findNearbyIssues(double lat, double lng, double radiusMeters) {
     LocalDateTime since = LocalDateTime.now().minusMonths(6);
 
+    // ONHOLD issues excluded from public nearby feed for the same reason as above.
     List<String> statuses =
         List.of(
             IssueStatusModel.OPEN.name(),
-            IssueStatusModel.ONHOLD.name(),
             IssueStatusModel.PENDING.name(),
             IssueStatusModel.RESOLVED.name());
 

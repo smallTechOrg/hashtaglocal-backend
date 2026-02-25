@@ -46,11 +46,14 @@ public class IssueController {
   @GetMapping("/issue/{issueId}")
   @Operation(
       summary = "Get issue",
-      description = "Returns a issue response with user, location, locality and viewer context.")
-  public ResponseEntity<NewAPIResponse<IssueResponseData>> getIssue(@PathVariable Long issueId) {
-    var issueEntity = issueQueryService.get(issueId);
+      description =
+          "Returns an issue with user, location, locality and viewer context. ONHOLD issues are"
+              + " only returned to the issue owner; all other callers receive 404.")
+  public ResponseEntity<NewAPIResponse<IssueResponseData>> getIssue(
+      @PathVariable Long issueId, @AuthenticationPrincipal Long viewerUserId) {
+    var issueEntity = issueQueryService.get(issueId, viewerUserId);
 
-    IssueResponseData issueResponse = issueViewMapper.map(issueEntity);
+    IssueResponseData issueResponse = issueViewMapper.map(issueEntity, viewerUserId);
 
     return ResponseEntity.ok(
         NewAPIResponse.<IssueResponseData>builder().data(issueResponse).build());

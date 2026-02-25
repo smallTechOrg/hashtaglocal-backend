@@ -17,6 +17,7 @@ import org.locationtech.jts.geom.Polygon;
 import org.locationtech.jts.geom.PrecisionModel;
 import org.smalltech.hashtaglocal_backend.dto.BlrPagesIssueDTO;
 import org.smalltech.hashtaglocal_backend.dto.BlrPagesResponse;
+import org.smalltech.hashtaglocal_backend.entity.IssueActionEntity;
 import org.smalltech.hashtaglocal_backend.entity.IssueEntity;
 import org.smalltech.hashtaglocal_backend.entity.IssueImportJob;
 import org.smalltech.hashtaglocal_backend.entity.IssueImportStatus;
@@ -24,10 +25,13 @@ import org.smalltech.hashtaglocal_backend.entity.Locality;
 import org.smalltech.hashtaglocal_backend.entity.Location;
 import org.smalltech.hashtaglocal_backend.entity.MediaEntity;
 import org.smalltech.hashtaglocal_backend.entity.UserEntity;
+import org.smalltech.hashtaglocal_backend.model.IssueActionApprovalStatus;
+import org.smalltech.hashtaglocal_backend.model.IssueActionModel;
 import org.smalltech.hashtaglocal_backend.model.IssueImportSource;
 import org.smalltech.hashtaglocal_backend.model.IssueStatusModel;
 import org.smalltech.hashtaglocal_backend.model.IssueTypeModel;
 import org.smalltech.hashtaglocal_backend.model.MediaTypeModel;
+import org.smalltech.hashtaglocal_backend.repository.IssueActionRepository;
 import org.smalltech.hashtaglocal_backend.repository.IssueImportJobRepository;
 import org.smalltech.hashtaglocal_backend.repository.IssueImportStatusRepository;
 import org.smalltech.hashtaglocal_backend.repository.IssueRepository;
@@ -59,6 +63,7 @@ public class IssueImportService {
   private final IssueImportJobRepository importJobRepository;
   private final IssueImportStatusRepository importStatusRepository;
   private final IssueRepository issueRepository;
+  private final IssueActionRepository issueActionRepository;
   private final MediaRepository mediaRepository;
   private final LocationRepository locationRepository;
   private final LocalityRepository localityRepository;
@@ -164,12 +169,25 @@ public class IssueImportService {
 
       MediaEntity media =
           MediaEntity.builder()
-              .issue(issue)
               .type(MediaTypeModel.PHOTO)
               .url(gcsPath)
               .location(location)
+              .createdAt(issue.getCreatedAt())
               .build();
-      mediaRepository.save(media);
+      media = mediaRepository.save(media);
+
+      // Create a REPORT action to own the media (imported issues are already OPEN,
+      // so approval is NOT_REQUIRED)
+      IssueActionEntity reportAction =
+          IssueActionEntity.builder()
+              .issueEntity(issue)
+              .userEntity(user)
+              .action(IssueActionModel.REPORT)
+              .approvalStatus(IssueActionApprovalStatus.NOT_REQUIRED)
+              .media(media)
+              .createdAt(issue.getCreatedAt())
+              .build();
+      issueActionRepository.save(reportAction);
 
       status.setIssue(issue);
       status.setImportStatus(IssueImportStatus.ImportStatus.SUCCESS);
