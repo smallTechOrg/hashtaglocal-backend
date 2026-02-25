@@ -1,5 +1,6 @@
 package org.smalltech.hashtaglocal_backend.service;
 
+import java.util.List;
 import java.util.Optional;
 import org.smalltech.hashtaglocal_backend.entity.UserAuthSessionEntity;
 import org.smalltech.hashtaglocal_backend.entity.UserEntity;
@@ -101,7 +102,9 @@ public class GetProfileService {
   private UserSummaryModel buildUserSummary(Long userId) {
     long total = issueRepository.countByUserExcludingRejected(userId);
     long onhold = issueRepository.countByUserAndStatus(userId, IssueStatusModel.ONHOLD);
-    long open = issueRepository.countByUserAndStatus(userId, IssueStatusModel.OPEN);
+    long open =
+        issueRepository.countByUserAndStatusIn(
+            userId, List.of(IssueStatusModel.OPEN, IssueStatusModel.PENDING));
     long resolved = issueRepository.countByUserAndStatus(userId, IssueStatusModel.RESOLVED);
     long verify =
         issueActionRepository.countDistinctIssuesByUserAndActionExcludingOwnIssues(

@@ -73,11 +73,8 @@ springdoc:
     enabled: true
     try-it-out-enabled: true
     display-request-duration: true
-  show-actuator: true
   paths-to-match:
     - /**
-    - /actuator/**
-  write-operation-modes: true
   default-consumes-media-type: application/json
   default-produces-media-type: application/json
 

@@ -3,6 +3,7 @@ package org.smalltech.hashtaglocal_backend.service;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -443,7 +444,9 @@ class GetProfileServiceTest {
           .thenReturn(Optional.of(session));
       when(issueRepository.countByUserExcludingRejected(1L)).thenReturn(12L);
       when(issueRepository.countByUserAndStatus(1L, IssueStatusModel.ONHOLD)).thenReturn(3L);
-      when(issueRepository.countByUserAndStatus(1L, IssueStatusModel.OPEN)).thenReturn(7L);
+      when(issueRepository.countByUserAndStatusIn(
+              1L, List.of(IssueStatusModel.OPEN, IssueStatusModel.PENDING)))
+          .thenReturn(7L);
       when(issueRepository.countByUserAndStatus(1L, IssueStatusModel.RESOLVED)).thenReturn(2L);
       when(issueActionRepository.countDistinctIssuesByUserAndActionExcludingOwnIssues(
               1L, IssueActionModel.VERIFY))
@@ -479,7 +482,9 @@ class GetProfileServiceTest {
           .thenReturn(Optional.of(session));
       when(issueRepository.countByUserExcludingRejected(2L)).thenReturn(0L);
       when(issueRepository.countByUserAndStatus(2L, IssueStatusModel.ONHOLD)).thenReturn(0L);
-      when(issueRepository.countByUserAndStatus(2L, IssueStatusModel.OPEN)).thenReturn(0L);
+      when(issueRepository.countByUserAndStatusIn(
+              2L, List.of(IssueStatusModel.OPEN, IssueStatusModel.PENDING)))
+          .thenReturn(0L);
       when(issueRepository.countByUserAndStatus(2L, IssueStatusModel.RESOLVED)).thenReturn(0L);
       when(issueActionRepository.countDistinctIssuesByUserAndActionExcludingOwnIssues(
               2L, IssueActionModel.VERIFY))
@@ -515,7 +520,9 @@ class GetProfileServiceTest {
           .thenReturn(Optional.of(session));
       when(issueRepository.countByUserExcludingRejected(3L)).thenReturn(5L);
       when(issueRepository.countByUserAndStatus(3L, IssueStatusModel.ONHOLD)).thenReturn(0L);
-      when(issueRepository.countByUserAndStatus(3L, IssueStatusModel.OPEN)).thenReturn(5L);
+      when(issueRepository.countByUserAndStatusIn(
+              3L, List.of(IssueStatusModel.OPEN, IssueStatusModel.PENDING)))
+          .thenReturn(5L);
       when(issueRepository.countByUserAndStatus(3L, IssueStatusModel.RESOLVED)).thenReturn(0L);
       when(issueActionRepository.countDistinctIssuesByUserAndActionExcludingOwnIssues(
               3L, IssueActionModel.VERIFY))
@@ -562,7 +569,9 @@ class GetProfileServiceTest {
           .thenReturn(Optional.of(locality));
       when(issueRepository.countByUserExcludingRejected(1L)).thenReturn(3L);
       when(issueRepository.countByUserAndStatus(1L, IssueStatusModel.ONHOLD)).thenReturn(1L);
-      when(issueRepository.countByUserAndStatus(1L, IssueStatusModel.OPEN)).thenReturn(2L);
+      when(issueRepository.countByUserAndStatusIn(
+              1L, List.of(IssueStatusModel.OPEN, IssueStatusModel.PENDING)))
+          .thenReturn(2L);
       when(issueRepository.countByUserAndStatus(1L, IssueStatusModel.RESOLVED)).thenReturn(0L);
       when(issueActionRepository.countDistinctIssuesByUserAndActionExcludingOwnIssues(
               1L, IssueActionModel.VERIFY))
