@@ -9,18 +9,18 @@ import lombok.Data;
 @Data
 public class IssueVerifyRequest {
 
-	@Valid
-	@JsonProperty("issue_action")
-	@NotNull(message = "issue_action is required")
-	private IssueActionRequest issueAction;
+  @Valid
+  @JsonProperty("issue_action")
+  @NotNull(message = "issue_action is required")
+  private IssueActionRequest issueAction;
 
-	@Data
-	public static class IssueActionRequest {
-		@NotNull(message = "action is required")
-		private String action; // VERIFY
+  @Data
+  public static class IssueActionRequest {
+    @NotNull(message = "action is required")
+    private String action; // VERIFY
 
-		@Valid
-		@JsonProperty("media_urls")
-		private List<MediaRequest> mediaUrls;
-	}
+    @Valid
+    @JsonProperty("media_urls")
+    private List<MediaRequest> mediaUrls;
+  }
 }

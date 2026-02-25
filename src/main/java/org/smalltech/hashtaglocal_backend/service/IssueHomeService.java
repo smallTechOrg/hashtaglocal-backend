@@ -15,26 +15,30 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class IssueHomeService {
 
-	private final IssueHomeQueryService issueHomeQueryService;
-	private final IssueViewMapper issueViewMapper;
+  private final IssueHomeQueryService issueHomeQueryService;
+  private final IssueViewMapper issueViewMapper;
 
-	public NewAPIResponse<IssueListResponseData> getHome(String localityHashtag) {
-		var entities = issueHomeQueryService.findRecentIssues(localityHashtag);
+  public NewAPIResponse<IssueListResponseData> getHome(String localityHashtag) {
+    var entities = issueHomeQueryService.findRecentIssues(localityHashtag);
 
-		List<Issue> issues = entities.stream().map(issueViewMapper::map).map(IssueResponseData::getIssue).toList();
+    List<Issue> issues =
+        entities.stream().map(issueViewMapper::map).map(IssueResponseData::getIssue).toList();
 
-		return NewAPIResponse.<IssueListResponseData>builder()
-				.data(IssueListResponseData.builder().issues(issues).build()).build();
-	}
+    return NewAPIResponse.<IssueListResponseData>builder()
+        .data(IssueListResponseData.builder().issues(issues).build())
+        .build();
+  }
 
-	public NewAPIResponse<IssueListResponseData> getNearby(double lat, double lng) {
-		double radiusMeters = 5000.0;
+  public NewAPIResponse<IssueListResponseData> getNearby(double lat, double lng) {
+    double radiusMeters = 5000.0;
 
-		var entities = issueHomeQueryService.findNearbyIssues(lat, lng, radiusMeters);
+    var entities = issueHomeQueryService.findNearbyIssues(lat, lng, radiusMeters);
 
-		List<Issue> issues = entities.stream().map(issueViewMapper::map).map(IssueResponseData::getIssue).toList();
+    List<Issue> issues =
+        entities.stream().map(issueViewMapper::map).map(IssueResponseData::getIssue).toList();
 
-		return NewAPIResponse.<IssueListResponseData>builder()
-				.data(IssueListResponseData.builder().issues(issues).build()).build();
-	}
+    return NewAPIResponse.<IssueListResponseData>builder()
+        .data(IssueListResponseData.builder().issues(issues).build())
+        .build();
+  }
 }

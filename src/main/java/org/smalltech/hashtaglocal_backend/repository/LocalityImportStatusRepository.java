@@ -8,10 +8,10 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface LocalityImportStatusRepository extends JpaRepository<LocalityImportStatus, Long> {
-	List<LocalityImportStatus> findByImportJob(ImportJob importJob);
+  List<LocalityImportStatus> findByImportJob(ImportJob importJob);
 
-	List<LocalityImportStatus> findByImportStatus(LocalityImportStatus.ImportStatus importStatus);
+  List<LocalityImportStatus> findByImportStatus(LocalityImportStatus.ImportStatus importStatus);
 
-	List<LocalityImportStatus> findByImportJobAndImportStatus(ImportJob importJob,
-			LocalityImportStatus.ImportStatus importStatus);
+  List<LocalityImportStatus> findByImportJobAndImportStatus(
+      ImportJob importJob, LocalityImportStatus.ImportStatus importStatus);
 }

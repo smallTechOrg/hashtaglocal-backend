@@ -7,54 +7,52 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/**
- * DTO representing structured location metadata with complete Google Maps data.
- */
+/** DTO representing structured location metadata with complete Google Maps data. */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
 public class LocationMetadataDTO {
-	private String city;
-	private String name;
-	private String region;
-	private String street;
-	private String country;
-	private String district;
-	private String timezone;
+  private String city;
+  private String name;
+  private String region;
+  private String street;
+  private String country;
+  private String district;
+  private String timezone;
 
-	@JsonProperty("sub_region")
-	private String subRegion;
+  @JsonProperty("sub_region")
+  private String subRegion;
 
-	@JsonProperty("postal_code")
-	private String postalCode;
+  @JsonProperty("postal_code")
+  private String postalCode;
 
-	@JsonProperty("street_number")
-	private String streetNumber;
+  @JsonProperty("street_number")
+  private String streetNumber;
 
-	@JsonProperty("iso_country_code")
-	private String isoCountryCode;
+  @JsonProperty("iso_country_code")
+  private String isoCountryCode;
 
-	@JsonProperty("formatted_address")
-	private String formattedAddress;
+  @JsonProperty("formatted_address")
+  private String formattedAddress;
 
-	// Additional fields for extra details
-	private String neighborhood;
+  // Additional fields for extra details
+  private String neighborhood;
 
-	@JsonProperty("point_of_interest")
-	private String pointOfInterest;
+  @JsonProperty("point_of_interest")
+  private String pointOfInterest;
 
-	@JsonProperty("premise_name")
-	private String premiseName;
+  @JsonProperty("premise_name")
+  private String premiseName;
 
-	@JsonProperty("establishment_type")
-	private String establishmentType;
+  @JsonProperty("establishment_type")
+  private String establishmentType;
 
-	// Store complete Google Maps response data for reference
-	@JsonProperty("google_maps_data")
-	private Map<String, Object> googleMapsData;
+  // Store complete Google Maps response data for reference
+  @JsonProperty("google_maps_data")
+  private Map<String, Object> googleMapsData;
 
-	// Store raw address components for reference
-	@JsonProperty("address_components")
-	private Map<String, String> addressComponents;
+  // Store raw address components for reference
+  @JsonProperty("address_components")
+  private Map<String, String> addressComponents;
 }

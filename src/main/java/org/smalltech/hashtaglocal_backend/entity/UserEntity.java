@@ -25,29 +25,29 @@ import org.hibernate.annotations.UpdateTimestamp;
 @Builder
 public class UserEntity {
 
-	@Id
-	@GeneratedValue(strategy = GenerationType.IDENTITY)
-	private Long id;
+  @Id
+  @GeneratedValue(strategy = GenerationType.IDENTITY)
+  private Long id;
 
-	// Human-readable issue key (optional)
-	@Column(unique = true, length = 100)
-	private String username;
+  // Human-readable issue key (optional)
+  @Column(unique = true, length = 100)
+  private String username;
 
-	private String profilePicture;
+  private String profilePicture;
 
-	@Column(nullable = false, length = 100)
-	private String locale;
+  @Column(nullable = false, length = 100)
+  private String locale;
 
-	@CreationTimestamp
-	@Column(nullable = false, updatable = false)
-	private LocalDateTime createdAt;
+  @CreationTimestamp
+  @Column(nullable = false, updatable = false)
+  private LocalDateTime createdAt;
 
-	@UpdateTimestamp
-	@Column(nullable = false)
-	private LocalDateTime updatedAt;
+  @UpdateTimestamp
+  @Column(nullable = false)
+  private LocalDateTime updatedAt;
 
-	// Primary location of the user
-	@ManyToOne(fetch = FetchType.LAZY)
-	@JoinColumn(name = "location_id")
-	private Location location;
+  // Primary location of the user
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "location_id")
+  private Location location;
 }

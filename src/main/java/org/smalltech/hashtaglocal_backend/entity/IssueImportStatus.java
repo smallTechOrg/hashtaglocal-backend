@@ -11,62 +11,65 @@ import org.hibernate.type.SqlTypes;
 import org.smalltech.hashtaglocal_backend.model.IssueImportSource;
 
 @Entity
-@Table(name = "issue_import_status", uniqueConstraints = {
-		@UniqueConstraint(columnNames = {"source", "source_issue_id"})})
+@Table(
+    name = "issue_import_status",
+    uniqueConstraints = {@UniqueConstraint(columnNames = {"source", "source_issue_id"})})
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
 public class IssueImportStatus {
 
-	public enum ImportStatus {
-		SUCCESS, FAILED, SKIPPED
-	}
+  public enum ImportStatus {
+    SUCCESS,
+    FAILED,
+    SKIPPED
+  }
 
-	@Id
-	@GeneratedValue(strategy = GenerationType.IDENTITY)
-	private Long id;
+  @Id
+  @GeneratedValue(strategy = GenerationType.IDENTITY)
+  private Long id;
 
-	@ManyToOne(fetch = FetchType.LAZY)
-	@JoinColumn(name = "job_id", nullable = false)
-	private IssueImportJob job;
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "job_id", nullable = false)
+  private IssueImportJob job;
 
-	@ManyToOne(fetch = FetchType.LAZY)
-	@JoinColumn(name = "issue_id")
-	private IssueEntity issue;
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "issue_id")
+  private IssueEntity issue;
 
-	@Enumerated(EnumType.STRING)
-	@Column(nullable = false, length = 50)
-	private IssueImportSource source;
+  @Enumerated(EnumType.STRING)
+  @Column(nullable = false, length = 50)
+  private IssueImportSource source;
 
-	@Column(name = "source_issue_id", nullable = false, length = 200)
-	private String sourceIssueId;
+  @Column(name = "source_issue_id", nullable = false, length = 200)
+  private String sourceIssueId;
 
-	@Column(name = "source_created_at")
-	private LocalDateTime sourceCreatedAt;
+  @Column(name = "source_created_at")
+  private LocalDateTime sourceCreatedAt;
 
-	@Enumerated(EnumType.STRING)
-	@Column(nullable = false, length = 50)
-	@Builder.Default
-	private ImportStatus importStatus = ImportStatus.SKIPPED;
+  @Enumerated(EnumType.STRING)
+  @Column(nullable = false, length = 50)
+  @Builder.Default
+  private ImportStatus importStatus = ImportStatus.SKIPPED;
 
-	@Column(length = 2000)
-	private String errorMessage;
+  @Column(length = 2000)
+  private String errorMessage;
 
-	@JdbcTypeCode(SqlTypes.JSON)
-	@Column(columnDefinition = "jsonb")
-	private String sourcePayload;
+  @JdbcTypeCode(SqlTypes.JSON)
+  @Column(columnDefinition = "jsonb")
+  private String sourcePayload;
 
-	@Column(length = 500)
-	private String storedMediaPath;
+  @Column(length = 500)
+  private String storedMediaPath;
 
-	@Column(nullable = false)
-	@Builder.Default
-	private Integer attemptCount = 1;
+  @Column(nullable = false)
+  @Builder.Default
+  private Integer attemptCount = 1;
 
-	@Column(nullable = false, updatable = false)
-	@Builder.Default
-	private LocalDateTime createdAt = LocalDateTime.now();
+  @Column(nullable = false, updatable = false)
+  @Builder.Default
+  private LocalDateTime createdAt = LocalDateTime.now();
 
-	private LocalDateTime updatedAt;
+  private LocalDateTime updatedAt;
 }

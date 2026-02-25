@@ -7,5 +7,5 @@ import lombok.*;
 @AllArgsConstructor
 @Builder
 public class APIResponse {
-	private ResponseData data;
+  private ResponseData data;
 }

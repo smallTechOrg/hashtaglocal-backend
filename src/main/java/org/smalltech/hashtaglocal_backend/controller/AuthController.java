@@ -21,49 +21,54 @@ import org.springframework.web.bind.annotation.RestController;
 @Tag(name = "Authentication", description = "Google OAuth APIs")
 public class AuthController {
 
-	private final AuthRefreshService authRefreshService;
-	private final GoogleAuthService googleAuthService;
+  private final AuthRefreshService authRefreshService;
+  private final GoogleAuthService googleAuthService;
 
-	public AuthController(AuthRefreshService authRefreshService, GoogleAuthService googleAuthService) {
-		this.authRefreshService = authRefreshService;
-		this.googleAuthService = googleAuthService;
-	}
+  public AuthController(
+      AuthRefreshService authRefreshService, GoogleAuthService googleAuthService) {
+    this.authRefreshService = authRefreshService;
+    this.googleAuthService = googleAuthService;
+  }
 
-	@GetMapping("/google/callback")
-	@Operation(summary = "Google OAuth callback")
-	public ResponseEntity<NewAPIResponse<AuthTokenResponseData>> googleCallback(@RequestParam("code") String code,
-			@RequestParam(value = "code_verifier", required = false) String codeVerifier) {
+  @GetMapping("/google/callback")
+  @Operation(summary = "Google OAuth callback")
+  public ResponseEntity<NewAPIResponse<AuthTokenResponseData>> googleCallback(
+      @RequestParam("code") String code,
+      @RequestParam(value = "code_verifier", required = false) String codeVerifier) {
 
-		System.out.println("➡️ /auth/google/callback hit");
-		System.out.println("Auth Code: " + code);
+    System.out.println("➡️ /auth/google/callback hit");
+    System.out.println("Auth Code: " + code);
 
-		var tokenData = googleAuthService.handleAuthorizationCode(code, codeVerifier);
+    var tokenData = googleAuthService.handleAuthorizationCode(code, codeVerifier);
 
-		return ResponseEntity.ok(NewAPIResponse.<AuthTokenResponseData>builder().data(tokenData).build());
-	}
+    return ResponseEntity.ok(
+        NewAPIResponse.<AuthTokenResponseData>builder().data(tokenData).build());
+  }
 
-	@GetMapping("/google/token")
-	@Operation(summary = "Authenticate using Google access token")
-	public ResponseEntity<NewAPIResponse<AuthTokenResponseData>> authenticateWithAccessToken(
-			@RequestParam("access_token") String accessToken) {
+  @GetMapping("/google/token")
+  @Operation(summary = "Authenticate using Google access token")
+  public ResponseEntity<NewAPIResponse<AuthTokenResponseData>> authenticateWithAccessToken(
+      @RequestParam("access_token") String accessToken) {
 
-		System.out.println("➡️ /auth/google/token hit");
-		System.out.println("Google Access Token: " + accessToken);
+    System.out.println("➡️ /auth/google/token hit");
+    System.out.println("Google Access Token: " + accessToken);
 
-		var tokenData = googleAuthService.handleAccessToken(accessToken);
+    var tokenData = googleAuthService.handleAccessToken(accessToken);
 
-		return ResponseEntity.ok(NewAPIResponse.<AuthTokenResponseData>builder().data(tokenData).build());
-	}
+    return ResponseEntity.ok(
+        NewAPIResponse.<AuthTokenResponseData>builder().data(tokenData).build());
+  }
 
-	@PostMapping("/refresh")
-	@Operation(summary = "Refresh access and refresh tokens")
-	public ResponseEntity<NewAPIResponse<AuthTokenResponseData>> refresh(
-			@Valid @RequestBody AuthRefreshRequest request) {
+  @PostMapping("/refresh")
+  @Operation(summary = "Refresh access and refresh tokens")
+  public ResponseEntity<NewAPIResponse<AuthTokenResponseData>> refresh(
+      @Valid @RequestBody AuthRefreshRequest request) {
 
-		System.out.println("/auth/refresh hit");
+    System.out.println("/auth/refresh hit");
 
-		AuthTokenResponseData tokenData = authRefreshService.refreshTokens(request.getRefreshToken());
+    AuthTokenResponseData tokenData = authRefreshService.refreshTokens(request.getRefreshToken());
 
-		return ResponseEntity.ok(NewAPIResponse.<AuthTokenResponseData>builder().data(tokenData).build());
-	}
+    return ResponseEntity.ok(
+        NewAPIResponse.<AuthTokenResponseData>builder().data(tokenData).build());
+  }
 }

@@ -7,6 +7,6 @@ import org.smalltech.hashtaglocal_backend.model.TokenResponse;
 @Data
 @Builder
 public class AuthTokenResponseData {
-	private TokenResponse accessToken;
-	private TokenResponse refreshToken;
+  private TokenResponse accessToken;
+  private TokenResponse refreshToken;
 }

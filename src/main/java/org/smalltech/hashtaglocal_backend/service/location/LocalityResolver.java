@@ -9,14 +9,16 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class LocalityResolver {
 
-	private final LocalityRepository localityRepository;
+  private final LocalityRepository localityRepository;
 
-	public Locality resolve(Double latitude, Double longitude, Locality defaultLocality) {
-		if (latitude == null || longitude == null) {
-			return defaultLocality;
-		}
+  public Locality resolve(Double latitude, Double longitude, Locality defaultLocality) {
+    if (latitude == null || longitude == null) {
+      return defaultLocality;
+    }
 
-		return localityRepository.findContainingLocality(latitude, longitude)
-				.or(() -> localityRepository.findNearestLocality(latitude, longitude)).orElse(defaultLocality);
-	}
+    return localityRepository
+        .findContainingLocality(latitude, longitude)
+        .or(() -> localityRepository.findNearestLocality(latitude, longitude))
+        .orElse(defaultLocality);
+  }
 }

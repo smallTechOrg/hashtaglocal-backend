@@ -7,7 +7,7 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface LocalityDiscoveryRunRepository extends JpaRepository<LocalityDiscoveryRun, Long> {
-	List<LocalityDiscoveryRun> findByCountryCode(String countryCode);
+  List<LocalityDiscoveryRun> findByCountryCode(String countryCode);
 
-	List<LocalityDiscoveryRun> findByStatus(LocalityDiscoveryRun.DiscoveryStatus status);
+  List<LocalityDiscoveryRun> findByStatus(LocalityDiscoveryRun.DiscoveryStatus status);
 }

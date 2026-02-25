@@ -17,21 +17,21 @@ import org.locationtech.jts.geom.Point;
 @AllArgsConstructor
 @Builder
 public class Location {
-	@Id
-	@GeneratedValue(strategy = GenerationType.IDENTITY)
-	private Long id;
+  @Id
+  @GeneratedValue(strategy = GenerationType.IDENTITY)
+  private Long id;
 
-	@Column(nullable = false, columnDefinition = "geometry(Point,4326)")
-	private Point point;
+  @Column(nullable = false, columnDefinition = "geometry(Point,4326)")
+  private Point point;
 
-	@ManyToOne(fetch = FetchType.LAZY)
-	@JoinColumn(name = "locality_id")
-	private Locality locality;
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "locality_id")
+  private Locality locality;
 
-	@Column(nullable = false)
-	private String name;
+  @Column(nullable = false)
+  private String name;
 
-	@Type(JsonType.class)
-	@Column(columnDefinition = "jsonb")
-	private Map<String, Object> metaData;
+  @Type(JsonType.class)
+  @Column(columnDefinition = "jsonb")
+  private Map<String, Object> metaData;
 }

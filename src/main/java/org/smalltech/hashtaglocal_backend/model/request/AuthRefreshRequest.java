@@ -12,7 +12,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @Builder
 public class AuthRefreshRequest {
-	@NotBlank(message = "refresh_token is required")
-	@JsonProperty("refresh_token")
-	private String refreshToken;
+  @NotBlank(message = "refresh_token is required")
+  @JsonProperty("refresh_token")
+  private String refreshToken;
 }

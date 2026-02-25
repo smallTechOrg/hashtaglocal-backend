@@ -25,40 +25,40 @@ import org.hibernate.annotations.UpdateTimestamp;
 @Builder
 public class UserAuthSessionEntity {
 
-	@Id
-	@GeneratedValue(strategy = GenerationType.IDENTITY)
-	private Long id;
+  @Id
+  @GeneratedValue(strategy = GenerationType.IDENTITY)
+  private Long id;
 
-	@ManyToOne(fetch = FetchType.LAZY)
-	@JoinColumn(name = "user_auth_provider_id", nullable = false)
-	private UserAuthProviderEntity userAuthProvider;
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "user_auth_provider_id", nullable = false)
+  private UserAuthProviderEntity userAuthProvider;
 
-	@Column(length = 2000)
-	private String deviceId;
+  @Column(length = 2000)
+  private String deviceId;
 
-	@ManyToOne(fetch = FetchType.LAZY)
-	@JoinColumn(name = "user_id", nullable = false)
-	private UserEntity user;
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "user_id", nullable = false)
+  private UserEntity user;
 
-	@Column(columnDefinition = "text")
-	private String accessToken;
+  @Column(columnDefinition = "text")
+  private String accessToken;
 
-	private Long accessTokenExpiryTs;
+  private Long accessTokenExpiryTs;
 
-	@Column(columnDefinition = "text")
-	private String refreshToken;
+  @Column(columnDefinition = "text")
+  private String refreshToken;
 
-	private Long refreshTokenExpiryTs;
+  private Long refreshTokenExpiryTs;
 
-	@CreationTimestamp
-	@Column(nullable = false, updatable = false)
-	private LocalDateTime createdAt;
+  @CreationTimestamp
+  @Column(nullable = false, updatable = false)
+  private LocalDateTime createdAt;
 
-	@UpdateTimestamp
-	@Column(nullable = false)
-	private LocalDateTime updatedAt;
+  @UpdateTimestamp
+  @Column(nullable = false)
+  private LocalDateTime updatedAt;
 
-	@Builder.Default
-	@Column(nullable = false)
-	private Boolean isActive = true;
+  @Builder.Default
+  @Column(nullable = false)
+  private Boolean isActive = true;
 }

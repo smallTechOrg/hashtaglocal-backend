@@ -36,65 +36,81 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class IssueController {
 
-	private final IssueActionService issueActionService;
-	private final IssueHomeService issueHomeAssembler;
-	private final IssuePatchService issuePatchService;
-	private final IssueQueryService issueQueryService;
-	private final IssueReportService issueReportService;
-	private final IssueViewMapper issueViewMapper;
+  private final IssueActionService issueActionService;
+  private final IssueHomeService issueHomeAssembler;
+  private final IssuePatchService issuePatchService;
+  private final IssueQueryService issueQueryService;
+  private final IssueReportService issueReportService;
+  private final IssueViewMapper issueViewMapper;
 
-	@GetMapping("/issue/{issueId}")
-	@Operation(summary = "Get issue", description = "Returns a issue response with user, location, locality and viewer context.")
-	public ResponseEntity<NewAPIResponse<IssueResponseData>> getIssue(@PathVariable Long issueId) {
-		var issueEntity = issueQueryService.get(issueId);
+  @GetMapping("/issue/{issueId}")
+  @Operation(
+      summary = "Get issue",
+      description = "Returns a issue response with user, location, locality and viewer context.")
+  public ResponseEntity<NewAPIResponse<IssueResponseData>> getIssue(@PathVariable Long issueId) {
+    var issueEntity = issueQueryService.get(issueId);
 
-		IssueResponseData issueResponse = issueViewMapper.map(issueEntity);
+    IssueResponseData issueResponse = issueViewMapper.map(issueEntity);
 
-		return ResponseEntity.ok(NewAPIResponse.<IssueResponseData>builder().data(issueResponse).build());
-	}
+    return ResponseEntity.ok(
+        NewAPIResponse.<IssueResponseData>builder().data(issueResponse).build());
+  }
 
-	@PatchMapping("/issue/{issueId}")
-	@Operation(summary = "Update issue", description = "Patch issue fields like status, type, description, and coordinates.")
-	public ResponseEntity<NewAPIResponse<IssueResponseData>> patchIssue(@PathVariable Long issueId,
-			@Valid @RequestBody IssuePatchRequest request) {
-		var issueEntity = issuePatchService.patchIssue(issueId, request);
+  @PatchMapping("/issue/{issueId}")
+  @Operation(
+      summary = "Update issue",
+      description = "Patch issue fields like status, type, description, and coordinates.")
+  public ResponseEntity<NewAPIResponse<IssueResponseData>> patchIssue(
+      @PathVariable Long issueId, @Valid @RequestBody IssuePatchRequest request) {
+    var issueEntity = issuePatchService.patchIssue(issueId, request);
 
-		IssueResponseData issueResponse = issueViewMapper.map(issueEntity);
+    IssueResponseData issueResponse = issueViewMapper.map(issueEntity);
 
-		return ResponseEntity.ok(NewAPIResponse.<IssueResponseData>builder().data(issueResponse).build());
-	}
+    return ResponseEntity.ok(
+        NewAPIResponse.<IssueResponseData>builder().data(issueResponse).build());
+  }
 
-	@PutMapping("/issue/{issueId}")
-	@SecurityRequirement(name = "bearerAuth")
-	@Operation(summary = "Verify or resolve issue", description = "Verify an issue with media attachments and create verification records.")
-	public ResponseEntity<NewAPIResponse<IssueActionResponseData>> verifyIssue(@PathVariable Long issueId,
-			@AuthenticationPrincipal Long userId, @Valid @RequestBody IssueVerifyRequest request) {
-		Long updatedIssueId = issueActionService.handle(issueId, userId, request);
+  @PutMapping("/issue/{issueId}")
+  @SecurityRequirement(name = "bearerAuth")
+  @Operation(
+      summary = "Verify or resolve issue",
+      description = "Verify an issue with media attachments and create verification records.")
+  public ResponseEntity<NewAPIResponse<IssueActionResponseData>> verifyIssue(
+      @PathVariable Long issueId,
+      @AuthenticationPrincipal Long userId,
+      @Valid @RequestBody IssueVerifyRequest request) {
+    Long updatedIssueId = issueActionService.handle(issueId, userId, request);
 
-		NewAPIResponse<IssueActionResponseData> response = NewAPIResponse.<IssueActionResponseData>builder()
-				.data(IssueActionResponseData.builder().issueId(updatedIssueId).build()).build();
+    NewAPIResponse<IssueActionResponseData> response =
+        NewAPIResponse.<IssueActionResponseData>builder()
+            .data(IssueActionResponseData.builder().issueId(updatedIssueId).build())
+            .build();
 
-		return ResponseEntity.ok(response);
-	}
+    return ResponseEntity.ok(response);
+  }
 
-	@GetMapping("/issues")
-	@Operation(summary = "Get issue Home", description = "Returns a List of issues with user, location, locality and viewer context. Optionally filter by locality hashtag.")
-	public NewAPIResponse<IssueListResponseData> getIssues(
-			@RequestParam(value = "locality", required = false) String localityHashtag) {
-		return issueHomeAssembler.getHome(localityHashtag);
-	}
+  @GetMapping("/issues")
+  @Operation(
+      summary = "Get issue Home",
+      description =
+          "Returns a List of issues with user, location, locality and viewer context. Optionally filter by locality hashtag.")
+  public NewAPIResponse<IssueListResponseData> getIssues(
+      @RequestParam(value = "locality", required = false) String localityHashtag) {
+    return issueHomeAssembler.getHome(localityHashtag);
+  }
 
-	@PostMapping("/issue")
-	@SecurityRequirement(name = "bearerAuth")
-	@Operation(summary = "Create issue", description = "Creates a new issue with the given details.")
-	public ResponseEntity<NewAPIResponse<IssueActionResponseData>> createIssue(@AuthenticationPrincipal Long userId,
-			@Valid @RequestBody IssueReportRequest request) {
-		Long issueId = issueReportService.createIssue(userId, request);
+  @PostMapping("/issue")
+  @SecurityRequirement(name = "bearerAuth")
+  @Operation(summary = "Create issue", description = "Creates a new issue with the given details.")
+  public ResponseEntity<NewAPIResponse<IssueActionResponseData>> createIssue(
+      @AuthenticationPrincipal Long userId, @Valid @RequestBody IssueReportRequest request) {
+    Long issueId = issueReportService.createIssue(userId, request);
 
-		NewAPIResponse<IssueActionResponseData> response = NewAPIResponse.<IssueActionResponseData>builder()
-				.data(IssueActionResponseData.builder().issueId(issueId).build()).build();
+    NewAPIResponse<IssueActionResponseData> response =
+        NewAPIResponse.<IssueActionResponseData>builder()
+            .data(IssueActionResponseData.builder().issueId(issueId).build())
+            .build();
 
-		return ResponseEntity.ok(response);
-	}
-
+    return ResponseEntity.ok(response);
+  }
 }

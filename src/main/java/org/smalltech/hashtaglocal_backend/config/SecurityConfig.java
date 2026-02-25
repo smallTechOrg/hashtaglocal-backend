@@ -11,21 +11,28 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @Configuration
 public class SecurityConfig {
 
-	private final AccessTokenAuthFilter accessTokenAuthFilter;
+  private final AccessTokenAuthFilter accessTokenAuthFilter;
 
-	public SecurityConfig(AccessTokenAuthFilter accessTokenAuthFilter) {
-		this.accessTokenAuthFilter = accessTokenAuthFilter;
-	}
+  public SecurityConfig(AccessTokenAuthFilter accessTokenAuthFilter) {
+    this.accessTokenAuthFilter = accessTokenAuthFilter;
+  }
 
-	@Bean
-	public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+  @Bean
+  public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
 
-		http.csrf(csrf -> csrf.disable())
-				.authorizeHttpRequests(auth -> auth.requestMatchers(HttpMethod.POST, "/api/v1/issue").authenticated()
-						.requestMatchers(HttpMethod.GET, "/api/v1/media/upload-url").authenticated()
-						.requestMatchers(HttpMethod.PUT, "/api/v1/issue/**").authenticated().anyRequest().permitAll())
-				.addFilterBefore(accessTokenAuthFilter, UsernamePasswordAuthenticationFilter.class);
+    http.csrf(csrf -> csrf.disable())
+        .authorizeHttpRequests(
+            auth ->
+                auth.requestMatchers(HttpMethod.POST, "/api/v1/issue")
+                    .authenticated()
+                    .requestMatchers(HttpMethod.GET, "/api/v1/media/upload-url")
+                    .authenticated()
+                    .requestMatchers(HttpMethod.PUT, "/api/v1/issue/**")
+                    .authenticated()
+                    .anyRequest()
+                    .permitAll())
+        .addFilterBefore(accessTokenAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
-		return http.build();
-	}
+    return http.build();
+  }
 }

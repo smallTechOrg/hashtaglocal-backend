@@ -8,14 +8,14 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface DiscoveredLocalityRepository extends JpaRepository<DiscoveredLocality, Long> {
-	List<DiscoveredLocality> findByDiscoveryRun(LocalityDiscoveryRun discoveryRun);
+  List<DiscoveredLocality> findByDiscoveryRun(LocalityDiscoveryRun discoveryRun);
 
-	List<DiscoveredLocality> findByLocalityType(DiscoveredLocality.LocalityType localityType);
+  List<DiscoveredLocality> findByLocalityType(DiscoveredLocality.LocalityType localityType);
 
-	List<DiscoveredLocality> findByDiscoveryRunAndLocalityType(LocalityDiscoveryRun discoveryRun,
-			DiscoveredLocality.LocalityType localityType);
+  List<DiscoveredLocality> findByDiscoveryRunAndLocalityType(
+      LocalityDiscoveryRun discoveryRun, DiscoveredLocality.LocalityType localityType);
 
-	List<DiscoveredLocality> findByState(String state);
+  List<DiscoveredLocality> findByState(String state);
 
-	List<DiscoveredLocality> findByCountryCode(String countryCode);
+  List<DiscoveredLocality> findByCountryCode(String countryCode);
 }

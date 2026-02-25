@@ -14,18 +14,18 @@ import org.locationtech.jts.geom.Polygon;
 @AllArgsConstructor
 @Builder
 public class Locality {
-	@Id
-	@GeneratedValue(strategy = GenerationType.IDENTITY)
-	private Long id;
+  @Id
+  @GeneratedValue(strategy = GenerationType.IDENTITY)
+  private Long id;
 
-	@Column(unique = true, nullable = false)
-	private String hashtag;
+  @Column(unique = true, nullable = false)
+  private String hashtag;
 
-	@Column(nullable = false, columnDefinition = "geometry(Polygon,4326)")
-	private Polygon geoBoundary;
+  @Column(nullable = false, columnDefinition = "geometry(Polygon,4326)")
+  private Polygon geoBoundary;
 
-	@Column(nullable = false)
-	private String name;
+  @Column(nullable = false)
+  private String name;
 
-	// parent not required in v1
+  // parent not required in v1
 }

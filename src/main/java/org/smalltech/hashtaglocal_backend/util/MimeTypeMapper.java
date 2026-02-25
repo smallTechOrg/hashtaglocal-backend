@@ -7,12 +7,13 @@ import lombok.experimental.UtilityClass;
 @UtilityClass
 public class MimeTypeMapper {
 
-	private static final Map<String, String> MIME_TO_EXTENSION = Map.of("image/jpeg", "jpg", "image/png", "png");
+  private static final Map<String, String> MIME_TO_EXTENSION =
+      Map.of("image/jpeg", "jpg", "image/png", "png");
 
-	public static String toExtension(String contentType) {
-		if (contentType == null || contentType.isBlank()) {
-			return "bin";
-		}
-		return MIME_TO_EXTENSION.getOrDefault(contentType, "bin");
-	}
+  public static String toExtension(String contentType) {
+    if (contentType == null || contentType.isBlank()) {
+      return "bin";
+    }
+    return MIME_TO_EXTENSION.getOrDefault(contentType, "bin");
+  }
 }

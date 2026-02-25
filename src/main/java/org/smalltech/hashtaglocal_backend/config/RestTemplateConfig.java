@@ -7,17 +7,17 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.web.client.RestTemplate;
 
 /**
- * Configuration for RestTemplate bean used by discovery and import services.
- * Configured with generous timeouts for long-running queries (e.g., OSM
- * Overpass API).
+ * Configuration for RestTemplate bean used by discovery and import services. Configured with
+ * generous timeouts for long-running queries (e.g., OSM Overpass API).
  */
 @Configuration
 public class RestTemplateConfig {
 
-	@Bean
-	public RestTemplate restTemplate(RestTemplateBuilder builder) {
-		return builder.setConnectTimeout(Duration.ofSeconds(10)) // Connection timeout: 10 seconds
-				.setReadTimeout(Duration.ofSeconds(90)) // Read timeout: 90 seconds (for OSM queries)
-				.build();
-	}
+  @Bean
+  public RestTemplate restTemplate(RestTemplateBuilder builder) {
+    return builder
+        .setConnectTimeout(Duration.ofSeconds(10)) // Connection timeout: 10 seconds
+        .setReadTimeout(Duration.ofSeconds(90)) // Read timeout: 90 seconds (for OSM queries)
+        .build();
+  }
 }

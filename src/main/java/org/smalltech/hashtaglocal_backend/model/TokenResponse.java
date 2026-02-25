@@ -7,6 +7,6 @@ import lombok.*;
 @AllArgsConstructor
 @Builder
 public class TokenResponse {
-	private String value;
-	private long expiry;
+  private String value;
+  private long expiry;
 }

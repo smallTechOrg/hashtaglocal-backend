@@ -6,17 +6,17 @@ import lombok.Data;
 @Data
 public class BlrPagesResponse {
 
-	private boolean success;
+  private boolean success;
 
-	private Result result;
+  private Result result;
 
-	@Data
-	public static class Result {
+  @Data
+  public static class Result {
 
-		private List<BlrPagesIssueDTO> data;
+    private List<BlrPagesIssueDTO> data;
 
-		private String city;
+    private String city;
 
-		private String name;
-	}
+    private String name;
+  }
 }

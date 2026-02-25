@@ -9,11 +9,19 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface LocalityRepository extends JpaRepository<Locality, Long> {
-	Optional<Locality> findByHashtag(String hashtag);
+  Optional<Locality> findByHashtag(String hashtag);
 
-	@Query(value = "SELECT * FROM localities l WHERE ST_Contains(l.geo_boundary, ST_SetSRID(ST_MakePoint(:lng, :lat), ST_SRID(l.geo_boundary))) ORDER BY ST_Area(l.geo_boundary) ASC LIMIT 1", nativeQuery = true)
-	Optional<Locality> findContainingLocality(@Param("lat") double latitude, @Param("lng") double longitude);
+  @Query(
+      value =
+          "SELECT * FROM localities l WHERE ST_Contains(l.geo_boundary, ST_SetSRID(ST_MakePoint(:lng, :lat), ST_SRID(l.geo_boundary))) ORDER BY ST_Area(l.geo_boundary) ASC LIMIT 1",
+      nativeQuery = true)
+  Optional<Locality> findContainingLocality(
+      @Param("lat") double latitude, @Param("lng") double longitude);
 
-	@Query(value = "SELECT * FROM localities l ORDER BY ST_Distance(l.geo_boundary::geography, ST_SetSRID(ST_MakePoint(:lng, :lat), ST_SRID(l.geo_boundary))::geography) ASC LIMIT 1", nativeQuery = true)
-	Optional<Locality> findNearestLocality(@Param("lat") double latitude, @Param("lng") double longitude);
+  @Query(
+      value =
+          "SELECT * FROM localities l ORDER BY ST_Distance(l.geo_boundary::geography, ST_SetSRID(ST_MakePoint(:lng, :lat), ST_SRID(l.geo_boundary))::geography) ASC LIMIT 1",
+      nativeQuery = true)
+  Optional<Locality> findNearestLocality(
+      @Param("lat") double latitude, @Param("lng") double longitude);
 }

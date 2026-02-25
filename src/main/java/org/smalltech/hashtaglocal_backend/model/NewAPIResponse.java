@@ -8,5 +8,5 @@ import lombok.*;
 @Builder
 public class NewAPIResponse<T> {
 
-	private T data;
+  private T data;
 }

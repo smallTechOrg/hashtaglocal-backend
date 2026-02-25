@@ -5,24 +5,22 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/**
- * DTO for raw discovery from a single source.
- */
+/** DTO for raw discovery from a single source. */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
 public class RawDiscoveryDTO {
 
-	private String name;
+  private String name;
 
-	private String state;
+  private String state;
 
-	private String countryCode;
+  private String countryCode;
 
-	private String localityType;
+  private String localityType;
 
-	private String source;
+  private String source;
 
-	private String sourceMetadata;
+  private String sourceMetadata;
 }

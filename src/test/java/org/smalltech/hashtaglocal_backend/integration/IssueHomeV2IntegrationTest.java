@@ -16,26 +16,31 @@ import org.springframework.test.web.servlet.MockMvc;
 @ActiveProfiles("test")
 class IssueHomeV2IntegrationTest {
 
-	@Autowired
-	private MockMvc mockMvc;
+  @Autowired private MockMvc mockMvc;
 
-	@Test
-	void getIssuesNearby_shouldExecutePostGISQuery() throws Exception {
-		// This will actually execute the native PostGIS query against your local
-		// PostgreSQL
-		// It would have caught the @EntityGraph error immediately
-		mockMvc.perform(get("/api/v2/issues").param("lat", "26.9124").param("lng", "75.8073"))
-				.andExpect(status().isOk()).andExpect(jsonPath("$.data").exists())
-				.andExpect(jsonPath("$.data.issues").isArray());
-	}
+  @Test
+  void getIssuesNearby_shouldExecutePostGISQuery() throws Exception {
+    // This will actually execute the native PostGIS query against your local
+    // PostgreSQL
+    // It would have caught the @EntityGraph error immediately
+    mockMvc
+        .perform(get("/api/v2/issues").param("lat", "26.9124").param("lng", "75.8073"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data").exists())
+        .andExpect(jsonPath("$.data.issues").isArray());
+  }
 
-	@Test
-	void getIssuesNearby_shouldRequireLatParameter() throws Exception {
-		mockMvc.perform(get("/api/v2/issues").param("lng", "75.8073")).andExpect(status().isBadRequest());
-	}
+  @Test
+  void getIssuesNearby_shouldRequireLatParameter() throws Exception {
+    mockMvc
+        .perform(get("/api/v2/issues").param("lng", "75.8073"))
+        .andExpect(status().isBadRequest());
+  }
 
-	@Test
-	void getIssuesNearby_shouldRequireLngParameter() throws Exception {
-		mockMvc.perform(get("/api/v2/issues").param("lat", "26.9124")).andExpect(status().isBadRequest());
-	}
+  @Test
+  void getIssuesNearby_shouldRequireLngParameter() throws Exception {
+    mockMvc
+        .perform(get("/api/v2/issues").param("lat", "26.9124"))
+        .andExpect(status().isBadRequest());
+  }
 }

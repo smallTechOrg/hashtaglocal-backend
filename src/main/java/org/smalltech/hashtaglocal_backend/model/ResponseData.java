@@ -10,11 +10,11 @@ import lombok.*;
 @AllArgsConstructor
 @Builder
 public class ResponseData {
-	private Issue issue;
-	private List<Issue> issues;
-	private SignedUrlResponse mediaUrl;
-	private Long issueId;
-	private TokenResponse refreshToken;
-	private TokenResponse accessToken;
-	private UserProfileModel user;
+  private Issue issue;
+  private List<Issue> issues;
+  private SignedUrlResponse mediaUrl;
+  private Long issueId;
+  private TokenResponse refreshToken;
+  private TokenResponse accessToken;
+  private UserProfileModel user;
 }

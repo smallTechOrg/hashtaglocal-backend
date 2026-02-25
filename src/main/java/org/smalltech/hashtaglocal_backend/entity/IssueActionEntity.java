@@ -26,22 +26,22 @@ import org.smalltech.hashtaglocal_backend.model.IssueActionModel;
 @Builder
 public class IssueActionEntity {
 
-	@Id
-	@GeneratedValue(strategy = GenerationType.IDENTITY)
-	private Long id;
+  @Id
+  @GeneratedValue(strategy = GenerationType.IDENTITY)
+  private Long id;
 
-	@ManyToOne(fetch = FetchType.LAZY)
-	@JoinColumn(name = "issue_id")
-	private IssueEntity issueEntity;
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "issue_id")
+  private IssueEntity issueEntity;
 
-	@ManyToOne(fetch = FetchType.LAZY)
-	@JoinColumn(name = "user_id")
-	private UserEntity userEntity;
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "user_id")
+  private UserEntity userEntity;
 
-	@Enumerated(EnumType.STRING)
-	@Column(nullable = false, length = 100)
-	private IssueActionModel action;
+  @Enumerated(EnumType.STRING)
+  @Column(nullable = false, length = 100)
+  private IssueActionModel action;
 
-	@Column(nullable = false, updatable = false)
-	private LocalDateTime createdAt;
+  @Column(nullable = false, updatable = false)
+  private LocalDateTime createdAt;
 }

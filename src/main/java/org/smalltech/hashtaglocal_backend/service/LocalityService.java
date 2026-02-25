@@ -12,62 +12,62 @@ import org.smalltech.hashtaglocal_backend.repository.LocalityRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Service for managing locality operations.
- */
+/** Service for managing locality operations. */
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class LocalityService {
 
-	private final LocalityRepository localityRepository;
+  private final LocalityRepository localityRepository;
 
-	/**
-	 * Get all localities with their polygon boundaries. Returns data in GeoJSON
-	 * format compatible with Google Maps.
-	 *
-	 * @return List of localities with polygon data
-	 */
-	@Transactional(readOnly = true)
-	public List<LocalityDTO> getAllLocalitiesWithPolygons() {
-		log.info("Fetching all localities with polygons");
-		List<Locality> localities = localityRepository.findAll();
-		log.info("Found {} localities", localities.size());
+  /**
+   * Get all localities with their polygon boundaries. Returns data in GeoJSON format compatible
+   * with Google Maps.
+   *
+   * @return List of localities with polygon data
+   */
+  @Transactional(readOnly = true)
+  public List<LocalityDTO> getAllLocalitiesWithPolygons() {
+    log.info("Fetching all localities with polygons");
+    List<Locality> localities = localityRepository.findAll();
+    log.info("Found {} localities", localities.size());
 
-		return localities.stream().map(this::convertToDTO).collect(Collectors.toList());
-	}
+    return localities.stream().map(this::convertToDTO).collect(Collectors.toList());
+  }
 
-	/**
-	 * Convert Locality entity to LocalityDTO with GeoJSON polygon.
-	 */
-	private LocalityDTO convertToDTO(Locality locality) {
-		return LocalityDTO.builder().id(locality.getId()).hashtag(locality.getHashtag()).name(locality.getName())
-				.geoBoundary(convertPolygonToGeoJSON(locality.getGeoBoundary())).build();
-	}
+  /** Convert Locality entity to LocalityDTO with GeoJSON polygon. */
+  private LocalityDTO convertToDTO(Locality locality) {
+    return LocalityDTO.builder()
+        .id(locality.getId())
+        .hashtag(locality.getHashtag())
+        .name(locality.getName())
+        .geoBoundary(convertPolygonToGeoJSON(locality.getGeoBoundary()))
+        .build();
+  }
 
-	/**
-	 * Convert JTS Polygon to GeoJSON format. GeoJSON uses [longitude, latitude]
-	 * order (opposite of typical lat/lng).
-	 */
-	private LocalityDTO.PolygonDTO convertPolygonToGeoJSON(Polygon polygon) {
-		if (polygon == null) {
-			return null;
-		}
+  /**
+   * Convert JTS Polygon to GeoJSON format. GeoJSON uses [longitude, latitude] order (opposite of
+   * typical lat/lng).
+   */
+  private LocalityDTO.PolygonDTO convertPolygonToGeoJSON(Polygon polygon) {
+    if (polygon == null) {
+      return null;
+    }
 
-		// Extract exterior ring coordinates
-		Coordinate[] coordinates = polygon.getExteriorRing().getCoordinates();
+    // Extract exterior ring coordinates
+    Coordinate[] coordinates = polygon.getExteriorRing().getCoordinates();
 
-		// Convert to GeoJSON format: [[[lng, lat], [lng, lat], ...]]
-		double[][] ring = new double[coordinates.length][2];
-		for (int i = 0; i < coordinates.length; i++) {
-			ring[i][0] = coordinates[i].x; // longitude
-			ring[i][1] = coordinates[i].y; // latitude
-		}
+    // Convert to GeoJSON format: [[[lng, lat], [lng, lat], ...]]
+    double[][] ring = new double[coordinates.length][2];
+    for (int i = 0; i < coordinates.length; i++) {
+      ring[i][0] = coordinates[i].x; // longitude
+      ring[i][1] = coordinates[i].y; // latitude
+    }
 
-		// GeoJSON Polygon structure: array of rings (first is exterior, rest are holes)
-		double[][][] geoJsonCoordinates = new double[1][][];
-		geoJsonCoordinates[0] = ring;
+    // GeoJSON Polygon structure: array of rings (first is exterior, rest are holes)
+    double[][][] geoJsonCoordinates = new double[1][][];
+    geoJsonCoordinates[0] = ring;
 
-		return LocalityDTO.PolygonDTO.builder().type("Polygon").coordinates(geoJsonCoordinates).build();
-	}
+    return LocalityDTO.PolygonDTO.builder().type("Polygon").coordinates(geoJsonCoordinates).build();
+  }
 }

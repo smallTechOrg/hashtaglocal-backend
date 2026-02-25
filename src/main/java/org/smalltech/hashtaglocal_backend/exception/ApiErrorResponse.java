@@ -8,19 +8,19 @@ import lombok.Data;
 @Builder
 public class ApiErrorResponse {
 
-	private ErrorEnvelope error;
+  private ErrorEnvelope error;
 
-	@Data
-	@Builder
-	public static class ErrorEnvelope {
-		private String message;
-		private List<ApiError> errors;
-	}
+  @Data
+  @Builder
+  public static class ErrorEnvelope {
+    private String message;
+    private List<ApiError> errors;
+  }
 
-	@Data
-	@Builder
-	public static class ApiError {
-		private String type; // VALIDATION, AUTH, PERMISSION, GEO, etc.
-		private String message; // human readable
-	}
+  @Data
+  @Builder
+  public static class ApiError {
+    private String type; // VALIDATION, AUTH, PERMISSION, GEO, etc.
+    private String message; // human readable
+  }
 }

@@ -17,16 +17,18 @@ import org.springframework.web.bind.annotation.RestController;
 @Tag(name = "Media", description = "Media upload and signed URL APIs")
 public class MediaController {
 
-	private final MediaService mediaService;
+  private final MediaService mediaService;
 
-	public MediaController(MediaService mediaService) {
-		this.mediaService = mediaService;
-	}
+  public MediaController(MediaService mediaService) {
+    this.mediaService = mediaService;
+  }
 
-	@GetMapping("/upload-url")
-	public NewAPIResponse<MediaUploadResponseData> getSignedUrl(@RequestParam("content_type") String contentType) {
-		var mediaUrl = mediaService.generateUploadUrl(contentType);
-		return NewAPIResponse.<MediaUploadResponseData>builder()
-				.data(MediaUploadResponseData.builder().mediaUrl(mediaUrl).build()).build();
-	}
+  @GetMapping("/upload-url")
+  public NewAPIResponse<MediaUploadResponseData> getSignedUrl(
+      @RequestParam("content_type") String contentType) {
+    var mediaUrl = mediaService.generateUploadUrl(contentType);
+    return NewAPIResponse.<MediaUploadResponseData>builder()
+        .data(MediaUploadResponseData.builder().mediaUrl(mediaUrl).build())
+        .build();
+  }
 }

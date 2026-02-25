@@ -11,7 +11,7 @@ import lombok.NoArgsConstructor;
 @Builder
 public class UserProfileModel {
 
-	private String username;
-	private String picture;
-	private String hashtag;
+  private String username;
+  private String picture;
+  private String hashtag;
 }

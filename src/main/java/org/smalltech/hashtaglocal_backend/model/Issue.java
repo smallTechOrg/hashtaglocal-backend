@@ -9,16 +9,16 @@ import lombok.*;
 @AllArgsConstructor
 @Builder
 public class Issue {
-	private Long id;
-	private User user;
-	private Location location;
-	private String type;
-	private String description;
-	private LocalDateTime createdAt;
-	private List<Media> mediaUrls;
-	private int voteCount;
-	private int verifyCount;
-	private String status;
-	private int rank;
-	private ViewerContext viewerContext;
+  private Long id;
+  private User user;
+  private Location location;
+  private String type;
+  private String description;
+  private LocalDateTime createdAt;
+  private List<Media> mediaUrls;
+  private int voteCount;
+  private int verifyCount;
+  private String status;
+  private int rank;
+  private ViewerContext viewerContext;
 }

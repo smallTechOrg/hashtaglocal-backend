@@ -8,9 +8,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/**
- * DTO for Google Maps Geocoding API response.
- */
+/** DTO for Google Maps Geocoding API response. */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -18,80 +16,80 @@ import lombok.NoArgsConstructor;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class GoogleMapsLocationDTO {
 
-	private List<Result> results;
+  private List<Result> results;
 
-	private String status;
+  private String status;
 
-	@Data
-	@NoArgsConstructor
-	@AllArgsConstructor
-	@Builder
-	@JsonIgnoreProperties(ignoreUnknown = true)
-	public static class Result {
+  @Data
+  @NoArgsConstructor
+  @AllArgsConstructor
+  @Builder
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  public static class Result {
 
-		@JsonProperty("formatted_address")
-		private String formattedAddress;
+    @JsonProperty("formatted_address")
+    private String formattedAddress;
 
-		private Geometry geometry;
+    private Geometry geometry;
 
-		@JsonProperty("place_id")
-		private String placeId;
+    @JsonProperty("place_id")
+    private String placeId;
 
-		private List<String> types;
+    private List<String> types;
 
-		@JsonProperty("address_components")
-		private List<AddressComponent> addressComponents;
-	}
+    @JsonProperty("address_components")
+    private List<AddressComponent> addressComponents;
+  }
 
-	@Data
-	@NoArgsConstructor
-	@AllArgsConstructor
-	@Builder
-	@JsonIgnoreProperties(ignoreUnknown = true)
-	public static class AddressComponent {
+  @Data
+  @NoArgsConstructor
+  @AllArgsConstructor
+  @Builder
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  public static class AddressComponent {
 
-		@JsonProperty("long_name")
-		private String longName;
+    @JsonProperty("long_name")
+    private String longName;
 
-		@JsonProperty("short_name")
-		private String shortName;
+    @JsonProperty("short_name")
+    private String shortName;
 
-		private List<String> types;
-	}
+    private List<String> types;
+  }
 
-	@Data
-	@NoArgsConstructor
-	@AllArgsConstructor
-	@Builder
-	@JsonIgnoreProperties(ignoreUnknown = true)
-	public static class Geometry {
+  @Data
+  @NoArgsConstructor
+  @AllArgsConstructor
+  @Builder
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  public static class Geometry {
 
-		private Location location;
+    private Location location;
 
-		private Viewport viewport;
-	}
+    private Viewport viewport;
+  }
 
-	@Data
-	@NoArgsConstructor
-	@AllArgsConstructor
-	@Builder
-	@JsonIgnoreProperties(ignoreUnknown = true)
-	public static class Viewport {
+  @Data
+  @NoArgsConstructor
+  @AllArgsConstructor
+  @Builder
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  public static class Viewport {
 
-		private Location northeast;
+    private Location northeast;
 
-		private Location southwest;
-	}
+    private Location southwest;
+  }
 
-	@Data
-	@NoArgsConstructor
-	@AllArgsConstructor
-	@Builder
-	@JsonIgnoreProperties(ignoreUnknown = true)
-	public static class Location {
+  @Data
+  @NoArgsConstructor
+  @AllArgsConstructor
+  @Builder
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  public static class Location {
 
-		private Double lat;
+    private Double lat;
 
-		private Double lng;
-	}
+    private Double lng;
+  }
 }

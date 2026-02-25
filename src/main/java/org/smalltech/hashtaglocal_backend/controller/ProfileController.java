@@ -17,66 +17,64 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/account/profile")
 public class ProfileController {
 
-	private final GetProfileService profileService;
+  private final GetProfileService profileService;
 
-	public ProfileController(GetProfileService profileService) {
-		this.profileService = profileService;
-	}
+  public ProfileController(GetProfileService profileService) {
+    this.profileService = profileService;
+  }
 
-	/**
-	 * Get authenticated user's own profile
-	 *
-	 * @param authorization
-	 *            The Authorization header with Bearer token
-	 * @param latitude
-	 *            Optional latitude for location-based hashtag resolution
-	 * @param longitude
-	 *            Optional longitude for location-based hashtag resolution
-	 * @return User's own profile information
-	 */
-	@GetMapping()
-	public ResponseEntity<NewAPIResponse<UserProfileResponseData>> getMyProfile(
-			@RequestHeader(value = "Authorization") String authorization,
-			@RequestParam(value = "lat", required = false) Double latitude,
-			@RequestParam(value = "lng", required = false) Double longitude) {
+  /**
+   * Get authenticated user's own profile
+   *
+   * @param authorization The Authorization header with Bearer token
+   * @param latitude Optional latitude for location-based hashtag resolution
+   * @param longitude Optional longitude for location-based hashtag resolution
+   * @return User's own profile information
+   */
+  @GetMapping()
+  public ResponseEntity<NewAPIResponse<UserProfileResponseData>> getMyProfile(
+      @RequestHeader(value = "Authorization") String authorization,
+      @RequestParam(value = "lat", required = false) Double latitude,
+      @RequestParam(value = "lng", required = false) Double longitude) {
 
-		System.out.println("➡️ /account/profile called");
-		System.out.println("Authorization header: " + authorization);
-		System.out.println("Latitude: " + latitude + ", Longitude: " + longitude);
+    System.out.println("➡️ /account/profile called");
+    System.out.println("Authorization header: " + authorization);
+    System.out.println("Latitude: " + latitude + ", Longitude: " + longitude);
 
-		String accessToken = extractBearerToken(authorization);
+    String accessToken = extractBearerToken(authorization);
 
-		if (accessToken == null) {
-			return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-					.body(NewAPIResponse.<UserProfileResponseData>builder().data(null).build());
-		}
+    if (accessToken == null) {
+      return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+          .body(NewAPIResponse.<UserProfileResponseData>builder().data(null).build());
+    }
 
-		Optional<UserProfileModel> profile = profileService.getMyProfile(accessToken, latitude, longitude);
+    Optional<UserProfileModel> profile =
+        profileService.getMyProfile(accessToken, latitude, longitude);
 
-		if (profile.isEmpty()) {
-			return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-					.body(NewAPIResponse.<UserProfileResponseData>builder().data(null).build());
-		}
+    if (profile.isEmpty()) {
+      return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+          .body(NewAPIResponse.<UserProfileResponseData>builder().data(null).build());
+    }
 
-		UserProfileResponseData responseData = UserProfileResponseData.builder().user(profile.get()).build();
+    UserProfileResponseData responseData =
+        UserProfileResponseData.builder().user(profile.get()).build();
 
-		NewAPIResponse<UserProfileResponseData> response = NewAPIResponse.<UserProfileResponseData>builder()
-				.data(responseData).build();
+    NewAPIResponse<UserProfileResponseData> response =
+        NewAPIResponse.<UserProfileResponseData>builder().data(responseData).build();
 
-		return ResponseEntity.ok(response);
-	}
+    return ResponseEntity.ok(response);
+  }
 
-	/**
-	 * Extract Bearer token from Authorization header
-	 *
-	 * @param authHeader
-	 *            The Authorization header value
-	 * @return The token string or null if not present
-	 */
-	private String extractBearerToken(String authHeader) {
-		if (authHeader != null && authHeader.startsWith("Bearer ")) {
-			return authHeader.substring("Bearer ".length());
-		}
-		return null;
-	}
+  /**
+   * Extract Bearer token from Authorization header
+   *
+   * @param authHeader The Authorization header value
+   * @return The token string or null if not present
+   */
+  private String extractBearerToken(String authHeader) {
+    if (authHeader != null && authHeader.startsWith("Bearer ")) {
+      return authHeader.substring("Bearer ".length());
+    }
+    return null;
+  }
 }

@@ -7,5 +7,6 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface UserAuthProviderRepository extends JpaRepository<UserAuthProviderEntity, Long> {
-	Optional<UserAuthProviderEntity> findByProviderTypeAndProviderUserId(String providerType, String providerUserId);
+  Optional<UserAuthProviderEntity> findByProviderTypeAndProviderUserId(
+      String providerType, String providerUserId);
 }

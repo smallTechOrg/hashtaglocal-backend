@@ -18,17 +18,20 @@ import org.springframework.web.bind.annotation.RestController;
 @Transactional(readOnly = true)
 public class IssueHomeV2Controller {
 
-	private final IssueHomeService issueHomeAssembler;
+  private final IssueHomeService issueHomeAssembler;
 
-	public IssueHomeV2Controller(IssueHomeService issueHomeAssembler) {
-		this.issueHomeAssembler = issueHomeAssembler;
-	}
+  public IssueHomeV2Controller(IssueHomeService issueHomeAssembler) {
+    this.issueHomeAssembler = issueHomeAssembler;
+  }
 
-	@GetMapping
-	@Operation(summary = "Get issue Home", description = "Returns a List of issues with user, location, locality and viewer context. Optionally filter by locality hashtag.")
-	public NewAPIResponse<IssueListResponseData> getIssuesNearby(@Valid LocationRequest locationRequest) {
+  @GetMapping
+  @Operation(
+      summary = "Get issue Home",
+      description =
+          "Returns a List of issues with user, location, locality and viewer context. Optionally filter by locality hashtag.")
+  public NewAPIResponse<IssueListResponseData> getIssuesNearby(
+      @Valid LocationRequest locationRequest) {
 
-		return issueHomeAssembler.getNearby(locationRequest.getLat(), locationRequest.getLng());
-	}
-
+    return issueHomeAssembler.getNearby(locationRequest.getLat(), locationRequest.getLng());
+  }
 }

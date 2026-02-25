@@ -12,75 +12,85 @@ import org.springframework.stereotype.Service;
 @Transactional
 public class AuthRefreshService {
 
-	private final UserAuthSessionRepository userAuthSessionRepository;
-	private final TokenService tokenService;
+  private final UserAuthSessionRepository userAuthSessionRepository;
+  private final TokenService tokenService;
 
-	public AuthRefreshService(UserAuthSessionRepository userAuthSessionRepository, TokenService tokenService) {
-		this.userAuthSessionRepository = userAuthSessionRepository;
-		this.tokenService = tokenService;
-	}
+  public AuthRefreshService(
+      UserAuthSessionRepository userAuthSessionRepository, TokenService tokenService) {
+    this.userAuthSessionRepository = userAuthSessionRepository;
+    this.tokenService = tokenService;
+  }
 
-	public AuthTokenResponseData refreshTokens(String refreshToken) {
+  public AuthTokenResponseData refreshTokens(String refreshToken) {
 
-		System.out.println("Attempting to refresh tokens");
+    System.out.println("Attempting to refresh tokens");
 
-		// Find the session by refresh token
-		Optional<UserAuthSessionEntity> sessionOpt = userAuthSessionRepository.findByRefreshToken(refreshToken);
+    // Find the session by refresh token
+    Optional<UserAuthSessionEntity> sessionOpt =
+        userAuthSessionRepository.findByRefreshToken(refreshToken);
 
-		if (sessionOpt.isEmpty()) {
-			System.out.println(" Refresh token not found");
-			throw new RuntimeException("Invalid refresh token");
-		}
+    if (sessionOpt.isEmpty()) {
+      System.out.println(" Refresh token not found");
+      throw new RuntimeException("Invalid refresh token");
+    }
 
-		UserAuthSessionEntity session = sessionOpt.get();
+    UserAuthSessionEntity session = sessionOpt.get();
 
-		// Check if session is active
-		if (!session.getIsActive()) {
-			System.out.println(" Session is inactive");
-			throw new RuntimeException("Session is inactive");
-		}
+    // Check if session is active
+    if (!session.getIsActive()) {
+      System.out.println(" Session is inactive");
+      throw new RuntimeException("Session is inactive");
+    }
 
-		long currentEpochSeconds = tokenService.nowEpochSeconds();
+    long currentEpochSeconds = tokenService.nowEpochSeconds();
 
-		// Check if refresh token is expired
-		if (session.getRefreshTokenExpiryTs() < currentEpochSeconds) {
-			System.out.println(" Refresh token expired");
-			throw new RuntimeException("Refresh token has expired");
-		}
+    // Check if refresh token is expired
+    if (session.getRefreshTokenExpiryTs() < currentEpochSeconds) {
+      System.out.println(" Refresh token expired");
+      throw new RuntimeException("Refresh token has expired");
+    }
 
-		System.out.println(" Valid refresh token found | Session ID: " + session.getId());
+    System.out.println(" Valid refresh token found | Session ID: " + session.getId());
 
-		// Check access token expiry
-		if (session.getAccessTokenExpiryTs() > currentEpochSeconds) {
-			System.out.println(" Access token is still active, returning existing tokens");
-			return AuthTokenResponseData.builder()
-					.accessToken(TokenResponse.builder().value(session.getAccessToken())
-							.expiry(session.getAccessTokenExpiryTs()).build())
-					.refreshToken(TokenResponse.builder().value(session.getRefreshToken())
-							.expiry(session.getRefreshTokenExpiryTs()).build())
-					.build();
-		}
+    // Check access token expiry
+    if (session.getAccessTokenExpiryTs() > currentEpochSeconds) {
+      System.out.println(" Access token is still active, returning existing tokens");
+      return AuthTokenResponseData.builder()
+          .accessToken(
+              TokenResponse.builder()
+                  .value(session.getAccessToken())
+                  .expiry(session.getAccessTokenExpiryTs())
+                  .build())
+          .refreshToken(
+              TokenResponse.builder()
+                  .value(session.getRefreshToken())
+                  .expiry(session.getRefreshTokenExpiryTs())
+                  .build())
+          .build();
+    }
 
-		// Generate new tokens
-		String newAccessToken = tokenService.generateToken();
-		String newRefreshToken = tokenService.generateToken();
+    // Generate new tokens
+    String newAccessToken = tokenService.generateToken();
+    String newRefreshToken = tokenService.generateToken();
 
-		long newAccessTokenExpiry = tokenService.accessExpiryEpochSeconds();
-		long newRefreshTokenExpiry = tokenService.refreshExpiryEpochSeconds();
+    long newAccessTokenExpiry = tokenService.accessExpiryEpochSeconds();
+    long newRefreshTokenExpiry = tokenService.refreshExpiryEpochSeconds();
 
-		// Update session with new tokens
-		session.setAccessToken(newAccessToken);
-		session.setAccessTokenExpiryTs(newAccessTokenExpiry);
-		session.setRefreshToken(newRefreshToken);
-		session.setRefreshTokenExpiryTs(newRefreshTokenExpiry);
+    // Update session with new tokens
+    session.setAccessToken(newAccessToken);
+    session.setAccessTokenExpiryTs(newAccessTokenExpiry);
+    session.setRefreshToken(newRefreshToken);
+    session.setRefreshTokenExpiryTs(newRefreshTokenExpiry);
 
-		userAuthSessionRepository.save(session);
+    userAuthSessionRepository.save(session);
 
-		System.out.println("Tokens refreshed | Session ID: " + session.getId());
+    System.out.println("Tokens refreshed | Session ID: " + session.getId());
 
-		return AuthTokenResponseData.builder()
-				.accessToken(TokenResponse.builder().value(newAccessToken).expiry(newAccessTokenExpiry).build())
-				.refreshToken(TokenResponse.builder().value(newRefreshToken).expiry(newRefreshTokenExpiry).build())
-				.build();
-	}
+    return AuthTokenResponseData.builder()
+        .accessToken(
+            TokenResponse.builder().value(newAccessToken).expiry(newAccessTokenExpiry).build())
+        .refreshToken(
+            TokenResponse.builder().value(newRefreshToken).expiry(newRefreshTokenExpiry).build())
+        .build();
+  }
 }

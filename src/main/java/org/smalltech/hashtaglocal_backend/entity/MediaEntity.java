@@ -26,33 +26,33 @@ import org.smalltech.hashtaglocal_backend.model.MediaTypeModel;
 @Builder
 public class MediaEntity {
 
-	@Id
-	@GeneratedValue(strategy = GenerationType.IDENTITY)
-	private Long id;
+  @Id
+  @GeneratedValue(strategy = GenerationType.IDENTITY)
+  private Long id;
 
-	// Media belongs to an Issue
-	@ManyToOne(fetch = FetchType.LAZY)
-	@JoinColumn(name = "issue_id", nullable = false)
-	private IssueEntity issue;
+  // Media belongs to an Issue
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "issue_id", nullable = false)
+  private IssueEntity issue;
 
-	@Enumerated(EnumType.STRING)
-	@Column(nullable = false, length = 20)
-	private MediaTypeModel type;
+  @Enumerated(EnumType.STRING)
+  @Column(nullable = false, length = 20)
+  private MediaTypeModel type;
 
-	@Column(nullable = false, length = 5000)
-	private String url;
+  @Column(nullable = false, length = 5000)
+  private String url;
 
-	@ManyToOne(fetch = FetchType.LAZY)
-	@JoinColumn(name = "location_id")
-	private Location location;
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "location_id")
+  private Location location;
 
-	@ManyToOne(fetch = FetchType.LAZY)
-	@JoinColumn(name = "user_id")
-	private UserEntity user;
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "user_id")
+  private UserEntity user;
 
-	@Column(length = 500)
-	private String description;
+  @Column(length = 500)
+  private String description;
 
-	@Column(nullable = false, updatable = false)
-	private LocalDateTime createdAt;
+  @Column(nullable = false, updatable = false)
+  private LocalDateTime createdAt;
 }

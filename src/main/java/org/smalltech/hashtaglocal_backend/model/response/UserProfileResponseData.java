@@ -7,5 +7,5 @@ import org.smalltech.hashtaglocal_backend.model.UserProfileModel;
 @Data
 @Builder
 public class UserProfileResponseData {
-	private UserProfileModel user;
+  private UserProfileModel user;
 }
