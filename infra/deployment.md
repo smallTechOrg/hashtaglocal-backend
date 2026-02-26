@@ -291,6 +291,9 @@ gcloud compute scp build/libs/hashtaglocal-backend-0.0.1-SNAPSHOT.jar ai-agent-s
 
 gcloud compute ssh ai-agent-staging --zone=us-central1-c --command="sudo mv /tmp/hashtaglocal-backend.jar /opt/hashtaglocal-backend/hashtaglocal-backend.jar && sudo systemctl restart hashtaglocal-backend" 
 
+gcloud compute ssh ai-agent-staging --zone=us-central1-c \
+  --command="sudo journalctl -u hashtaglocal-backend -f"
+
 gcloud compute scp gcs-key.json \
   ai-agent-staging:/tmp/gcs-key.json \
   --zone=us-central1-c

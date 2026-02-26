@@ -5,6 +5,7 @@ import java.util.Locale;
 import lombok.RequiredArgsConstructor;
 import org.smalltech.hashtaglocal_backend.config.CustomProperties;
 import org.smalltech.hashtaglocal_backend.entity.IssueActionEntity;
+import org.smalltech.hashtaglocal_backend.model.IssueActionApprovalStatus;
 import org.smalltech.hashtaglocal_backend.model.IssueActionModel;
 import org.smalltech.hashtaglocal_backend.model.IssueStatusModel;
 import org.smalltech.hashtaglocal_backend.model.request.IssueVerifyRequest;
@@ -65,6 +66,11 @@ public class IssueActionService {
                     new ResponseStatusException(
                         HttpStatus.INTERNAL_SERVER_ERROR, "User not found"));
 
+    // APPROVE is reserved for the admin endpoint — block public callers
+    if (issueActionModel == IssueActionModel.APPROVE) {
+      throw new ResponseStatusException(HttpStatus.FORBIDDEN, "APPROVE is an admin-only action");
+    }
+
     // Reject issue: only owner can reject
     if (issueActionModel == IssueActionModel.REJECT) {
       Long ownerId =
@@ -76,80 +82,109 @@ public class IssueActionService {
       }
     }
 
-    // Enforce geo-fence for VERIFY / RESOLVE
+    // Enforce geo-fence for VERIFY / RESOLVE (geo-fence is skipped when media location is
+    // absent, preserving backward compatibility with clients that do not send coordinates).
     if (issueActionModel == IssueActionModel.VERIFY
         || issueActionModel == IssueActionModel.RESOLVE) {
 
       var mediaUrls = request.getIssueAction().getMediaUrls();
 
+      // Geo-fence: only enforced when at least one media item carries a location.
+      if (mediaUrls != null && !mediaUrls.isEmpty()) {
+        var firstLocation = mediaUrls.get(0).getLocation();
+        if (firstLocation != null
+            && firstLocation.getLat() != null
+            && firstLocation.getLng() != null) {
+          geoFenceService.assertWithinRadius(
+              issueEntity.getLocation(),
+              firstLocation.getLat(),
+              firstLocation.getLng(),
+              appProperties.getGeo().getVerifyRadiusMeters());
+        }
+      }
+
+      // Create one action per media item (media_urls is optional — old clients may omit it).
+      if (mediaUrls != null) {
+        for (var mediaRequest : mediaUrls) {
+
+          var mediaLocReq = mediaRequest.getLocation();
+
+          var mediaLocation =
+              mediaLocReq != null && mediaLocReq.getLat() != null && mediaLocReq.getLng() != null
+                  ? locationService.createAndSaveLocation(
+                      mediaLocReq.getLat(),
+                      mediaLocReq.getLng(),
+                      mediaLocReq.getMetaData(),
+                      "Unknown")
+                  : null;
+
+          // Media submitted as part of a VERIFY/RESOLVE action; visibility is controlled
+          // by the parent action's approvalStatus (starts as PENDING until admin approves).
+          var mediaEntity =
+              org.smalltech.hashtaglocal_backend.entity.MediaEntity.builder()
+                  .type(EnumParsers.parseMediaType(mediaRequest.getType()))
+                  .url(mediaRequest.getUrl())
+                  .description(mediaRequest.getDescription())
+                  .location(mediaLocation)
+                  .createdAt(LocalDateTime.now())
+                  .build();
+
+          var savedMedia = mediaRepository.save(mediaEntity);
+
+          IssueActionEntity actionEntity =
+              IssueActionEntity.builder()
+                  .issueEntity(issueEntity)
+                  .userEntity(userEntity)
+                  .action(issueActionModel)
+                  .approvalStatus(IssueActionApprovalStatus.PENDING)
+                  .media(savedMedia)
+                  .createdAt(LocalDateTime.now())
+                  .build();
+          issueActionRepository.save(actionEntity);
+        }
+      }
+
+      // If no media was submitted at all, still record the action (no media link).
       if (mediaUrls == null || mediaUrls.isEmpty()) {
-        throw new ResponseStatusException(
-            HttpStatus.BAD_REQUEST,
-            "At least one media with location is required to verify or resolve an issue");
-      }
-
-      var actionLocation = mediaUrls.get(0).getLocation();
-      if (actionLocation == null
-          || actionLocation.getLat() == null
-          || actionLocation.getLng() == null) {
-        throw new ResponseStatusException(
-            HttpStatus.BAD_REQUEST,
-            "Location (lat, lng) is required to verify or resolve an issue");
-      }
-
-      geoFenceService.assertWithinRadius(
-          issueEntity.getLocation(),
-          actionLocation.getLat(),
-          actionLocation.getLng(),
-          appProperties.getGeo().getVerifyRadiusMeters());
-
-      // Process media URLs if provided
-      for (var mediaRequest : mediaUrls) {
-
-        var mediaLocReq = mediaRequest.getLocation();
-
-        var mediaLocation =
-            locationService.createAndSaveLocation(
-                mediaLocReq.getLat(), mediaLocReq.getLng(), mediaLocReq.getMetaData(), "Unknown");
-
-        var mediaEntity =
-            org.smalltech.hashtaglocal_backend.entity.MediaEntity.builder()
-                .issue(issueEntity)
-                .type(EnumParsers.parseMediaType(mediaRequest.getType()))
-                .url(mediaRequest.getUrl())
-                .user(userEntity)
-                .description(mediaRequest.getDescription())
-                .location(mediaLocation)
+        IssueActionEntity actionEntity =
+            IssueActionEntity.builder()
+                .issueEntity(issueEntity)
+                .userEntity(userEntity)
+                .action(issueActionModel)
+                .approvalStatus(IssueActionApprovalStatus.PENDING)
                 .createdAt(LocalDateTime.now())
                 .build();
-
-        mediaRepository.save(mediaEntity);
+        issueActionRepository.save(actionEntity);
       }
+    } else {
+      // Non-media actions (REJECT, UPDATE): single action, no media
+      IssueActionApprovalStatus approvalStatus =
+          (issueActionModel == IssueActionModel.REJECT
+                  || issueActionModel == IssueActionModel.UPDATE)
+              ? IssueActionApprovalStatus.NOT_REQUIRED
+              : IssueActionApprovalStatus.PENDING;
+
+      IssueActionEntity issueActionEntity =
+          IssueActionEntity.builder()
+              .issueEntity(issueEntity)
+              .userEntity(userEntity)
+              .action(issueActionModel)
+              .approvalStatus(approvalStatus)
+              .createdAt(LocalDateTime.now())
+              .build();
+      issueActionRepository.save(issueActionEntity);
     }
 
-    // Save issue action record
-    IssueActionEntity issueActionEntity =
-        IssueActionEntity.builder()
-            .issueEntity(issueEntity)
-            .userEntity(userEntity)
-            .action(issueActionModel)
-            .createdAt(LocalDateTime.now())
-            .build();
-
-    issueActionRepository.save(issueActionEntity);
-
     // Action-based status update
+    // REJECT: owner withdraws the issue immediately
+    // RESOLVE: sets PENDING so admin sees it in the approval queue
+    // VERIFY: no status change — status is driven entirely by admin REPORT approval
     if (issueActionModel == IssueActionModel.REJECT) {
       issueEntity.setStatus(IssueStatusModel.REJECTED);
 
-    } else if (!IssueStatusModel.ONHOLD.equals(issueEntity.getStatus())) {
-
-      if (issueActionModel == IssueActionModel.VERIFY) {
-        issueEntity.setStatus(IssueStatusModel.OPEN);
-
-      } else if (issueActionModel == IssueActionModel.RESOLVE) {
-        issueEntity.setStatus(IssueStatusModel.PENDING);
-      }
+    } else if (issueActionModel == IssueActionModel.RESOLVE
+        && !IssueStatusModel.ONHOLD.equals(issueEntity.getStatus())) {
+      issueEntity.setStatus(IssueStatusModel.PENDING);
     }
 
     issueEntity.setUpdatedAt(LocalDateTime.now());

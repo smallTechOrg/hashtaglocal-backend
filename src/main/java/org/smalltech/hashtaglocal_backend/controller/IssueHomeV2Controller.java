@@ -7,6 +7,7 @@ import org.smalltech.hashtaglocal_backend.model.NewAPIResponse;
 import org.smalltech.hashtaglocal_backend.model.request.LocationRequest;
 import org.smalltech.hashtaglocal_backend.model.response.IssueListResponseData;
 import org.smalltech.hashtaglocal_backend.service.IssueHomeService;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -30,8 +31,9 @@ public class IssueHomeV2Controller {
       description =
           "Returns a List of issues with user, location, locality and viewer context. Optionally filter by locality hashtag.")
   public NewAPIResponse<IssueListResponseData> getIssuesNearby(
-      @Valid LocationRequest locationRequest) {
+      @AuthenticationPrincipal Long viewerUserId, @Valid LocationRequest locationRequest) {
 
-    return issueHomeAssembler.getNearby(locationRequest.getLat(), locationRequest.getLng());
+    return issueHomeAssembler.getNearby(
+        locationRequest.getLat(), locationRequest.getLng(), viewerUserId);
   }
 }

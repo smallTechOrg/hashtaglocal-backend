@@ -46,11 +46,14 @@ public class IssueController {
   @GetMapping("/issue/{issueId}")
   @Operation(
       summary = "Get issue",
-      description = "Returns a issue response with user, location, locality and viewer context.")
-  public ResponseEntity<NewAPIResponse<IssueResponseData>> getIssue(@PathVariable Long issueId) {
-    var issueEntity = issueQueryService.get(issueId);
+      description =
+          "Returns an issue with user, location, locality and viewer context. ONHOLD issues are"
+              + " only returned to the issue owner; all other callers receive 404.")
+  public ResponseEntity<NewAPIResponse<IssueResponseData>> getIssue(
+      @PathVariable Long issueId, @AuthenticationPrincipal Long viewerUserId) {
+    var issueEntity = issueQueryService.get(issueId, viewerUserId);
 
-    IssueResponseData issueResponse = issueViewMapper.map(issueEntity);
+    IssueResponseData issueResponse = issueViewMapper.map(issueEntity, viewerUserId);
 
     return ResponseEntity.ok(
         NewAPIResponse.<IssueResponseData>builder().data(issueResponse).build());
@@ -95,8 +98,9 @@ public class IssueController {
       description =
           "Returns a List of issues with user, location, locality and viewer context. Optionally filter by locality hashtag.")
   public NewAPIResponse<IssueListResponseData> getIssues(
+      @AuthenticationPrincipal Long viewerUserId,
       @RequestParam(value = "locality", required = false) String localityHashtag) {
-    return issueHomeAssembler.getHome(localityHashtag);
+    return issueHomeAssembler.getHome(localityHashtag, viewerUserId);
   }
 
   @PostMapping("/issue")

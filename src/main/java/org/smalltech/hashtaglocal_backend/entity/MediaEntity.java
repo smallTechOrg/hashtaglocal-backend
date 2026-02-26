@@ -18,6 +18,11 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.smalltech.hashtaglocal_backend.model.MediaTypeModel;
 
+/**
+ * A single media item (photo / video). Media has no direct link to an issue or user — those
+ * relationships are derived through the owning {@link IssueActionEntity} (action → issue, action →
+ * user).
+ */
 @Entity
 @Table(name = "media")
 @Data
@@ -30,11 +35,6 @@ public class MediaEntity {
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;
 
-  // Media belongs to an Issue
-  @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "issue_id", nullable = false)
-  private IssueEntity issue;
-
   @Enumerated(EnumType.STRING)
   @Column(nullable = false, length = 20)
   private MediaTypeModel type;
@@ -45,10 +45,6 @@ public class MediaEntity {
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "location_id")
   private Location location;
-
-  @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "user_id")
-  private UserEntity user;
 
   @Column(length = 500)
   private String description;

@@ -2,6 +2,8 @@ package org.smalltech.hashtaglocal_backend.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -16,6 +18,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.smalltech.hashtaglocal_backend.model.UserRole;
 
 @Entity
 @Table(name = "users")
@@ -34,6 +37,12 @@ public class UserEntity {
   private String username;
 
   private String profilePicture;
+
+  /** The role of this user. Defaults to {@code USER}; set to {@code ADMIN} for administrators. */
+  @Enumerated(EnumType.STRING)
+  @Column(nullable = false, length = 20)
+  @Builder.Default
+  private UserRole role = UserRole.USER;
 
   @Column(nullable = false, length = 100)
   private String locale;

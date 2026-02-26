@@ -9,14 +9,18 @@ import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.Point;
 import org.locationtech.jts.geom.Polygon;
+import org.smalltech.hashtaglocal_backend.entity.IssueActionEntity;
 import org.smalltech.hashtaglocal_backend.entity.IssueEntity;
 import org.smalltech.hashtaglocal_backend.entity.Locality;
 import org.smalltech.hashtaglocal_backend.entity.Location;
 import org.smalltech.hashtaglocal_backend.entity.MediaEntity;
 import org.smalltech.hashtaglocal_backend.entity.UserEntity;
+import org.smalltech.hashtaglocal_backend.model.IssueActionApprovalStatus;
+import org.smalltech.hashtaglocal_backend.model.IssueActionModel;
 import org.smalltech.hashtaglocal_backend.model.IssueStatusModel;
 import org.smalltech.hashtaglocal_backend.model.IssueTypeModel;
 import org.smalltech.hashtaglocal_backend.model.MediaTypeModel;
+import org.smalltech.hashtaglocal_backend.repository.IssueActionRepository;
 import org.smalltech.hashtaglocal_backend.repository.IssueRepository;
 import org.smalltech.hashtaglocal_backend.repository.LocalityRepository;
 import org.smalltech.hashtaglocal_backend.repository.LocationRepository;
@@ -30,6 +34,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class IssueTestDataConfig implements CommandLineRunner {
 
   private final IssueRepository issueRepository;
+  private final IssueActionRepository issueActionRepository;
   private final UserRepository userRepository;
   private final LocalityRepository localityRepository;
   private final LocationRepository locationRepository;
@@ -37,11 +42,13 @@ public class IssueTestDataConfig implements CommandLineRunner {
 
   public IssueTestDataConfig(
       IssueRepository issueRepository,
+      IssueActionRepository issueActionRepository,
       UserRepository userRepository,
       LocalityRepository localityRepository,
       LocationRepository locationRepository,
       MediaRepository mediaRepository) {
     this.issueRepository = issueRepository;
+    this.issueActionRepository = issueActionRepository;
     this.userRepository = userRepository;
     this.localityRepository = localityRepository;
     this.locationRepository = locationRepository;
@@ -140,26 +147,42 @@ public class IssueTestDataConfig implements CommandLineRunner {
               .build();
       issue1 = issueRepository.save(issue1);
 
-      // Create media for issue 1
+      // Create media for issue 1 (through REPORT actions)
       MediaEntity media1 =
           MediaEntity.builder()
-              .issue(issue1)
               .type(MediaTypeModel.PHOTO)
               .url("https://sripath.com/wp-content/uploads/2025/01/iStock-174662203.jpg")
               .location(location)
               .createdAt(LocalDateTime.now())
               .build();
-      mediaRepository.save(media1);
+      media1 = mediaRepository.save(media1);
+      issueActionRepository.save(
+          IssueActionEntity.builder()
+              .issueEntity(issue1)
+              .userEntity(user)
+              .action(IssueActionModel.REPORT)
+              .approvalStatus(IssueActionApprovalStatus.NOT_REQUIRED)
+              .media(media1)
+              .createdAt(issue1.getCreatedAt())
+              .build());
 
       MediaEntity media2 =
           MediaEntity.builder()
-              .issue(issue1)
               .type(MediaTypeModel.PHOTO)
               .url("https://nub.news/api/image/526263/article.png")
               .location(location)
               .createdAt(LocalDateTime.now())
               .build();
-      mediaRepository.save(media2);
+      media2 = mediaRepository.save(media2);
+      issueActionRepository.save(
+          IssueActionEntity.builder()
+              .issueEntity(issue1)
+              .userEntity(user)
+              .action(IssueActionModel.REPORT)
+              .approvalStatus(IssueActionApprovalStatus.NOT_REQUIRED)
+              .media(media2)
+              .createdAt(issue1.getCreatedAt())
+              .build());
 
       // Create issue 2 - newer issue (world)
       IssueEntity issue2 =
@@ -175,26 +198,42 @@ public class IssueTestDataConfig implements CommandLineRunner {
               .build();
       issue2 = issueRepository.save(issue2);
 
-      // Create media for issue 2
+      // Create media for issue 2 (through REPORT actions)
       MediaEntity media3 =
           MediaEntity.builder()
-              .issue(issue2)
               .type(MediaTypeModel.PHOTO)
               .url("https://sripath.com/wp-content/uploads/2025/01/iStock-174662203.jpg")
               .location(location)
               .createdAt(LocalDateTime.now())
               .build();
-      mediaRepository.save(media3);
+      media3 = mediaRepository.save(media3);
+      issueActionRepository.save(
+          IssueActionEntity.builder()
+              .issueEntity(issue2)
+              .userEntity(user)
+              .action(IssueActionModel.REPORT)
+              .approvalStatus(IssueActionApprovalStatus.NOT_REQUIRED)
+              .media(media3)
+              .createdAt(issue2.getCreatedAt())
+              .build());
 
       MediaEntity media4 =
           MediaEntity.builder()
-              .issue(issue2)
               .type(MediaTypeModel.PHOTO)
               .url("https://nub.news/api/image/526263/article.png")
               .location(location)
               .createdAt(LocalDateTime.now())
               .build();
-      mediaRepository.save(media4);
+      media4 = mediaRepository.save(media4);
+      issueActionRepository.save(
+          IssueActionEntity.builder()
+              .issueEntity(issue2)
+              .userEntity(user)
+              .action(IssueActionModel.REPORT)
+              .approvalStatus(IssueActionApprovalStatus.NOT_REQUIRED)
+              .media(media4)
+              .createdAt(issue2.getCreatedAt())
+              .build());
 
       // Create issue 3 - ONHOLD issue (world, newest)
       IssueEntity issue3 =
@@ -213,13 +252,21 @@ public class IssueTestDataConfig implements CommandLineRunner {
       // Create media for issue 3
       MediaEntity media5 =
           MediaEntity.builder()
-              .issue(issue3)
               .type(MediaTypeModel.PHOTO)
               .url("https://example.com/waste-photo.jpg")
               .location(location)
               .createdAt(LocalDateTime.now())
               .build();
-      mediaRepository.save(media5);
+      media5 = mediaRepository.save(media5);
+      issueActionRepository.save(
+          IssueActionEntity.builder()
+              .issueEntity(issue3)
+              .userEntity(user)
+              .action(IssueActionModel.REPORT)
+              .approvalStatus(IssueActionApprovalStatus.NOT_REQUIRED)
+              .media(media5)
+              .createdAt(issue3.getCreatedAt())
+              .build());
 
       // Create issue 4 - Jaipur locality
       IssueEntity jaipurIssue =
@@ -237,13 +284,21 @@ public class IssueTestDataConfig implements CommandLineRunner {
 
       MediaEntity jaipurMedia =
           MediaEntity.builder()
-              .issue(jaipurIssue)
               .type(MediaTypeModel.PHOTO)
               .url("https://example.com/jaipur-pothole.jpg")
               .location(jaipurLocation)
               .createdAt(LocalDateTime.now())
               .build();
-      mediaRepository.save(jaipurMedia);
+      jaipurMedia = mediaRepository.save(jaipurMedia);
+      issueActionRepository.save(
+          IssueActionEntity.builder()
+              .issueEntity(jaipurIssue)
+              .userEntity(user)
+              .action(IssueActionModel.REPORT)
+              .approvalStatus(IssueActionApprovalStatus.NOT_REQUIRED)
+              .media(jaipurMedia)
+              .createdAt(jaipurIssue.getCreatedAt())
+              .build());
     }
   }
 }

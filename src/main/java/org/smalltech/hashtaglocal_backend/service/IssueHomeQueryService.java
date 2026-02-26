@@ -16,35 +16,48 @@ public class IssueHomeQueryService {
 
   private final IssueRepository issueRepository;
 
-  public List<IssueEntity> findRecentIssues(String localityHashtag) {
+  /**
+   * Fetches recent issues for the feed. ONHOLD issues are included only when they belong to the
+   * authenticated viewer (so the reporter can see their own pending issues).
+   *
+   * @param localityHashtag optional locality filter
+   * @param viewerUserId authenticated viewer's user ID, or {@code null} for anonymous callers
+   */
+  public List<IssueEntity> findRecentIssues(String localityHashtag, Long viewerUserId) {
     LocalDateTime since = LocalDateTime.now().minusMonths(6);
+    Long safeUserId = viewerUserId != null ? viewerUserId : -1L;
 
     List<IssueStatusModel> statuses =
-        List.of(
-            IssueStatusModel.OPEN,
-            IssueStatusModel.ONHOLD,
-            IssueStatusModel.PENDING,
-            IssueStatusModel.RESOLVED);
+        List.of(IssueStatusModel.OPEN, IssueStatusModel.PENDING, IssueStatusModel.RESOLVED);
 
     if (localityHashtag != null && !localityHashtag.isBlank()) {
-      return issueRepository.findByStatusInAndCreatedAtAfterAndLocalityHashtagOrderByCreatedAtDesc(
-          statuses, since, localityHashtag);
+      return issueRepository
+          .findByStatusInOrOnholdOwnedAndCreatedAtAfterAndLocalityHashtagOrderByCreatedAtDesc(
+              statuses, safeUserId, since, localityHashtag);
     }
 
-    return issueRepository.findByStatusInAndCreatedAtAfterOrderByCreatedAtDesc(statuses, since);
+    return issueRepository.findByStatusInOrOnholdOwnedAndCreatedAtAfterOrderByCreatedAtDesc(
+        statuses, safeUserId, since);
   }
 
-  public List<IssueEntity> findNearbyIssues(double lat, double lng, double radiusMeters) {
+  /**
+   * Fetches nearby issues for the map. ONHOLD issues are included only when they belong to the
+   * authenticated viewer.
+   *
+   * @param viewerUserId authenticated viewer's user ID, or {@code null} for anonymous callers
+   */
+  public List<IssueEntity> findNearbyIssues(
+      double lat, double lng, double radiusMeters, Long viewerUserId) {
     LocalDateTime since = LocalDateTime.now().minusMonths(6);
+    Long safeUserId = viewerUserId != null ? viewerUserId : -1L;
 
     List<String> statuses =
         List.of(
             IssueStatusModel.OPEN.name(),
-            IssueStatusModel.ONHOLD.name(),
             IssueStatusModel.PENDING.name(),
             IssueStatusModel.RESOLVED.name());
 
-    return issueRepository.findByStatusInAndCreatedAtAfterAndWithinRadius(
-        statuses, since, lat, lng, radiusMeters);
+    return issueRepository.findByStatusInOrOnholdOwnedAndCreatedAtAfterAndWithinRadius(
+        statuses, safeUserId, since, lat, lng, radiusMeters);
   }
 }

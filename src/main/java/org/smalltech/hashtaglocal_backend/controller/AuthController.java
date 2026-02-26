@@ -34,12 +34,13 @@ public class AuthController {
   @Operation(summary = "Google OAuth callback")
   public ResponseEntity<NewAPIResponse<AuthTokenResponseData>> googleCallback(
       @RequestParam("code") String code,
-      @RequestParam(value = "code_verifier", required = false) String codeVerifier) {
+      @RequestParam(value = "code_verifier", required = false) String codeVerifier,
+      @RequestParam(value = "redirect_uri", required = false) String redirectUri) {
 
     System.out.println("➡️ /auth/google/callback hit");
     System.out.println("Auth Code: " + code);
 
-    var tokenData = googleAuthService.handleAuthorizationCode(code, codeVerifier);
+    var tokenData = googleAuthService.handleAuthorizationCode(code, codeVerifier, redirectUri);
 
     return ResponseEntity.ok(
         NewAPIResponse.<AuthTokenResponseData>builder().data(tokenData).build());

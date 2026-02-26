@@ -21,6 +21,7 @@ import org.smalltech.hashtaglocal_backend.entity.Locality;
 import org.smalltech.hashtaglocal_backend.entity.Location;
 import org.smalltech.hashtaglocal_backend.entity.MediaEntity;
 import org.smalltech.hashtaglocal_backend.entity.UserEntity;
+import org.smalltech.hashtaglocal_backend.repository.IssueActionRepository;
 import org.smalltech.hashtaglocal_backend.repository.IssueImportJobRepository;
 import org.smalltech.hashtaglocal_backend.repository.IssueImportStatusRepository;
 import org.smalltech.hashtaglocal_backend.repository.IssueRepository;
@@ -45,6 +46,8 @@ class IssueImportServiceTest {
 
   @Mock private IssueRepository issueRepository;
 
+  @Mock private IssueActionRepository issueActionRepository;
+
   @Mock private MediaRepository mediaRepository;
 
   @Mock private LocationRepository locationRepository;
@@ -66,6 +69,7 @@ class IssueImportServiceTest {
             jobRepository,
             statusRepository,
             issueRepository,
+            issueActionRepository,
             mediaRepository,
             locationRepository,
             localityRepository,
