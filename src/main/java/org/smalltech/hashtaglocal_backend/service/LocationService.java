@@ -31,7 +31,7 @@ public class LocationService {
     Location location =
         Location.builder()
             .point(LocationUtil.createPoint(lat, lng))
-            .name(name != null ? name : locality.getName())
+            .name(name != null ? name : (locality != null ? locality.getName() : fallbackName))
             .locality(locality)
             .metaData(metaData)
             .build();

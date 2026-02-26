@@ -27,4 +27,7 @@ public interface EventRepository extends JpaRepository<EventEntity, Long> {
 
   /** Returns all events whose start time is on or after the given date-time. */
   List<EventEntity> findByStartTimeGreaterThanEqual(LocalDateTime dateTime);
+
+  /** Returns events that have a raw address but no geocoded location yet. */
+  List<EventEntity> findByLocationIsNullAndAddressIsNotNull();
 }
