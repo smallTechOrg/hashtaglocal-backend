@@ -19,5 +19,6 @@ public class Media {
   private String urlThumbnail;
   private String description;
   private String username;
+  private String profilePhoto;
   private LocalDateTime createdAt;
 }

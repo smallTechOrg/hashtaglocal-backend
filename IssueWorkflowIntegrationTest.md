@@ -43,8 +43,11 @@ When admin rejects RESOLVE action issues transitions back to OPEN, media doesn't
 
 When issue is ONHOLD.
 Same user can still VERIFY issue.
-Admin can selectively APPROVE the issue but the VERIFY.
+Admin can selectively APPROVE the issue and the VERIFY.
 IN that case issue stays open but VERIFY not listed.
+
+Admin can also selectively APPROVE both
+Then both the issue will be OPEN and the verify will. be listed.
 
 
 

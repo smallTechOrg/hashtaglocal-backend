@@ -33,6 +33,16 @@ public class SecurityConfig {
                     .authenticated()
                     .anyRequest()
                     .permitAll())
+        .exceptionHandling(
+            ex -> {
+              ex.authenticationEntryPoint(
+                  new org.springframework.security.web.authentication.HttpStatusEntryPoint(
+                      org.springframework.http.HttpStatus.UNAUTHORIZED));
+              ex.accessDeniedHandler(
+                  (request, response, accessDeniedException) -> {
+                    response.setStatus(org.springframework.http.HttpStatus.FORBIDDEN.value());
+                  });
+            })
         .addFilterBefore(accessTokenAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
     return http.build();

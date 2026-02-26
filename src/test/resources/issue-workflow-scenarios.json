@@ -355,8 +355,8 @@
       ]
     },
     {
-      "name": "verify_onhold_blocked",
-      "description": "VERIFY on ONHOLD issue is blocked (400)",
+      "name": "verify_onhold_allowed",
+      "description": "VERIFY on ONHOLD issue is allowed — both actions sit in admin queue",
       "steps": [
         {
           "description": "Report an issue (stays ONHOLD)",
@@ -371,20 +371,44 @@
           "expect": { "httpStatus": 200, "issueStatus": "ONHOLD" }
         },
         {
-          "description": "Verify on ONHOLD issue → blocked with 400",
+          "description": "Verify on ONHOLD issue succeeds (action is PENDING)",
           "action": "VERIFY_ISSUE",
           "actor": "reporter",
           "input": {
             "mediaType": "PHOTO",
             "mediaUrl": "https://example.com/verify.jpg"
           },
-          "expect": { "httpStatus": 400 }
+          "expect": { "httpStatus": 200, "issueStatus": "ONHOLD" }
+        },
+        {
+          "description": "Owner sees both report and pending verify media",
+          "action": "GET_ISSUE",
+          "actor": "reporter",
+          "expect": { "httpStatus": 200, "status": "ONHOLD", "mediaCount": 2 }
+        },
+        {
+          "description": "Admin approves REPORT → issue opens",
+          "action": "APPROVE_ACTION",
+          "input": { "pendingActionType": "REPORT" },
+          "expect": { "httpStatus": 200, "issueStatus": "OPEN" }
+        },
+        {
+          "description": "Admin approves VERIFY → verifyCount increments",
+          "action": "APPROVE_ACTION",
+          "input": { "pendingActionType": "VERIFY" },
+          "expect": { "httpStatus": 200, "issueStatus": "OPEN" }
+        },
+        {
+          "description": "Everyone sees 2 media and verifyCount=1",
+          "action": "GET_ISSUE",
+          "actor": "anonymous",
+          "expect": { "httpStatus": 200, "status": "OPEN", "mediaCount": 2, "verifyCount": 1 }
         }
       ]
     },
     {
       "name": "approve_report_reject_verify",
-      "description": "Admin approves REPORT but rejects VERIFY — selective approval",
+      "description": "User reports and immediately verifies on ONHOLD. Admin approves REPORT but rejects VERIFY — selective approval",
       "steps": [
         {
           "description": "Report an issue",
@@ -396,17 +420,17 @@
             "mediaType": "PHOTO",
             "mediaUrl": "https://example.com/report.jpg"
           },
-          "expect": { "httpStatus": 200 }
+          "expect": { "httpStatus": 200, "issueStatus": "ONHOLD" }
         },
         {
-          "description": "Verify blocked while issue is ONHOLD",
+          "description": "User immediately verifies while ONHOLD",
           "action": "VERIFY_ISSUE",
           "actor": "reporter",
           "input": {
             "mediaType": "PHOTO",
-            "mediaUrl": "https://example.com/blocked-verify.jpg"
+            "mediaUrl": "https://example.com/verify.jpg"
           },
-          "expect": { "httpStatus": 400 }
+          "expect": { "httpStatus": 200, "issueStatus": "ONHOLD" }
         },
         {
           "description": "Approve REPORT → issue opens",
@@ -415,20 +439,10 @@
           "expect": { "httpStatus": 200, "issueStatus": "OPEN" }
         },
         {
-          "description": "Now verify succeeds",
-          "action": "VERIFY_ISSUE",
-          "actor": "reporter",
-          "input": {
-            "mediaType": "PHOTO",
-            "mediaUrl": "https://example.com/verify.jpg"
-          },
-          "expect": { "httpStatus": 200 }
-        },
-        {
           "description": "Admin rejects VERIFY",
           "action": "REJECT_ACTION",
           "input": { "pendingActionType": "VERIFY" },
-          "expect": { "httpStatus": 200 }
+          "expect": { "httpStatus": 200, "issueStatus": "OPEN" }
         },
         {
           "description": "Issue OPEN, no verify count, only report media",
@@ -440,10 +454,10 @@
     },
     {
       "name": "unauthenticated_cannot_create",
-      "description": "Unauthenticated user cannot create an issue (403)",
+      "description": "Unauthenticated user cannot create an issue (401)",
       "steps": [
         {
-          "description": "Unauthenticated POST → 403",
+          "description": "Unauthenticated POST → 401",
           "action": "REPORT_ISSUE",
           "actor": "anonymous",
           "input": {
@@ -452,7 +466,7 @@
             "mediaType": "PHOTO",
             "mediaUrl": "https://example.com/report.jpg"
           },
-          "expect": { "httpStatus": 403 }
+            "expect": { "httpStatus": 401 }
         }
       ]
     },
@@ -475,7 +489,7 @@
         {
           "description": "Non-admin tries to approve → 403",
           "action": "APPROVE_ACTION",
-          "actor": "reporter",
+          "actor": "other",
           "input": { "pendingActionType": "REPORT" },
           "expect": { "httpStatus": 403 }
         }

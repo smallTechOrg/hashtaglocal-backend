@@ -98,8 +98,9 @@ public class IssueController {
       description =
           "Returns a List of issues with user, location, locality and viewer context. Optionally filter by locality hashtag.")
   public NewAPIResponse<IssueListResponseData> getIssues(
+      @AuthenticationPrincipal Long viewerUserId,
       @RequestParam(value = "locality", required = false) String localityHashtag) {
-    return issueHomeAssembler.getHome(localityHashtag);
+    return issueHomeAssembler.getHome(localityHashtag, viewerUserId);
   }
 
   @PostMapping("/issue")

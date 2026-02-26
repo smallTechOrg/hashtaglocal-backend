@@ -59,6 +59,41 @@ public interface IssueRepository extends JpaRepository<IssueEntity, Long> {
       @Param("lng") double lng,
       @Param("radiusMeters") double radiusMeters);
 
+  @EntityGraph(attributePaths = {"userEntity", "location", "location.locality"})
+  @Query(
+      "SELECT i FROM IssueEntity i WHERE (i.status IN :statuses OR (i.status = org.smalltech.hashtaglocal_backend.model.IssueStatusModel.ONHOLD AND i.userEntity.id = :ownerUserId)) AND i.createdAt >= :startDate ORDER BY i.createdAt DESC")
+  List<IssueEntity> findByStatusInOrOnholdOwnedAndCreatedAtAfterOrderByCreatedAtDesc(
+      @Param("statuses") List<IssueStatusModel> statuses,
+      @Param("ownerUserId") Long ownerUserId,
+      @Param("startDate") LocalDateTime startDate);
+
+  @EntityGraph(attributePaths = {"userEntity", "location", "location.locality"})
+  @Query(
+      "SELECT i FROM IssueEntity i WHERE (i.status IN :statuses OR (i.status = org.smalltech.hashtaglocal_backend.model.IssueStatusModel.ONHOLD AND i.userEntity.id = :ownerUserId)) AND i.createdAt >= :startDate AND LOWER(i.location.locality.hashtag) = LOWER(:localityHashtag) ORDER BY i.createdAt DESC")
+  List<IssueEntity>
+      findByStatusInOrOnholdOwnedAndCreatedAtAfterAndLocalityHashtagOrderByCreatedAtDesc(
+          @Param("statuses") List<IssueStatusModel> statuses,
+          @Param("ownerUserId") Long ownerUserId,
+          @Param("startDate") LocalDateTime startDate,
+          @Param("localityHashtag") String localityHashtag);
+
+  @Query(
+      value =
+          "SELECT i.* FROM issues i "
+              + "INNER JOIN locations l ON i.location_id = l.id "
+              + "WHERE (i.status IN :statuses OR (i.status = 'ONHOLD' AND i.user_id = :ownerUserId)) "
+              + "AND i.created_at >= :startDate "
+              + "AND ST_DWithin(l.point::geography, ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography, :radiusMeters) "
+              + "ORDER BY i.created_at DESC",
+      nativeQuery = true)
+  List<IssueEntity> findByStatusInOrOnholdOwnedAndCreatedAtAfterAndWithinRadius(
+      @Param("statuses") List<String> statuses,
+      @Param("ownerUserId") Long ownerUserId,
+      @Param("startDate") LocalDateTime startDate,
+      @Param("lat") double lat,
+      @Param("lng") double lng,
+      @Param("radiusMeters") double radiusMeters);
+
   @Query(
       "SELECT COUNT(i) FROM IssueEntity i WHERE i.userEntity.id = :userId AND i.status <> org.smalltech.hashtaglocal_backend.model.IssueStatusModel.REJECTED")
   long countByUserExcludingRejected(@Param("userId") Long userId);

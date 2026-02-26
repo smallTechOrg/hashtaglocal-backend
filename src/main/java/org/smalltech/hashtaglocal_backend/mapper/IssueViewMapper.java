@@ -162,6 +162,10 @@ public class IssueViewMapper {
                       .urlThumbnail(gcsService.generateThumbnailUrl(mediaEntity.getUrl()))
                       .description(mediaEntity.getDescription())
                       .username(username)
+                      .profilePhoto(
+                          action.getUserEntity() != null
+                              ? action.getUserEntity().getProfilePicture()
+                              : null)
                       .createdAt(mediaEntity.getCreatedAt())
                       .build();
                 })

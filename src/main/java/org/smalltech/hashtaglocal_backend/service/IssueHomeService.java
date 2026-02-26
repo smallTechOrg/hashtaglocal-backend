@@ -18,24 +18,31 @@ public class IssueHomeService {
   private final IssueHomeQueryService issueHomeQueryService;
   private final IssueViewMapper issueViewMapper;
 
-  public NewAPIResponse<IssueListResponseData> getHome(String localityHashtag) {
-    var entities = issueHomeQueryService.findRecentIssues(localityHashtag);
+  public NewAPIResponse<IssueListResponseData> getHome(String localityHashtag, Long viewerUserId) {
+    var entities = issueHomeQueryService.findRecentIssues(localityHashtag, viewerUserId);
 
     List<Issue> issues =
-        entities.stream().map(issueViewMapper::map).map(IssueResponseData::getIssue).toList();
+        entities.stream()
+            .map(e -> issueViewMapper.map(e, viewerUserId))
+            .map(IssueResponseData::getIssue)
+            .toList();
 
     return NewAPIResponse.<IssueListResponseData>builder()
         .data(IssueListResponseData.builder().issues(issues).build())
         .build();
   }
 
-  public NewAPIResponse<IssueListResponseData> getNearby(double lat, double lng) {
+  public NewAPIResponse<IssueListResponseData> getNearby(
+      double lat, double lng, Long viewerUserId) {
     double radiusMeters = 5000.0;
 
-    var entities = issueHomeQueryService.findNearbyIssues(lat, lng, radiusMeters);
+    var entities = issueHomeQueryService.findNearbyIssues(lat, lng, radiusMeters, viewerUserId);
 
     List<Issue> issues =
-        entities.stream().map(issueViewMapper::map).map(IssueResponseData::getIssue).toList();
+        entities.stream()
+            .map(e -> issueViewMapper.map(e, viewerUserId))
+            .map(IssueResponseData::getIssue)
+            .toList();
 
     return NewAPIResponse.<IssueListResponseData>builder()
         .data(IssueListResponseData.builder().issues(issues).build())

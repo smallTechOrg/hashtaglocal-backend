@@ -82,70 +82,76 @@ public class IssueActionService {
       }
     }
 
-    // VERIFY is not allowed while the issue is still ONHOLD (awaiting its own approval)
-    if (issueActionModel == IssueActionModel.VERIFY
-        && IssueStatusModel.ONHOLD.equals(issueEntity.getStatus())) {
-      throw new ResponseStatusException(
-          HttpStatus.BAD_REQUEST,
-          "Cannot verify an issue that is still ONHOLD. Wait for admin approval first.");
-    }
-
-    // Enforce geo-fence for VERIFY / RESOLVE
+    // Enforce geo-fence for VERIFY / RESOLVE (geo-fence is skipped when media location is
+    // absent, preserving backward compatibility with clients that do not send coordinates).
     if (issueActionModel == IssueActionModel.VERIFY
         || issueActionModel == IssueActionModel.RESOLVE) {
 
       var mediaUrls = request.getIssueAction().getMediaUrls();
 
+      // Geo-fence: only enforced when at least one media item carries a location.
+      if (mediaUrls != null && !mediaUrls.isEmpty()) {
+        var firstLocation = mediaUrls.get(0).getLocation();
+        if (firstLocation != null
+            && firstLocation.getLat() != null
+            && firstLocation.getLng() != null) {
+          geoFenceService.assertWithinRadius(
+              issueEntity.getLocation(),
+              firstLocation.getLat(),
+              firstLocation.getLng(),
+              appProperties.getGeo().getVerifyRadiusMeters());
+        }
+      }
+
+      // Create one action per media item (media_urls is optional — old clients may omit it).
+      if (mediaUrls != null) {
+        for (var mediaRequest : mediaUrls) {
+
+          var mediaLocReq = mediaRequest.getLocation();
+
+          var mediaLocation =
+              mediaLocReq != null && mediaLocReq.getLat() != null && mediaLocReq.getLng() != null
+                  ? locationService.createAndSaveLocation(
+                      mediaLocReq.getLat(),
+                      mediaLocReq.getLng(),
+                      mediaLocReq.getMetaData(),
+                      "Unknown")
+                  : null;
+
+          // Media submitted as part of a VERIFY/RESOLVE action; visibility is controlled
+          // by the parent action's approvalStatus (starts as PENDING until admin approves).
+          var mediaEntity =
+              org.smalltech.hashtaglocal_backend.entity.MediaEntity.builder()
+                  .type(EnumParsers.parseMediaType(mediaRequest.getType()))
+                  .url(mediaRequest.getUrl())
+                  .description(mediaRequest.getDescription())
+                  .location(mediaLocation)
+                  .createdAt(LocalDateTime.now())
+                  .build();
+
+          var savedMedia = mediaRepository.save(mediaEntity);
+
+          IssueActionEntity actionEntity =
+              IssueActionEntity.builder()
+                  .issueEntity(issueEntity)
+                  .userEntity(userEntity)
+                  .action(issueActionModel)
+                  .approvalStatus(IssueActionApprovalStatus.PENDING)
+                  .media(savedMedia)
+                  .createdAt(LocalDateTime.now())
+                  .build();
+          issueActionRepository.save(actionEntity);
+        }
+      }
+
+      // If no media was submitted at all, still record the action (no media link).
       if (mediaUrls == null || mediaUrls.isEmpty()) {
-        throw new ResponseStatusException(
-            HttpStatus.BAD_REQUEST,
-            "At least one media with location is required to verify or resolve an issue");
-      }
-
-      var actionLocation = mediaUrls.get(0).getLocation();
-      if (actionLocation == null
-          || actionLocation.getLat() == null
-          || actionLocation.getLng() == null) {
-        throw new ResponseStatusException(
-            HttpStatus.BAD_REQUEST,
-            "Location (lat, lng) is required to verify or resolve an issue");
-      }
-
-      geoFenceService.assertWithinRadius(
-          issueEntity.getLocation(),
-          actionLocation.getLat(),
-          actionLocation.getLng(),
-          appProperties.getGeo().getVerifyRadiusMeters());
-
-      // Create one action per media item. Each action links to exactly one media entity.
-      for (var mediaRequest : mediaUrls) {
-
-        var mediaLocReq = mediaRequest.getLocation();
-
-        var mediaLocation =
-            locationService.createAndSaveLocation(
-                mediaLocReq.getLat(), mediaLocReq.getLng(), mediaLocReq.getMetaData(), "Unknown");
-
-        // Media submitted as part of a VERIFY/RESOLVE action; visibility is controlled
-        // by the parent action's approvalStatus (starts as PENDING until admin approves)
-        var mediaEntity =
-            org.smalltech.hashtaglocal_backend.entity.MediaEntity.builder()
-                .type(EnumParsers.parseMediaType(mediaRequest.getType()))
-                .url(mediaRequest.getUrl())
-                .description(mediaRequest.getDescription())
-                .location(mediaLocation)
-                .createdAt(LocalDateTime.now())
-                .build();
-
-        var savedMedia = mediaRepository.save(mediaEntity);
-
         IssueActionEntity actionEntity =
             IssueActionEntity.builder()
                 .issueEntity(issueEntity)
                 .userEntity(userEntity)
                 .action(issueActionModel)
                 .approvalStatus(IssueActionApprovalStatus.PENDING)
-                .media(savedMedia)
                 .createdAt(LocalDateTime.now())
                 .build();
         issueActionRepository.save(actionEntity);
