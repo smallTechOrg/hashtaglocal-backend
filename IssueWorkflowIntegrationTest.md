@@ -49,6 +49,18 @@ IN that case issue stays open but VERIFY not listed.
 Admin can also selectively APPROVE both
 Then both the issue will be OPEN and the verify will. be listed.
 
+3. b. Reject cases
 
 
-Add other cases as you see fit.
+Issue could be either in ONHOLD, OPEN.
+If there is only one user who is owner and verifier 
+owner can REJECt the issue.
+
+Issue could be either in OPEN.
+But there is more than user verified
+Owner cannot reject the issue.
+
+Issue is in PENDING or RESOLVED.
+Owner cannot reject the issue.
+
+Admin can REJECT issue in any state.

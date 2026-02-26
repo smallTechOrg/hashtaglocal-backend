@@ -99,7 +99,7 @@ public class GetProfileService {
   }
 
   /** Build user summary with issue counts */
-  private UserSummaryModel buildUserSummary(Long userId) {
+  public UserSummaryModel buildUserSummary(Long userId) {
     long total = issueRepository.countByUserExcludingRejected(userId);
     long onhold = issueRepository.countByUserAndStatus(userId, IssueStatusModel.ONHOLD);
     long open =

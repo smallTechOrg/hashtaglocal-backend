@@ -20,6 +20,9 @@ public class IssueActionAdminResponseData {
   /** ID of the issue this action belongs to. */
   private Long issueId;
 
+  /** ID of the user who submitted the action. Used to fetch user summary stats. */
+  private Long submittedByUserId;
+
   /** Username of the user who submitted the action. */
   private String submittedByUsername;
 

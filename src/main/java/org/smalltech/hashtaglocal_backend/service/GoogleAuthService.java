@@ -61,9 +61,17 @@ public class GoogleAuthService {
    * ===============================
    */
 
-  public AuthTokenResponseData handleAuthorizationCode(String code, String codeVerifier) {
+  public AuthTokenResponseData handleAuthorizationCode(
+      String code, String codeVerifier, String clientRedirectUri) {
 
     System.out.println("🔁 Exchanging auth code for Google tokens");
+
+    // Use caller-supplied redirect_uri (must match the one in the auth request),
+    // fall back to server-configured value.
+    String effectiveRedirectUri =
+        (clientRedirectUri != null && !clientRedirectUri.isEmpty())
+            ? clientRedirectUri
+            : redirectUri;
 
     RestTemplate restTemplate = new RestTemplate();
 
@@ -71,7 +79,7 @@ public class GoogleAuthService {
     body.add("code", code);
     body.add("client_id", clientId);
     body.add("client_secret", clientSecret);
-    body.add("redirect_uri", redirectUri);
+    body.add("redirect_uri", effectiveRedirectUri);
     body.add("grant_type", "authorization_code");
 
     if (codeVerifier != null && !codeVerifier.isEmpty()) {

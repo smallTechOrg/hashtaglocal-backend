@@ -5,6 +5,9 @@ import org.smalltech.hashtaglocal_backend.entity.IssueEntity;
 import org.smalltech.hashtaglocal_backend.model.IssueStatusModel;
 import org.smalltech.hashtaglocal_backend.repository.IssueRepository;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -53,12 +56,20 @@ public class IssueQueryService {
 
     if (IssueStatusModel.ONHOLD.equals(issue.getStatus())) {
       Long ownerId = issue.getUserEntity() != null ? issue.getUserEntity().getId() : null;
-      if (ownerId == null || !ownerId.equals(viewerUserId)) {
+      boolean isOwner = ownerId != null && ownerId.equals(viewerUserId);
+      boolean isAdmin = isCurrentUserAdmin();
+      if (!isOwner && !isAdmin) {
         // Return 404 rather than 403 to avoid leaking existence of the issue
         throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Issue not found");
       }
     }
 
     return issue;
+  }
+
+  /** Check if the current request is from an ADMIN user via Spring Security context. */
+  private boolean isCurrentUserAdmin() {
+    Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+    return auth != null && auth.getAuthorities().contains(new SimpleGrantedAuthority("ROLE_ADMIN"));
   }
 }

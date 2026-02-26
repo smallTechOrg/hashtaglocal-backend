@@ -7,8 +7,11 @@ import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.smalltech.hashtaglocal_backend.model.IssueActionApprovalStatus;
 import org.smalltech.hashtaglocal_backend.model.NewAPIResponse;
+import org.smalltech.hashtaglocal_backend.model.UserSummaryModel;
 import org.smalltech.hashtaglocal_backend.model.response.IssueActionAdminResponseData;
 import org.smalltech.hashtaglocal_backend.model.response.IssueActionResponseData;
+import org.smalltech.hashtaglocal_backend.repository.UserRepository;
+import org.smalltech.hashtaglocal_backend.service.GetProfileService;
 import org.smalltech.hashtaglocal_backend.service.IssueActionAdminService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -46,6 +49,8 @@ import org.springframework.web.bind.annotation.RestController;
 public class IssueAdminController {
 
   private final IssueActionAdminService issueActionAdminService;
+  private final GetProfileService getProfileService;
+  private final UserRepository userRepository;
 
   /**
    * Returns all issue actions currently awaiting admin review, ordered oldest-first.
@@ -69,6 +74,8 @@ public class IssueAdminController {
                             action.getIssueEntity() != null
                                 ? action.getIssueEntity().getId()
                                 : null)
+                        .submittedByUserId(
+                            action.getUserEntity() != null ? action.getUserEntity().getId() : null)
                         .submittedByUsername(
                             action.getUserEntity() != null
                                 ? action.getUserEntity().getUsername()
@@ -131,5 +138,29 @@ public class IssueAdminController {
         NewAPIResponse.<IssueActionResponseData>builder()
             .data(IssueActionResponseData.builder().issueId(issueId).build())
             .build());
+  }
+
+  /**
+   * Returns a summary of a user's issue activity — total issues, status breakdown, and contribution
+   * counts. Used by the ops portal to give reviewers context about the submitter.
+   *
+   * @param userId the ID of the user to look up
+   */
+  @GetMapping("/user/{userId}/summary")
+  @Operation(
+      summary = "Get user summary",
+      description =
+          "Returns issue count breakdown for the given user: "
+              + "total, onhold, open, resolved, verify contributions, resolve contributions.")
+  public ResponseEntity<NewAPIResponse<UserSummaryModel>> getUserSummary(
+      @PathVariable Long userId) {
+
+    // Verify user exists
+    if (userRepository.findById(userId).isEmpty()) {
+      return ResponseEntity.notFound().build();
+    }
+
+    UserSummaryModel summary = getProfileService.buildUserSummary(userId);
+    return ResponseEntity.ok(NewAPIResponse.<UserSummaryModel>builder().data(summary).build());
   }
 }
