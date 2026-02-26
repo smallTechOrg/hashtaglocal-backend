@@ -49,9 +49,11 @@ public class IssueQueryService {
             .orElseThrow(
                 () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Issue not found"));
 
-    // REJECTED issues are not visible to anyone — treat as if they don't exist.
+    // REJECTED issues are visible only to admins (they review them in the ops portal).
     if (IssueStatusModel.REJECTED.equals(issue.getStatus())) {
-      throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Issue not found");
+      if (!isCurrentUserAdmin()) {
+        throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Issue not found");
+      }
     }
 
     if (IssueStatusModel.ONHOLD.equals(issue.getStatus())) {

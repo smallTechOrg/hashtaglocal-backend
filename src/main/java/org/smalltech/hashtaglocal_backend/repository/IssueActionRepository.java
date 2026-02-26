@@ -60,4 +60,11 @@ public interface IssueActionRepository extends JpaRepository<IssueActionEntity, 
    */
   List<IssueActionEntity> findByApprovalStatusOrderByCreatedAtAsc(
       IssueActionApprovalStatus approvalStatus);
+
+  /**
+   * Returns all actions for a given issue with the specified approval status. Used to cascade
+   * status changes (e.g. reject all remaining PENDING actions when the REPORT is rejected).
+   */
+  List<IssueActionEntity> findByIssueEntityAndApprovalStatus(
+      IssueEntity issueEntity, IssueActionApprovalStatus approvalStatus);
 }

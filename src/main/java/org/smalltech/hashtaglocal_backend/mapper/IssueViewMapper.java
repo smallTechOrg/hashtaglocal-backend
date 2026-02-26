@@ -17,6 +17,9 @@ import org.smalltech.hashtaglocal_backend.model.ViewerContext;
 import org.smalltech.hashtaglocal_backend.model.response.IssueResponseData;
 import org.smalltech.hashtaglocal_backend.repository.IssueActionRepository;
 import org.smalltech.hashtaglocal_backend.service.GCSService;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 
 /**
@@ -25,9 +28,9 @@ import org.springframework.stereotype.Component;
  * <h2>Media visibility rules</h2>
  *
  * <ul>
- *   <li><b>Issue owner</b>: receives media from actions with {@code APPROVED}, {@code NOT_REQUIRED}
- *       or {@code PENDING} approval status so they can see their own pending verification uploads
- *       while waiting for admin review.
+ *   <li><b>Issue owner or admin</b>: receives media from actions with {@code APPROVED}, {@code
+ *       NOT_REQUIRED} or {@code PENDING} approval status. Owners see their own pending uploads;
+ *       admins need to see pending media during review.
  *   <li><b>Everyone else</b>: receives media only from {@code APPROVED} or {@code NOT_REQUIRED}
  *       actions.
  * </ul>
@@ -102,15 +105,17 @@ public class IssueViewMapper {
             .colloquialName(name)
             .build();
 
-    // Determine whether the viewer is the issue owner
+    // Determine whether the viewer is the issue owner or an admin
     Long ownerId = userEntity.getId();
     boolean isOwner = viewerUserId != null && viewerUserId.equals(ownerId);
+    boolean isAdmin = isCurrentUserAdmin();
 
     // Fetch media through actions based on viewer identity:
-    //   owner  → APPROVED + NOT_REQUIRED + PENDING (see own pending uploads)
-    //   others → APPROVED + NOT_REQUIRED only
+    //   owner or admin → APPROVED + NOT_REQUIRED + PENDING (admins need to see pending media to
+    //                     review; owners see their own pending uploads)
+    //   others         → APPROVED + NOT_REQUIRED only
     List<IssueActionApprovalStatus> approvalStatuses =
-        isOwner
+        (isOwner || isAdmin)
             ? List.of(
                 IssueActionApprovalStatus.APPROVED,
                 IssueActionApprovalStatus.NOT_REQUIRED,
@@ -193,5 +198,11 @@ public class IssueViewMapper {
             .build();
 
     return IssueResponseData.builder().issue(issue).build();
+  }
+
+  /** Check whether the current authenticated user has the ADMIN role. */
+  private boolean isCurrentUserAdmin() {
+    Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+    return auth != null && auth.getAuthorities().contains(new SimpleGrantedAuthority("ROLE_ADMIN"));
   }
 }

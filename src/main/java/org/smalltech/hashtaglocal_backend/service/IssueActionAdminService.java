@@ -85,6 +85,19 @@ public class IssueActionAdminService {
         issueEntity.setStatus(IssueStatusModel.OPEN);
       } else {
         issueEntity.setStatus(IssueStatusModel.REJECTED);
+        // Cascade-reject all other PENDING actions on this issue so they don't
+        // linger in the pending queue after the issue itself is rejected.
+        issueActionRepository
+            .findByIssueEntityAndApprovalStatus(issueEntity, IssueActionApprovalStatus.PENDING)
+            .stream()
+            .filter(a -> !a.getId().equals(action.getId()))
+            .forEach(
+                a -> {
+                  a.setApprovalStatus(IssueActionApprovalStatus.REJECTED);
+                  a.setApprovedByUser(admin);
+                  a.setApprovedAt(LocalDateTime.now());
+                  issueActionRepository.save(a);
+                });
       }
       issueEntity.setUpdatedAt(LocalDateTime.now());
       issueRepository.save(issueEntity);
