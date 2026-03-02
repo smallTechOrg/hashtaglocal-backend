@@ -378,6 +378,72 @@ spring:
       max-lifetime: 1800000
 ```
 
+
+
+## JVM Memory Monitoring & Operations
+
+### Checking JVM Memory Usage
+
+1. Find the Java process:
+  ```bash
+  ps aux | grep java
+  ```
+2. Check memory usage for the Java process (replace <PID> with the actual process ID):
+  ```bash
+  top -p <PID>
+  ps -o pid,user,vsz,rss,comm -p <PID>
+  ```
+3. For JVM heap details (run as the same user as the Java process, often root):
+  ```bash
+  sudo jcmd <PID> GC.heap_info
+  sudo jstat -gc <PID> 1000
+  ```
+
+### Interpreting `jcmd GC.heap_info` Output
+
+- **DefNew / eden space**: Young generation (new objects). High usage after requests is normal; should drop after GC.
+- **from space / to space**: Survivor spaces for objects that survived one GC cycle.
+- **Tenured / the space**: Old generation (long-lived objects). If this approaches 100% and stays high, risk of OutOfMemory errors and high CPU.
+
+**Example healthy output:**
+```
+Tenured    total 87424K, used 45860K
+the  space 87424K,  52% used
+```
+
+**After API request:**
+- Eden space may spike, then drop after GC.
+- Tenured space increases slightly if objects persist.
+
+**If tenured space keeps rising:**
+- Possible memory leak or excessive object retention.
+- Investigate application code or increase heap/VM RAM.
+
+### Recommended JVM Heap Settings for Low-Memory VMs
+
+- For 1GB RAM: `-Xmx128m -Xms64m`
+- For 2GB RAM: `-Xmx256m -Xms128m`
+- For 4GB RAM: `-Xmx512m -Xms256m`
+
+Update your systemd service file’s `ExecStart` line, e.g.:
+```
+ExecStart=/usr/bin/java -Xmx128m -Xms64m -jar /opt/hashtaglocal-backend/hashtaglocal-backend.jar
+```
+Then reload and restart:
+```
+sudo systemctl daemon-reload
+sudo systemctl restart hashtaglocal-backend
+```
+
+### Operational Recommendations
+
+- Monitor JVM heap usage regularly, especially after deployment or traffic spikes.
+- If tenured space usage stabilizes, memory is healthy.
+- If tenured space keeps increasing, check for memory leaks or increase heap/VM RAM.
+- Use `free -h` and `top` to monitor overall system memory.
+- Adjust heap settings as needed based on observed usage and available RAM.
+
+---
 ---
 
 ## Monitoring
