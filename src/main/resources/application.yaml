@@ -94,3 +94,11 @@ auth:
     expiry-seconds: ${AUTH_ACCESS_TOKEN_EXPIRY_SECONDS:10}
   refresh-token:
     expiry-seconds: ${AUTH_REFRESH_TOKEN_EXPIRY_SECONDS:30}
+
+events:
+  scrape:
+    # URL of the external scrape service that provides raw event data
+    url: ${EVENTS_SCRAPE_URL:}
+    # Cron expression for the ingestion job (default: every 2 minutes)
+    # Use '-' to disable. Override via EVENTS_SCRAPE_CRON env var.
+    cron: ${EVENTS_SCRAPE_CRON:0 */10 * * * * *}

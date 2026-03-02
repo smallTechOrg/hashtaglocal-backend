@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.smalltech.hashtaglocal_backend.dto.ScrapeResponseDTO;
 import org.smalltech.hashtaglocal_backend.job.EventGeocodingJob;
+import org.smalltech.hashtaglocal_backend.job.EventIngestionCronJob;
 import org.smalltech.hashtaglocal_backend.model.NewAPIResponse;
 import org.smalltech.hashtaglocal_backend.model.response.EventData;
 import org.smalltech.hashtaglocal_backend.model.response.EventListResponseData;
@@ -32,6 +33,7 @@ public class EventController {
   private final EventService eventService;
   private final EventImportService eventImportService;
   private final EventGeocodingJob eventGeocodingJob;
+  private final EventIngestionCronJob eventIngestionCronJob;
 
   @GetMapping("/api/v1/events")
   @Operation(
@@ -88,5 +90,17 @@ public class EventController {
   @PostMapping("/admin/events/geocode")
   public ResponseEntity<EventGeocodingJob.GeocodingJobResult> geocodeEvents() {
     return ResponseEntity.ok(eventGeocodingJob.run());
+  }
+
+  @Operation(
+      summary = "Manually trigger the event ingestion pipeline",
+      description =
+          "Runs the same pipeline as the scheduled cron job: fetches events from the scrape"
+              + " service, imports new ones, then geocodes any un-resolved addresses.")
+  @ApiResponse(responseCode = "200", description = "Pipeline completed — returns a summary")
+  @PostMapping("/admin/events/ingest")
+  public ResponseEntity<String> triggerIngestion() {
+    eventIngestionCronJob.run();
+    return ResponseEntity.ok("Ingestion pipeline completed. Check logs for details.");
   }
 }
