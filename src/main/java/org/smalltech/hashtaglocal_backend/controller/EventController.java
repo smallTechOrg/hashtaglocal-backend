@@ -1,90 +1,92 @@
 package org.smalltech.hashtaglocal_backend.controller;
 
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
-import org.smalltech.hashtaglocal_backend.entity.EventEntity;
-import org.smalltech.hashtaglocal_backend.entity.Location;
+import lombok.extern.slf4j.Slf4j;
+import org.smalltech.hashtaglocal_backend.dto.ScrapeResponseDTO;
+import org.smalltech.hashtaglocal_backend.job.EventGeocodingJob;
 import org.smalltech.hashtaglocal_backend.model.NewAPIResponse;
 import org.smalltech.hashtaglocal_backend.model.response.EventData;
 import org.smalltech.hashtaglocal_backend.model.response.EventListResponseData;
+import org.smalltech.hashtaglocal_backend.service.EventImportService;
 import org.smalltech.hashtaglocal_backend.service.EventService;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
-/**
- * Public REST controller exposing event data to the frontend.
- *
- * <p>Base path: {@code /api/v1}
- *
- * <p>All responses are wrapped in {@link NewAPIResponse} so the JSON shape is always: {@code {
- * "data": { ... } }}.
- */
 @RestController
-@RequestMapping("/api/v1")
 @Tag(name = "Event", description = "Event APIs")
 @RequiredArgsConstructor
+@Slf4j
 public class EventController {
 
   private final EventService eventService;
+  private final EventImportService eventImportService;
+  private final EventGeocodingJob eventGeocodingJob;
 
-  /**
-   * Returns all events stored in the database.
-   *
-   * <p>Each event includes location details (lat, lng, locality name) when geocoding has been done.
-   * If {@code location} is null in the response, the {@code address} field holds the raw address
-   * string as a fallback.
-   *
-   * <p>{@code GET /api/v1/events}
-   */
-  @GetMapping("/events")
-  @Operation(summary = "List all events", description = "Returns all events with location details.")
+  @GetMapping("/api/v1/events")
+  @Operation(
+      summary = "List all events",
+      description = "Returns events that have a resolved location.")
   public NewAPIResponse<EventListResponseData> getEvents() {
-    List<EventData> events = eventService.getAll().stream().map(this::toEventData).toList();
-
+    List<EventData> events = eventService.getAllAsEventData();
     return NewAPIResponse.<EventListResponseData>builder()
         .data(EventListResponseData.builder().events(events).build())
         .build();
   }
 
-  /**
-   * Converts a database {@link EventEntity} into the API response model {@link EventData}.
-   *
-   * <p>Extracts lat/lng from the PostGIS Point stored in the linked {@link Location}. If no
-   * Location has been linked yet (geocoding pending), the {@code location} field in the response is
-   * left null.
-   */
-  private EventData toEventData(EventEntity entity) {
-    EventData.LocationData locationData = null;
-    Location loc = entity.getLocation();
-    if (loc != null) {
-      // PostGIS Point: X = longitude, Y = latitude
-      String localityName = loc.getLocality() != null ? loc.getLocality().getName() : null;
-      locationData =
-          EventData.LocationData.builder()
-              .id(loc.getId())
-              .lat(loc.getPoint().getY())
-              .lng(loc.getPoint().getX())
-              .name(loc.getName())
-              .locality(localityName)
-              .build();
+  @Operation(
+      summary = "Import events from scrape service",
+      description =
+          "Accepts the scrape service JSON payload and imports new events."
+              + " Events with the same name + start_time are deduplicated.")
+  @ApiResponses({
+    @ApiResponse(
+        responseCode = "200",
+        description = "Import succeeded — returns count of newly imported events",
+        content =
+            @Content(
+                mediaType = MediaType.TEXT_PLAIN_VALUE,
+                schema = @Schema(example = "Imported 7 events successfully."))),
+    @ApiResponse(
+        responseCode = "400",
+        description = "Import failed — returns error message",
+        content =
+            @Content(
+                mediaType = MediaType.TEXT_PLAIN_VALUE,
+                schema = @Schema(example = "Import failed: ...")))
+  })
+  @PostMapping("/admin/events/import")
+  public ResponseEntity<String> importEvents(@RequestBody ScrapeResponseDTO body) {
+    try {
+      var events = body.getData() != null ? body.getData().getEvents() : null;
+      int count = eventImportService.importFromScrapeResponse(events);
+      return ResponseEntity.ok("Imported " + count + " events successfully.");
+    } catch (Exception e) {
+      log.error("Event import failed", e);
+      return ResponseEntity.badRequest().body("Import failed: " + e.getMessage());
     }
+  }
 
-    return EventData.builder()
-        .id(entity.getId())
-        .name(entity.getEventName())
-        .organisation(entity.getOrganisation())
-        .imageUrl(entity.getImageUrl())
-        .portal(entity.getPortal() != null ? entity.getPortal().name() : null)
-        .type(entity.getEventType() != null ? entity.getEventType().name() : null)
-        .startTime(entity.getStartTime())
-        .endTime(entity.getEndTime())
-        .location(locationData)
-        .address(entity.getAddress())
-        .link(entity.getLink())
-        .metaData(entity.getMetaData())
-        .build();
+  @Operation(
+      summary = "Geocode event addresses",
+      description =
+          "For every event with a raw address and no lat/lng, calls Google Maps to resolve"
+              + " coordinates, creates a Location row, and links it to the event.")
+  @ApiResponse(
+      responseCode = "200",
+      description = "Job completed — returns total/success/failed counts")
+  @PostMapping("/admin/events/geocode")
+  public ResponseEntity<EventGeocodingJob.GeocodingJobResult> geocodeEvents() {
+    return ResponseEntity.ok(eventGeocodingJob.run());
   }
 }

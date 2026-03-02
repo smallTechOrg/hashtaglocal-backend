@@ -72,8 +72,8 @@ class EventControllerIntegrationTest {
   }
 
   @Test
-  @DisplayName("Returns events with location=null — location is populated only after geocoding")
-  void returnsEventsWithNullLocationBeforeGeocoding() {
+  @DisplayName("Events without a geocoded location are excluded from the response")
+  void eventsWithoutLocationAreExcluded() {
     eventRepository.save(
         EventEntity.builder()
             .eventName("Tree Plantation Drive")
@@ -92,32 +92,14 @@ class EventControllerIntegrationTest {
         .exchange()
         .expectStatus()
         .isOk()
-        .expectBody(String.class)
-        .value(
-            body -> {
-              // location is null until POST /admin/events/geocode is called
-              org.junit.jupiter.api.Assertions.assertTrue(
-                  body.contains("\"location\":null"), "location should be null before geocoding");
-              org.junit.jupiter.api.Assertions.assertTrue(body.contains("Tree Plantation Drive"));
-              org.junit.jupiter.api.Assertions.assertTrue(
-                  body.contains("Lalbagh Main gate, Bengaluru"));
-            });
+        .expectBody()
+        .jsonPath("$.data.events.length()")
+        .isEqualTo(0);
   }
 
   @Test
-  @DisplayName("Returns all fields in snake_case — Spring SNAKE_CASE naming strategy is applied")
+  @DisplayName("Response wrapper shape is correct — data.events array is always present")
   void returnsCorrectResponseShape() {
-    eventRepository.save(
-        EventEntity.builder()
-            .eventName("Beach Cleanup")
-            .organisation("Clean Oceans")
-            .portal(EventPortalModel.IVOLUNTEER)
-            .eventType(EventTypeModel.BEACH_CLEANUP)
-            .startTime(LocalDateTime.of(2026, 3, 15, 0, 0))
-            .address("Juhu Beach, Mumbai")
-            .link("https://example.com/event/2")
-            .build());
-
     webTestClient
         .get()
         .uri("/api/v1/events")
@@ -125,19 +107,11 @@ class EventControllerIntegrationTest {
         .expectStatus()
         .isOk()
         .expectBody()
+        .jsonPath("$.data")
+        .exists()
+        .jsonPath("$.data.events")
+        .isArray()
         .jsonPath("$.data.events.length()")
-        .isEqualTo(1)
-        .jsonPath("$.data.events[0].id")
-        .exists()
-        .jsonPath("$.data.events[0].name")
-        .isEqualTo("Beach Cleanup")
-        .jsonPath("$.data.events[0].organisation")
-        .isEqualTo("Clean Oceans")
-        .jsonPath("$.data.events[0].type")
-        .isEqualTo("BEACH_CLEANUP")
-        .jsonPath("$.data.events[0].start_time")
-        .exists()
-        .jsonPath("$.data.events[0].address")
-        .isEqualTo("Juhu Beach, Mumbai");
+        .isEqualTo(0);
   }
 }

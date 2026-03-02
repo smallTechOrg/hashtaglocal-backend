@@ -1,6 +1,7 @@
 package org.smalltech.hashtaglocal_backend.model.response;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Map;
 import lombok.Builder;
 import lombok.Data;
@@ -48,25 +49,18 @@ public class EventData {
   /** Free-form extra fields that vary per organisation or portal (stored as JSONB). */
   private Map<String, Object> metaData;
 
-  /**
-   * Geocoded location details extracted from the {@code locations} table. Exposes the PostGIS Point
-   * as plain lat/lng doubles and includes the resolved Locality (city) name.
-   */
   @Data
   @Builder
   public static class LocationData {
-    private Long id;
-
-    /** Latitude extracted from the PostGIS Point (point.getY()). */
     private Double lat;
-
-    /** Longitude extracted from the PostGIS Point (point.getX()). */
     private Double lng;
-
-    /** Human-readable name of the location (e.g., "Lalbagh Main Gate"). */
     private String name;
+    private LocalityData locality;
+  }
 
-    /** Name of the resolved Locality (city/area polygon) this location falls within. */
-    private String locality;
+  @Data
+  @Builder
+  public static class LocalityData {
+    private List<String> hashtags;
   }
 }

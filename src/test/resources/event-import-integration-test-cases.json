@@ -90,6 +90,31 @@
     }
   },
   {
+    "scenario": "geocode_skips_already_geocoded_events",
+    "description": "POST /admin/events/geocode — events that already have a location_id set are excluded by the repository query and never sent to Google Maps",
+    "db_seed": [
+      {
+        "name": "Trek and Plog",
+        "organisation": "Team Everest",
+        "portal": "TEAMEVEREST",
+        "type": "TREKANDPLOG",
+        "startTime": "2026-02-21T05:00:00",
+        "address": "Lalbagh Main gate, Bengaluru",
+        "link": "https://teameverest.ngo/events/trek",
+        "has_location": true,
+        "note": "location_id is already set — this event must be excluded from geocoding"
+      }
+    ],
+    "expected": {
+      "status": 200,
+      "total": 0,
+      "success": 0,
+      "failed": 0,
+      "google_maps_calls": 0,
+      "note": "findByLocationIsNullAndAddressIsNotNull returns empty — Google Maps API must not be called"
+    }
+  },
+  {
     "scenario": "portal_normalisation",
     "description": "Raw portal strings from scraper are normalised to EventPortalModel enum values",
     "mappings": [

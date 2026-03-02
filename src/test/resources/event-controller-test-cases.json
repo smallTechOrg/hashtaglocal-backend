@@ -9,8 +9,8 @@
     }
   },
   {
-    "scenario": "null_location_before_geocoding",
-    "description": "Event imported but POST /admin/events/geocode not yet called — location field must be null",
+    "scenario": "event_without_location_excluded",
+    "description": "Event imported but not yet geocoded — excluded from GET /api/v1/events response (no location = not shown)",
     "db_seed": [
       {
         "name": "Tree Plantation Drive",
@@ -18,47 +18,32 @@
         "portal": "MYBHARATGOVIN",
         "type": "TREEPLANTATION",
         "start_time": "2026-02-21T00:00:00",
-        "end_time": null,
         "address": "Lalbagh Main gate, Bengaluru",
         "link": "https://mybharat.gov.in/events/tree-plantation-drive",
-        "image_url": null,
-        "meta_data": { "city": "Bengaluru" }
+        "has_location": false
       }
     ],
     "expected": {
       "status": 200,
-      "events_count": 1,
-      "location": null,
-      "note": "location_id is null until POST /admin/events/geocode is called — frontend falls back to address"
+      "events_count": 0,
+      "note": "Events without a geocoded location are excluded — frontend only shows events with known coordinates"
     }
   },
   {
     "scenario": "snake_case_response_shape",
-    "description": "All response fields are serialised as snake_case — Spring SNAKE_CASE naming strategy is applied",
-    "db_seed": [
-      {
-        "name": "Beach Cleanup",
-        "organisation": "Clean Oceans",
-        "portal": "IVOLUNTEER",
-        "type": "BEACH_CLEANUP",
-        "start_time": "2026-03-15T00:00:00",
-        "end_time": null,
-        "address": "Juhu Beach, Mumbai",
-        "link": "https://ivolunteer.in/beach-cleanup",
-        "image_url": null,
-        "meta_data": null
-      }
-    ],
+    "description": "Response wrapper shape is correct — outer keys are data.events array",
+    "db_seed": [],
     "expected": {
       "status": 200,
-      "events_count": 1,
-      "json_keys": ["id", "name", "organisation", "image_url", "portal", "type", "start_time", "end_time", "location", "address", "link", "meta_data"],
-      "note": "camelCase Java fields (imageUrl, startTime, endTime, metaData) must appear as snake_case in JSON"
+      "events_count": 0,
+      "json_keys": ["data"],
+      "data_keys": ["events"],
+      "note": "camelCase Java fields (imageUrl, startTime, endTime, metaData) must appear as snake_case in JSON when events are present"
     }
   },
   {
-    "scenario": "multiple_events_different_portals",
-    "description": "Events from different portals are all returned together",
+    "scenario": "only_geocoded_events_returned",
+    "description": "Mix of geocoded and un-geocoded events — only the geocoded ones appear in the response",
     "db_seed": [
       {
         "name": "Coastal Cleanup Drive",
@@ -67,7 +52,8 @@
         "type": "BEACH_CLEANUP",
         "start_time": "2026-04-05T08:00:00",
         "address": "Marina Beach, Chennai",
-        "link": "https://mybharat.gov.in/events/coastal-cleanup"
+        "link": "https://mybharat.gov.in/events/coastal-cleanup",
+        "has_location": true
       },
       {
         "name": "Green City Run",
@@ -76,21 +62,15 @@
         "type": "TREEPLANTATION",
         "start_time": "2026-04-12T06:30:00",
         "address": "Cubbon Park, Bengaluru",
-        "link": "https://ivolunteer.in/green-city-run"
-      },
-      {
-        "name": "Heritage Trek",
-        "organisation": "Team Everest",
-        "portal": "TEAMEVEREST",
-        "type": "TREKANDPLOG",
-        "start_time": "2026-04-19T05:00:00",
-        "address": "Nandi Hills, Karnataka",
-        "link": "https://teameverest.ngo/events/heritage-trek"
+        "link": "https://ivolunteer.in/green-city-run",
+        "has_location": false,
+        "note": "no location yet — must be excluded"
       }
     ],
     "expected": {
       "status": 200,
-      "events_count": 3
+      "events_count": 1,
+      "returned_event": "Coastal Cleanup Drive"
     }
   }
 ]

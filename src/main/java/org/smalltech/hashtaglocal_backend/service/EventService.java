@@ -3,6 +3,9 @@ package org.smalltech.hashtaglocal_backend.service;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.smalltech.hashtaglocal_backend.entity.EventEntity;
+import org.smalltech.hashtaglocal_backend.entity.Locality;
+import org.smalltech.hashtaglocal_backend.entity.Location;
+import org.smalltech.hashtaglocal_backend.model.response.EventData;
 import org.smalltech.hashtaglocal_backend.repository.EventRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -45,5 +48,56 @@ public class EventService {
   @Transactional
   public List<EventEntity> saveAll(List<EventEntity> events) {
     return eventRepository.saveAll(events);
+  }
+
+  /**
+   * Returns all events that have a resolved location, mapped to {@link EventData}.
+   *
+   * <p>Events without a linked {@link Location} (geocoding still pending) are excluded.
+   */
+  @Transactional(readOnly = true)
+  public List<EventData> getAllAsEventData() {
+    return eventRepository.findAll().stream()
+        .filter(e -> e.getLocation() != null)
+        .map(this::toEventData)
+        .toList();
+  }
+
+  /**
+   * Converts a database {@link EventEntity} into the API response model {@link EventData}.
+   *
+   * <p>Extracts lat/lng from the PostGIS Point stored in the linked {@link Location}. If no
+   * Location has been linked yet (geocoding pending), the {@code location} field in the response is
+   * left null.
+   */
+  public EventData toEventData(EventEntity entity) {
+    Location loc = entity.getLocation();
+    Locality locality = loc.getLocality();
+    EventData.LocalityData localityData =
+        locality != null
+            ? EventData.LocalityData.builder().hashtags(List.of(locality.getHashtag())).build()
+            : null;
+    EventData.LocationData locationData =
+        EventData.LocationData.builder()
+            .lat(loc.getPoint().getY())
+            .lng(loc.getPoint().getX())
+            .name(loc.getName())
+            .locality(localityData)
+            .build();
+
+    return EventData.builder()
+        .id(entity.getId())
+        .name(entity.getEventName())
+        .organisation(entity.getOrganisation())
+        .imageUrl(entity.getImageUrl())
+        .portal(entity.getPortal() != null ? entity.getPortal().name() : null)
+        .type(entity.getEventType() != null ? entity.getEventType().name() : null)
+        .startTime(entity.getStartTime())
+        .endTime(entity.getEndTime())
+        .location(locationData)
+        .address(entity.getAddress())
+        .link(entity.getLink())
+        .metaData(entity.getMetaData())
+        .build();
   }
 }
