@@ -1,7 +1,6 @@
 package org.smalltech.hashtaglocal_backend.controller;
 
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -9,34 +8,28 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.smalltech.hashtaglocal_backend.dto.ScrapeResponseDTO;
 import org.smalltech.hashtaglocal_backend.job.EventGeocodingJob;
 import org.smalltech.hashtaglocal_backend.service.EventImportService;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.multipart.MultipartFile;
 
 /**
- * Admin-only REST controller for importing events from a CSV file.
+ * Admin-only REST controller for importing events from the scrape service.
  *
  * <p>Base path: {@code /admin} — this should be protected by network rules or security config so it
  * is not publicly accessible.
  *
- * <p>Usage: export the events Excel sheet as a UTF-8 CSV and upload it via:
- *
- * <pre>
- *   POST /admin/events/import
- *   Content-Type: multipart/form-data
- *   form field: file = &lt;your CSV file&gt;
- * </pre>
- *
- * <p>The import is idempotent in the sense that re-uploading the same CSV will insert duplicate
- * rows — there is currently no deduplication logic.
+ * <p>Usage: the external scrape service calls {@code POST /admin/events/import} with the events
+ * JSON payload after scraping each portal.
  */
-@Tag(name = "Admin - Event Import", description = "Admin endpoints for bulk importing events")
+@Tag(
+    name = "Admin - Event Import",
+    description = "Admin endpoints for importing and geocoding events")
 @RestController
 @RequestMapping("/admin")
 @RequiredArgsConstructor
@@ -47,28 +40,26 @@ public class EventImportController {
   private final EventGeocodingJob eventGeocodingJob;
 
   /**
-   * Accepts a CSV file upload and imports all valid rows as events.
+   * Accepts a JSON payload from the scrape service and imports new events, skipping duplicates.
    *
-   * <p>Returns a plain-text summary of how many events were imported, or an error message if
-   * parsing fails entirely. Individual bad rows are skipped with a warning log rather than failing
-   * the whole request.
+   * <p>Deduplication key: {@code eventName + startTime}. Events that already exist in the database
+   * are silently skipped.
    *
    * <p>{@code POST /admin/events/import}
-   *
-   * @param file the CSV file (multipart form field named "file")
    */
   @Operation(
-      summary = "Import events from CSV",
+      summary = "Import events from scrape service",
       description =
-          "Upload a UTF-8 CSV file to bulk-import events. Duplicate rows are not deduplicated.")
+          "Accepts the scrape service JSON payload and imports new events."
+              + " Events with the same name + start_time are deduplicated.")
   @ApiResponses({
     @ApiResponse(
         responseCode = "200",
-        description = "Import succeeded — returns count of imported events",
+        description = "Import succeeded — returns count of newly imported events",
         content =
             @Content(
                 mediaType = MediaType.TEXT_PLAIN_VALUE,
-                schema = @Schema(example = "Imported 42 events successfully."))),
+                schema = @Schema(example = "Imported 7 events successfully."))),
     @ApiResponse(
         responseCode = "400",
         description = "Import failed — returns error message",
@@ -77,12 +68,11 @@ public class EventImportController {
                 mediaType = MediaType.TEXT_PLAIN_VALUE,
                 schema = @Schema(example = "Import failed: ...")))
   })
-  @PostMapping(value = "/events/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-  public ResponseEntity<String> importEvents(
-      @Parameter(description = "UTF-8 CSV file to import", required = true) @RequestParam("file")
-          MultipartFile file) {
+  @PostMapping("/events/import")
+  public ResponseEntity<String> importEvents(@RequestBody ScrapeResponseDTO body) {
     try {
-      int count = eventImportService.importFromCsv(file);
+      var events = body.getData() != null ? body.getData().getEvents() : null;
+      int count = eventImportService.importFromScrapeResponse(events);
       return ResponseEntity.ok("Imported " + count + " events successfully.");
     } catch (Exception e) {
       log.error("Event import failed", e);

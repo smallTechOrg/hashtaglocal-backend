@@ -6,6 +6,7 @@ import java.time.LocalDateTime;
 import java.util.Map;
 import lombok.*;
 import org.hibernate.annotations.Type;
+import org.smalltech.hashtaglocal_backend.model.EventPortalModel;
 import org.smalltech.hashtaglocal_backend.model.EventTypeModel;
 
 /**
@@ -31,14 +32,24 @@ public class EventEntity {
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;
 
-  @Column(nullable = false)
+  @Column(name = "name", nullable = false)
   private String eventName;
 
   @Column(nullable = false)
   private String organisation;
 
-  /** Hosting platform (e.g., "digitalindia", "mybharat.gov.in", "ivolunteer", "Team everest"). */
-  @Column private String platform;
+  /** URL to the event banner/thumbnail image provided by the source portal. */
+  @Column(length = 2048)
+  private String imageUrl;
+
+  /**
+   * Source portal stored as VARCHAR in DB, enforced as enum in Java.
+   *
+   * @see EventPortalModel
+   */
+  @Enumerated(EnumType.STRING)
+  @Column(name = "portal", length = 50)
+  private EventPortalModel portal;
 
   /**
    * Event activity type stored as VARCHAR in DB, enforced as enum in Java.
@@ -46,7 +57,7 @@ public class EventEntity {
    * @see EventTypeModel
    */
   @Enumerated(EnumType.STRING)
-  @Column(name = "event_type", length = 50)
+  @Column(name = "type", length = 50)
   private EventTypeModel eventType;
 
   /** Event start date and time. Required. */

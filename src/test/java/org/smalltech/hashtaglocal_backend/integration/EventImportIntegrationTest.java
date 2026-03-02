@@ -2,32 +2,36 @@ package org.smalltech.hashtaglocal_backend.integration;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.smalltech.hashtaglocal_backend.dto.ScrapeEventDTO;
+import org.smalltech.hashtaglocal_backend.dto.ScrapeResponseDTO;
 import org.smalltech.hashtaglocal_backend.entity.EventEntity;
+import org.smalltech.hashtaglocal_backend.model.EventPortalModel;
+import org.smalltech.hashtaglocal_backend.model.EventTypeModel;
 import org.smalltech.hashtaglocal_backend.repository.EventRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.core.io.ClassPathResource;
-import org.springframework.http.client.MultipartBodyBuilder;
+import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.reactive.server.WebTestClient;
-import org.springframework.web.reactive.function.BodyInserters;
+import reactor.core.publisher.Mono;
 
 /**
  * Integration tests for {@code POST /admin/events/import}.
  *
- * <p>Uploads a real CSV file and verifies the events are persisted correctly to the database. The
- * test CSV lives at {@code src/test/resources/test-events.csv}.
+ * <p>Posts a scrape service JSON payload and verifies events are persisted correctly in the
+ * database.
  *
  * <p>Key behaviours verified:
  *
  * <ul>
- *   <li>All valid CSV rows become EventEntity rows in the DB
+ *   <li>All valid events in the payload become EventEntity rows in the DB
  *   <li>location_id is null immediately after import — geocoding is a separate step
- *   <li>The city column in the CSV is ignored — city is derived from the geocoded locality
+ *   <li>Duplicate events (same name + startTime) are not re-inserted on a second call
  * </ul>
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
@@ -38,21 +42,50 @@ class EventImportIntegrationTest {
   @Autowired private WebTestClient webTestClient;
   @Autowired private EventRepository eventRepository;
 
+  private static final LocalDateTime START_TIME = LocalDateTime.of(2026, 2, 21, 5, 0);
+
   @BeforeEach
   void cleanUp() {
     eventRepository.deleteAll();
   }
 
+  private ScrapeResponseDTO payload(ScrapeEventDTO... events) {
+    return ScrapeResponseDTO.builder()
+        .data(ScrapeResponseDTO.Data.builder().events(List.of(events)).build())
+        .build();
+  }
+
   @Test
-  @DisplayName("Imports all valid rows from the CSV and persists them to the database")
-  void importsCsvAndPersistsEvents() {
-    MultipartBodyBuilder builder = new MultipartBodyBuilder();
-    builder.part("file", new ClassPathResource("test-events.csv")).filename("test-events.csv");
+  @DisplayName("Imports all events from the payload and persists them to the database")
+  void importsPayloadAndPersistsEvents() {
+    ScrapeEventDTO trek =
+        ScrapeEventDTO.builder()
+            .name("Trek and Plog")
+            .organisation("Team Everest")
+            .portal("Team everest")
+            .type("TREKANDPLOG")
+            .startTime(START_TIME)
+            .address("Lalbagh Main gate, Bengaluru")
+            .link("https://www.teameverest.ngo/events/trek-plog-bengaluru1")
+            .image("https://images.unsplash.com/photo-1551632811.jpg")
+            .build();
+
+    ScrapeEventDTO beach =
+        ScrapeEventDTO.builder()
+            .name("Beach Cleanup")
+            .organisation("ivolunteer")
+            .portal("ivolunteer")
+            .type("BEACH_CLEANUP")
+            .startTime(LocalDateTime.of(2026, 2, 21, 0, 0))
+            .address("Holy Cross Church, Vile Parle West, Mumbai")
+            .link("https://www.ivolunteer.in/opportunity/beach-cleanup")
+            .build();
 
     webTestClient
         .post()
         .uri("/admin/events/import")
-        .body(BodyInserters.fromMultipartData(builder.build()))
+        .contentType(MediaType.APPLICATION_JSON)
+        .body(Mono.just(payload(trek, beach)), ScrapeResponseDTO.class)
         .exchange()
         .expectStatus()
         .isOk()
@@ -62,39 +95,73 @@ class EventImportIntegrationTest {
     List<EventEntity> events = eventRepository.findAll();
     assertEquals(2, events.size());
 
-    EventEntity treePlantation =
+    EventEntity trekEntity =
         events.stream()
-            .filter(e -> "Tree Plantation Drive".equals(e.getEventName()))
+            .filter(e -> "Trek and Plog".equals(e.getEventName()))
             .findFirst()
-            .orElseThrow(() -> new AssertionError("Tree Plantation Drive event not found in DB"));
+            .orElseThrow(() -> new AssertionError("Trek and Plog event not found in DB"));
 
-    assertEquals("Green India", treePlantation.getOrganisation());
-    assertEquals("mybharat.gov.in", treePlantation.getPlatform());
-    assertEquals("Lalbagh Main gate", treePlantation.getAddress());
-
-    // location is null — geocoding has not been run yet
-    assertNull(treePlantation.getLocation(), "location_id should be null until geocoded");
-    // city column from CSV is ignored — meta_data is null after import
-    assertNull(treePlantation.getMetaData());
+    assertEquals("Team Everest", trekEntity.getOrganisation());
+    assertEquals(EventPortalModel.TEAMEVEREST, trekEntity.getPortal());
+    assertEquals(EventTypeModel.TREKANDPLOG, trekEntity.getEventType());
+    assertEquals("Lalbagh Main gate, Bengaluru", trekEntity.getAddress());
+    assertNull(trekEntity.getLocation(), "location_id should be null until geocoded");
+    assertNull(trekEntity.getMetaData());
   }
 
   @Test
-  @DisplayName("Returns a 0 count response for a CSV that contains only the header row")
-  void returnsZeroForHeaderOnlyCsv() {
-    byte[] headerOnly =
-        "event_name,city,organisation,platform,event_type,start_time,end_time,address,link\n"
-            .getBytes();
+  @DisplayName("Duplicate events are not re-inserted on a second import call")
+  void deduplicatesOnSecondImport() {
+    ScrapeEventDTO trek =
+        ScrapeEventDTO.builder()
+            .name("Trek and Plog")
+            .organisation("Team Everest")
+            .portal("Team everest")
+            .type("TREKANDPLOG")
+            .startTime(START_TIME)
+            .address("Lalbagh Main gate, Bengaluru")
+            .build();
 
-    MultipartBodyBuilder builder = new MultipartBodyBuilder();
-    builder
-        .part("file", headerOnly)
-        .header("Content-Disposition", "form-data; name=\"file\"; filename=\"empty.csv\"")
-        .header("Content-Type", "text/csv");
+    // First import — should persist 1 event
+    webTestClient
+        .post()
+        .uri("/admin/events/import")
+        .contentType(MediaType.APPLICATION_JSON)
+        .body(Mono.just(payload(trek)), ScrapeResponseDTO.class)
+        .exchange()
+        .expectStatus()
+        .isOk();
+
+    assertEquals(1, eventRepository.count());
+
+    // Second import with same event — duplicate must be skipped
+    webTestClient
+        .post()
+        .uri("/admin/events/import")
+        .contentType(MediaType.APPLICATION_JSON)
+        .body(Mono.just(payload(trek)), ScrapeResponseDTO.class)
+        .exchange()
+        .expectStatus()
+        .isOk()
+        .expectBody(String.class)
+        .value(body -> assertTrue(body.contains("0"), "Second import should save 0 new events"));
+
+    assertEquals(1, eventRepository.count(), "DB must still have exactly 1 event after dedup");
+  }
+
+  @Test
+  @DisplayName("Returns 0 count for a payload with an empty events list")
+  void returnsZeroForEmptyEventsList() {
+    ScrapeResponseDTO emptyPayload =
+        ScrapeResponseDTO.builder()
+            .data(ScrapeResponseDTO.Data.builder().events(List.of()).build())
+            .build();
 
     webTestClient
         .post()
         .uri("/admin/events/import")
-        .body(BodyInserters.fromMultipartData(builder.build()))
+        .contentType(MediaType.APPLICATION_JSON)
+        .body(Mono.just(emptyPayload), ScrapeResponseDTO.class)
         .exchange()
         .expectStatus()
         .isOk()

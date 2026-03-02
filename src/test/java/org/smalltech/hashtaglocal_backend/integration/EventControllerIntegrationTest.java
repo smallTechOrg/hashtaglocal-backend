@@ -6,6 +6,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.smalltech.hashtaglocal_backend.entity.EventEntity;
+import org.smalltech.hashtaglocal_backend.model.EventPortalModel;
 import org.smalltech.hashtaglocal_backend.model.EventTypeModel;
 import org.smalltech.hashtaglocal_backend.repository.EventRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,13 +25,14 @@ import org.springframework.test.web.reactive.server.WebTestClient;
  *     "events": [
  *       {
  *         "id": 1,
- *         "event_name": "Tree Plantation Drive",
+ *         "name": "Tree Plantation Drive",
  *         "organisation": "Green India",
- *         "platform": "mybharat.gov.in",
- *         "event_type": "TREEPLANTATION",
+ *         "image_url": null,
+ *         "portal": "MYBHARATGOVIN",
+ *         "type": "TREEPLANTATION",
  *         "start_time": "2026-02-21T00:00:00",
  *         "end_time": null,
- *         "location": null,        // null until POST /admin/events/geocode is run
+ *         "location": null,
  *         "address": "Lalbagh Main gate, Bengaluru",
  *         "link": null,
  *         "meta_data": { "city": "Bengaluru" }
@@ -76,7 +78,7 @@ class EventControllerIntegrationTest {
         EventEntity.builder()
             .eventName("Tree Plantation Drive")
             .organisation("Green India")
-            .platform("mybharat.gov.in")
+            .portal(EventPortalModel.MYBHARATGOVIN)
             .eventType(EventTypeModel.TREEPLANTATION)
             .startTime(LocalDateTime.of(2026, 2, 21, 0, 0))
             .address("Lalbagh Main gate, Bengaluru")
@@ -108,7 +110,7 @@ class EventControllerIntegrationTest {
         EventEntity.builder()
             .eventName("Beach Cleanup")
             .organisation("Clean Oceans")
-            .platform("ivolunteer")
+            .portal(EventPortalModel.IVOLUNTEER)
             .eventType(EventTypeModel.BEACH_CLEANUP)
             .startTime(LocalDateTime.of(2026, 3, 15, 0, 0))
             .address("Juhu Beach, Mumbai")
@@ -125,11 +127,11 @@ class EventControllerIntegrationTest {
         .isEqualTo(1)
         .jsonPath("$.data.events[0].id")
         .exists()
-        .jsonPath("$.data.events[0].event_name")
+        .jsonPath("$.data.events[0].name")
         .isEqualTo("Beach Cleanup")
         .jsonPath("$.data.events[0].organisation")
         .isEqualTo("Clean Oceans")
-        .jsonPath("$.data.events[0].event_type")
+        .jsonPath("$.data.events[0].type")
         .isEqualTo("BEACH_CLEANUP")
         .jsonPath("$.data.events[0].start_time")
         .exists()

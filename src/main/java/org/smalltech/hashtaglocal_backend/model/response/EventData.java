@@ -18,14 +18,15 @@ import lombok.Data;
 public class EventData {
 
   private Long id;
-  private String eventName;
+  private String name;
   private String organisation;
+  private String imageUrl;
 
-  /** The platform this event was sourced from (e.g., "mybharat.gov.in", "ivolunteer"). */
-  private String platform;
+  /** The portal this event was sourced from (e.g., "MYBHARATGOVIN", "IVOLUNTEER"). */
+  private String portal;
 
   /** String name of the {@link org.smalltech.hashtaglocal_backend.model.EventTypeModel} enum. */
-  private String eventType;
+  private String type;
 
   private LocalDateTime startTime;
 
@@ -41,10 +42,10 @@ public class EventData {
   /** Raw address string from the original data source. */
   private String address;
 
-  /** URL to the event page on the source platform. */
+  /** URL to the event page on the source portal. */
   private String link;
 
-  /** Free-form extra fields that vary per organisation or platform (stored as JSONB). */
+  /** Free-form extra fields that vary per organisation or portal (stored as JSONB). */
   private Map<String, Object> metaData;
 
   /**

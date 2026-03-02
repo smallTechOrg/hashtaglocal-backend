@@ -3,6 +3,7 @@ package org.smalltech.hashtaglocal_backend.repository;
 import java.time.LocalDateTime;
 import java.util.List;
 import org.smalltech.hashtaglocal_backend.entity.EventEntity;
+import org.smalltech.hashtaglocal_backend.model.EventPortalModel;
 import org.smalltech.hashtaglocal_backend.model.EventTypeModel;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
@@ -19,8 +20,8 @@ public interface EventRepository extends JpaRepository<EventEntity, Long> {
   /** Returns all events organised by the given organisation name (case-sensitive). */
   List<EventEntity> findByOrganisation(String organisation);
 
-  /** Returns all events sourced from the given platform (e.g., "mybharat.gov.in"). */
-  List<EventEntity> findByPlatform(String platform);
+  /** Returns all events sourced from the given portal. */
+  List<EventEntity> findByPortal(EventPortalModel portal);
 
   /** Returns all events matching the given activity type. */
   List<EventEntity> findByEventType(EventTypeModel eventType);
@@ -30,4 +31,12 @@ public interface EventRepository extends JpaRepository<EventEntity, Long> {
 
   /** Returns events that have a raw address but no geocoded location yet. */
   List<EventEntity> findByLocationIsNullAndAddressIsNotNull();
+
+  /**
+   * Returns {@code true} if an event with the same name and start time already exists.
+   *
+   * <p>Used for deduplication during import — prevents re-inserting events that were already
+   * imported from a previous scrape of the same portal.
+   */
+  boolean existsByEventNameAndStartTime(String eventName, LocalDateTime startTime);
 }
