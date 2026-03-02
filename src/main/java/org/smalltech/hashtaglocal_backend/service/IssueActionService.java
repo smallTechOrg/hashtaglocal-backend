@@ -82,14 +82,6 @@ public class IssueActionService {
       }
     }
 
-    // VERIFY is not allowed while the issue is still ONHOLD (awaiting its own approval)
-    if (issueActionModel == IssueActionModel.VERIFY
-        && IssueStatusModel.ONHOLD.equals(issueEntity.getStatus())) {
-      throw new ResponseStatusException(
-          HttpStatus.BAD_REQUEST,
-          "Cannot verify an issue that is still ONHOLD. Wait for admin approval first.");
-    }
-
     // Enforce geo-fence for VERIFY / RESOLVE (geo-fence is skipped when media location is
     // absent, preserving backward compatibility with clients that do not send coordinates).
     if (issueActionModel == IssueActionModel.VERIFY

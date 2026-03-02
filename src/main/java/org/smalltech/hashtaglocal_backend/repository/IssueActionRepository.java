@@ -67,4 +67,11 @@ public interface IssueActionRepository extends JpaRepository<IssueActionEntity, 
    */
   List<IssueActionEntity> findByIssueEntityAndApprovalStatus(
       IssueEntity issueEntity, IssueActionApprovalStatus approvalStatus);
+
+  /**
+   * Returns recently reviewed (APPROVED or REJECTED) actions, ordered newest-first. Used by the
+   * admin history endpoint.
+   */
+  List<IssueActionEntity> findByApprovalStatusInOrderByApprovedAtDesc(
+      List<IssueActionApprovalStatus> statuses);
 }

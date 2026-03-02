@@ -139,4 +139,11 @@ public class IssueActionAdminService {
     return issueActionRepository.findByApprovalStatusOrderByCreatedAtAsc(
         IssueActionApprovalStatus.PENDING);
   }
+
+  /** Returns all recently reviewed (APPROVED or REJECTED) actions, ordered newest-first. */
+  @Transactional(readOnly = true)
+  public List<IssueActionEntity> getRecentlyReviewedActions() {
+    return issueActionRepository.findByApprovalStatusInOrderByApprovedAtDesc(
+        List.of(IssueActionApprovalStatus.APPROVED, IssueActionApprovalStatus.REJECTED));
+  }
 }
