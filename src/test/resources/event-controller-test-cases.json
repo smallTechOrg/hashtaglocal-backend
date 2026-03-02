@@ -1,0 +1,96 @@
+[
+  {
+    "scenario": "empty_list",
+    "description": "No events in DB — GET /api/v1/events returns an empty events array",
+    "db_seed": [],
+    "expected": {
+      "status": 200,
+      "events_count": 0
+    }
+  },
+  {
+    "scenario": "null_location_before_geocoding",
+    "description": "Event imported but POST /admin/events/geocode not yet called — location field must be null",
+    "db_seed": [
+      {
+        "name": "Tree Plantation Drive",
+        "organisation": "Green India",
+        "portal": "MYBHARATGOVIN",
+        "type": "TREEPLANTATION",
+        "start_time": "2026-02-21T00:00:00",
+        "end_time": null,
+        "address": "Lalbagh Main gate, Bengaluru",
+        "link": "https://mybharat.gov.in/events/tree-plantation-drive",
+        "image_url": null,
+        "meta_data": { "city": "Bengaluru" }
+      }
+    ],
+    "expected": {
+      "status": 200,
+      "events_count": 1,
+      "location": null,
+      "note": "location_id is null until POST /admin/events/geocode is called — frontend falls back to address"
+    }
+  },
+  {
+    "scenario": "snake_case_response_shape",
+    "description": "All response fields are serialised as snake_case — Spring SNAKE_CASE naming strategy is applied",
+    "db_seed": [
+      {
+        "name": "Beach Cleanup",
+        "organisation": "Clean Oceans",
+        "portal": "IVOLUNTEER",
+        "type": "BEACH_CLEANUP",
+        "start_time": "2026-03-15T00:00:00",
+        "end_time": null,
+        "address": "Juhu Beach, Mumbai",
+        "link": "https://ivolunteer.in/beach-cleanup",
+        "image_url": null,
+        "meta_data": null
+      }
+    ],
+    "expected": {
+      "status": 200,
+      "events_count": 1,
+      "json_keys": ["id", "name", "organisation", "image_url", "portal", "type", "start_time", "end_time", "location", "address", "link", "meta_data"],
+      "note": "camelCase Java fields (imageUrl, startTime, endTime, metaData) must appear as snake_case in JSON"
+    }
+  },
+  {
+    "scenario": "multiple_events_different_portals",
+    "description": "Events from different portals are all returned together",
+    "db_seed": [
+      {
+        "name": "Coastal Cleanup Drive",
+        "organisation": "Ocean Warriors",
+        "portal": "MYBHARATGOVIN",
+        "type": "BEACH_CLEANUP",
+        "start_time": "2026-04-05T08:00:00",
+        "address": "Marina Beach, Chennai",
+        "link": "https://mybharat.gov.in/events/coastal-cleanup"
+      },
+      {
+        "name": "Green City Run",
+        "organisation": "Run For Trees",
+        "portal": "IVOLUNTEER",
+        "type": "TREEPLANTATION",
+        "start_time": "2026-04-12T06:30:00",
+        "address": "Cubbon Park, Bengaluru",
+        "link": "https://ivolunteer.in/green-city-run"
+      },
+      {
+        "name": "Heritage Trek",
+        "organisation": "Team Everest",
+        "portal": "TEAMEVEREST",
+        "type": "TREKANDPLOG",
+        "start_time": "2026-04-19T05:00:00",
+        "address": "Nandi Hills, Karnataka",
+        "link": "https://teameverest.ngo/events/heritage-trek"
+      }
+    ],
+    "expected": {
+      "status": 200,
+      "events_count": 3
+    }
+  }
+]

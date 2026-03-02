@@ -120,6 +120,7 @@ class EventImportIntegrationTest {
             .type("TREKANDPLOG")
             .startTime(START_TIME)
             .address("Lalbagh Main gate, Bengaluru")
+            .link("https://www.teameverest.ngo/events/trek-plog-bengaluru1")
             .build();
 
     // First import — should persist 1 event

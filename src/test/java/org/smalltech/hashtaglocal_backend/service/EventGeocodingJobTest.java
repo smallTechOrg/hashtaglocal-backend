@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
@@ -32,6 +33,12 @@ import org.smalltech.hashtaglocal_backend.repository.EventRepository;
  * <p>The job queries for un-geocoded events (location_id IS NULL), calls the Google Maps API for
  * each address, creates a Location row, and links it back to the event. These tests verify that
  * flow without hitting the database or the real API.
+ *
+ * <p>Locality linking: after geocoding, {@code locationService.relinkLocalities()} is always called
+ * as a final step to attach a Locality polygon to any Location rows whose locality_id is still
+ * null. The tests verify the count is propagated in {@link
+ * EventGeocodingJob.GeocodingJobResult#localitiesLinked()} and that the call happens even when
+ * geocoding fails or there are no events.
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("EventGeocodingJob — geocoding logic")
@@ -54,10 +61,17 @@ class EventGeocodingJobTest {
   }
 
   // ---------------------------------------------------------------------------
-  // Parameterized: address → lat/lng — test cases live in geocoding-test-cases.json
+  // Parameterized: address → lat/lng + locality — test cases live in geocoding-test-cases.json
   // ---------------------------------------------------------------------------
 
-  record GeocodingTestCase(String address, double lat, double lng, String city, String name) {}
+  record GeocodingTestCase(
+      String address,
+      double lat,
+      double lng,
+      String city,
+      String name,
+      String locality,
+      @JsonProperty("localities_linked") int localitiesLinked) {}
 
   static Stream<Arguments> geocodingTestCases() throws IOException {
     List<GeocodingTestCase> cases =
@@ -66,14 +80,29 @@ class EventGeocodingJobTest {
                 EventGeocodingJobTest.class.getResourceAsStream("/geocoding-test-cases.json"),
                 new TypeReference<>() {});
     return cases.stream()
-        .map(tc -> Arguments.of(tc.address(), tc.lat(), tc.lng(), tc.city(), tc.name()));
+        .map(
+            tc ->
+                Arguments.of(
+                    tc.address(),
+                    tc.lat(),
+                    tc.lng(),
+                    tc.city(),
+                    tc.name(),
+                    tc.locality(),
+                    tc.localitiesLinked()));
   }
 
   @ParameterizedTest(name = "{0}")
   @MethodSource("geocodingTestCases")
-  @DisplayName("Links correct lat/lng to event for address")
+  @DisplayName("Links correct lat/lng and locality count to event for address")
   void linksCorrectCoordinatesToEvent(
-      String address, double expectedLat, double expectedLng, String city, String name)
+      String address,
+      double expectedLat,
+      double expectedLng,
+      String city,
+      String name,
+      String locality,
+      int expectedLocalitiesLinked)
       throws Exception {
     EventEntity event = eventWithAddress(1L, address);
     when(eventRepository.findByLocationIsNullAndAddressIsNotNull()).thenReturn(List.of(event));
@@ -87,11 +116,16 @@ class EventGeocodingJobTest {
     Location savedLocation = Location.builder().id(10L).name(name).build();
     when(locationService.createAndSaveLocation(eq(expectedLat), eq(expectedLng), any(), eq(name)))
         .thenReturn(savedLocation);
+    when(locationService.relinkLocalities()).thenReturn(expectedLocalitiesLinked);
 
     EventGeocodingJob.GeocodingJobResult result = geocodingJob.run();
 
     assertEquals(1, result.success());
     assertEquals(0, result.failed());
+    assertEquals(
+        expectedLocalitiesLinked,
+        result.localitiesLinked(),
+        "localitiesLinked should match — locality=" + locality);
     verify(eventRepository).save(argThat(e -> savedLocation.equals(e.getLocation())));
   }
 
@@ -175,5 +209,87 @@ class EventGeocodingJobTest {
     // locality relinking still runs (it's always the final step)
     verify(locationService).relinkLocalities();
     verify(locationService, never()).createAndSaveLocation(any(), any(), any(), any());
+  }
+
+  // ---------------------------------------------------------------------------
+  // Locality linking
+  // ---------------------------------------------------------------------------
+
+  @Test
+  @DisplayName("localitiesLinked count from relinkLocalities() is propagated in job result")
+  void localitiesLinkedCountIsPropagatedInResult() {
+    EventEntity event = eventWithAddress(1L, "Lalbagh Main Gate, Bengaluru");
+    when(eventRepository.findByLocationIsNullAndAddressIsNotNull()).thenReturn(List.of(event));
+
+    LocationMetadataDTO metadata =
+        LocationMetadataDTO.builder().city("Bengaluru").name("Lalbagh").build();
+    when(geocodingService.forwardGeocode(anyString()))
+        .thenReturn(
+            new GoogleMapsGeocodingService.ForwardGeocodeResult(12.9507, 77.5848, metadata));
+    when(geocodingService.metadataToMap(any())).thenReturn(Map.of("city", "Bengaluru"));
+    when(locationService.createAndSaveLocation(any(), any(), any(), any()))
+        .thenReturn(Location.builder().id(10L).name("Lalbagh").build());
+    when(locationService.relinkLocalities()).thenReturn(3);
+
+    EventGeocodingJob.GeocodingJobResult result = geocodingJob.run();
+
+    assertEquals(3, result.localitiesLinked());
+  }
+
+  @Test
+  @DisplayName("relinkLocalities() is called even when all geocoding fails")
+  void relinkLocalitiesIsCalledEvenWhenAllGeocodingFails() {
+    when(eventRepository.findByLocationIsNullAndAddressIsNotNull())
+        .thenReturn(
+            List.of(
+                eventWithAddress(1L, "Bad Address One"), eventWithAddress(2L, "Bad Address Two")));
+    when(geocodingService.forwardGeocode(anyString())).thenReturn(null);
+
+    geocodingJob.run();
+
+    verify(locationService).relinkLocalities();
+  }
+
+  @Test
+  @DisplayName("localitiesLinked is 0 when relinkLocalities() returns 0 — localities table empty")
+  void localitiesLinkedIsZeroWhenNoLocalitiesExist() {
+    EventEntity event = eventWithAddress(1L, "Juhu Beach, Mumbai");
+    when(eventRepository.findByLocationIsNullAndAddressIsNotNull()).thenReturn(List.of(event));
+
+    LocationMetadataDTO metadata =
+        LocationMetadataDTO.builder().city("Mumbai").name("Juhu Beach").build();
+    when(geocodingService.forwardGeocode(anyString()))
+        .thenReturn(
+            new GoogleMapsGeocodingService.ForwardGeocodeResult(19.0896, 72.8266, metadata));
+    when(geocodingService.metadataToMap(any())).thenReturn(Map.of("city", "Mumbai"));
+    when(locationService.createAndSaveLocation(any(), any(), any(), any()))
+        .thenReturn(Location.builder().id(11L).name("Juhu Beach").build());
+    when(locationService.relinkLocalities()).thenReturn(0);
+
+    EventGeocodingJob.GeocodingJobResult result = geocodingJob.run();
+
+    assertEquals(0, result.localitiesLinked(), "No localities in DB — nothing can be linked");
+  }
+
+  @Test
+  @DisplayName("relinkLocalities() is called exactly once per job run regardless of event count")
+  void relinkLocalitiesIsCalledExactlyOncePerRun() {
+    when(eventRepository.findByLocationIsNullAndAddressIsNotNull())
+        .thenReturn(
+            List.of(
+                eventWithAddress(1L, "Lalbagh Main Gate, Bengaluru"),
+                eventWithAddress(2L, "Cubbon Park, Bengaluru")));
+
+    LocationMetadataDTO metadata =
+        LocationMetadataDTO.builder().city("Bengaluru").name("Bengaluru Location").build();
+    when(geocodingService.forwardGeocode(anyString()))
+        .thenReturn(new GoogleMapsGeocodingService.ForwardGeocodeResult(12.97, 77.59, metadata));
+    when(geocodingService.metadataToMap(any())).thenReturn(Map.of());
+    when(locationService.createAndSaveLocation(any(), any(), any(), any()))
+        .thenReturn(Location.builder().id(10L).build());
+
+    geocodingJob.run();
+
+    verify(locationService, times(1)).relinkLocalities();
   }
 }

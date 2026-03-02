@@ -82,6 +82,7 @@ class EventControllerIntegrationTest {
             .eventType(EventTypeModel.TREEPLANTATION)
             .startTime(LocalDateTime.of(2026, 2, 21, 0, 0))
             .address("Lalbagh Main gate, Bengaluru")
+            .link("https://example.com/event/1")
             .metaData(Map.of("city", "Bengaluru"))
             .build());
 
@@ -114,6 +115,7 @@ class EventControllerIntegrationTest {
             .eventType(EventTypeModel.BEACH_CLEANUP)
             .startTime(LocalDateTime.of(2026, 3, 15, 0, 0))
             .address("Juhu Beach, Mumbai")
+            .link("https://example.com/event/2")
             .build());
 
     webTestClient

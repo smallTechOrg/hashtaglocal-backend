@@ -35,8 +35,7 @@ public class EventEntity {
   @Column(name = "name", nullable = false)
   private String eventName;
 
-  @Column(nullable = false)
-  private String organisation;
+  @Column private String organisation;
 
   /** URL to the event banner/thumbnail image provided by the source portal. */
   @Column(length = 2048)
@@ -48,7 +47,7 @@ public class EventEntity {
    * @see EventPortalModel
    */
   @Enumerated(EnumType.STRING)
-  @Column(name = "portal", length = 50)
+  @Column(name = "portal", length = 50, nullable = false)
   private EventPortalModel portal;
 
   /**
@@ -57,7 +56,7 @@ public class EventEntity {
    * @see EventTypeModel
    */
   @Enumerated(EnumType.STRING)
-  @Column(name = "type", length = 50)
+  @Column(name = "type", length = 50, nullable = false)
   private EventTypeModel eventType;
 
   /** Event start date and time. Required. */
@@ -79,11 +78,11 @@ public class EventEntity {
    * Raw address string copied directly from the event data source (e.g., the Excel sheet). Kept as
    * a human-readable fallback while `location_id` is still null.
    */
-  @Column(length = 1024)
+  @Column(length = 1024, nullable = false)
   private String address;
 
   /** URL to the original event page on the source platform. */
-  @Column(length = 2048)
+  @Column(length = 2048, nullable = false)
   private String link;
 
   /**

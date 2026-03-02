@@ -1,0 +1,102 @@
+[
+  {
+    "scenario": "import_multiple_events",
+    "description": "All valid events in the payload are persisted — location_id is null immediately after import",
+    "payload": {
+      "data": {
+        "events": [
+          {
+            "name": "Trek and Plog",
+            "organisation": "Team Everest",
+            "portal": "Team everest",
+            "type": "TREKANDPLOG",
+            "startTime": "2026-02-21T05:00:00",
+            "address": "Lalbagh Main gate, Bengaluru",
+            "link": "https://www.teameverest.ngo/events/trek-plog-bengaluru1",
+            "image": "https://images.unsplash.com/photo-1551632811.jpg"
+          },
+          {
+            "name": "Beach Cleanup",
+            "organisation": "ivolunteer",
+            "portal": "ivolunteer",
+            "type": "BEACH_CLEANUP",
+            "startTime": "2026-02-21T00:00:00",
+            "address": "Holy Cross Church, Vile Parle West, Mumbai",
+            "link": "https://www.ivolunteer.in/opportunity/beach-cleanup"
+          }
+        ]
+      }
+    },
+    "expected": {
+      "status": 200,
+      "imported_count": 2,
+      "db_count": 2,
+      "location_id_null": true,
+      "note": "location_id stays null until POST /admin/events/geocode is called"
+    }
+  },
+  {
+    "scenario": "deduplication_second_import",
+    "description": "The same event sent twice — second import skips the duplicate, DB stays at 1 row",
+    "first_payload": {
+      "data": {
+        "events": [
+          {
+            "name": "Trek and Plog",
+            "organisation": "Team Everest",
+            "portal": "Team everest",
+            "type": "TREKANDPLOG",
+            "startTime": "2026-02-21T05:00:00",
+            "address": "Lalbagh Main gate, Bengaluru",
+            "link": "https://www.teameverest.ngo/events/trek-plog-bengaluru1"
+          }
+        ]
+      }
+    },
+    "second_payload": {
+      "data": {
+        "events": [
+          {
+            "name": "Trek and Plog",
+            "organisation": "Team Everest",
+            "portal": "Team everest",
+            "type": "TREKANDPLOG",
+            "startTime": "2026-02-21T05:00:00",
+            "address": "Lalbagh Main gate, Bengaluru",
+            "link": "https://www.teameverest.ngo/events/trek-plog-bengaluru1"
+          }
+        ]
+      }
+    },
+    "expected": {
+      "first_import_count": 1,
+      "second_import_count": 0,
+      "db_count_after_both": 1,
+      "dedup_key": "name + startTime"
+    }
+  },
+  {
+    "scenario": "empty_events_list",
+    "description": "Payload with an empty events array — import returns 0 and nothing is saved",
+    "payload": {
+      "data": {
+        "events": []
+      }
+    },
+    "expected": {
+      "status": 200,
+      "imported_count": 0,
+      "db_count": 0
+    }
+  },
+  {
+    "scenario": "portal_normalisation",
+    "description": "Raw portal strings from scraper are normalised to EventPortalModel enum values",
+    "mappings": [
+      { "raw": "Team everest", "enum": "TEAMEVEREST" },
+      { "raw": "ivolunteer",   "enum": "IVOLUNTEER" },
+      { "raw": "mybharat.gov.in", "enum": "MYBHARATGOVIN" }
+    ],
+    "note": "EventPortalModel.fromString() handles case-insensitive normalisation"
+  }
+]
