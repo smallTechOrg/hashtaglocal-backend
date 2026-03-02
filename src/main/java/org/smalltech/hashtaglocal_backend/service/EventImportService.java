@@ -5,17 +5,14 @@ import com.opencsv.exceptions.CsvValidationException;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.MonthDay;
 import java.time.Year;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.smalltech.hashtaglocal_backend.entity.EventEntity;
@@ -38,8 +35,8 @@ import org.springframework.web.multipart.MultipartFile;
  *   <li>Rows with a blank {@code event_name} or {@code organisation} are silently skipped.
  *   <li>Any row that throws an unexpected exception is logged and skipped — one bad row does not
  *       abort the whole import.
- *   <li>{@code city} has no dedicated column in the DB; it is stored inside {@code meta_data} as
- *       {@code {"city": "Bangalore"}}.
+ *   <li>The {@code city} column in the CSV is ignored — city is derived from the geocoded locality
+ *       after {@code POST /admin/events/geocode} is run.
  *   <li>Start/end dates are expected in "Month Day" format (e.g., "February 21"). They are parsed
  *       as the current year at midnight (00:00:00). Unparseable values are stored as null.
  *   <li>Event type strings are normalised (lowercased, spaces/hyphens removed) before being mapped
@@ -56,6 +53,16 @@ public class EventImportService {
   // Parses date strings like "February 21" or "March 1" from the spreadsheet.
   private static final DateTimeFormatter MONTH_DAY_FMT =
       DateTimeFormatter.ofPattern("MMMM d", Locale.ENGLISH);
+
+  // Parses full datetime strings — handles both padded (05:00:00) and unpadded (5:00:00) values,
+  // both slash and dash separators, and an optional comma after the year
+  // e.g. "21/02/2026 05:00:00", "21-02-2026 5:00:00", or "21/02/2026, 05:00".
+  private static final List<DateTimeFormatter> FULL_DATETIME_FMTS =
+      List.of(
+          DateTimeFormatter.ofPattern("d/M/yyyy H:mm:ss", Locale.ENGLISH),
+          DateTimeFormatter.ofPattern("d-M-yyyy H:mm:ss", Locale.ENGLISH),
+          DateTimeFormatter.ofPattern("d/M/yyyy H:mm", Locale.ENGLISH),
+          DateTimeFormatter.ofPattern("d/M/yyyy, H:mm", Locale.ENGLISH));
 
   private final EventService eventService;
 
@@ -113,8 +120,8 @@ public class EventImportService {
     }
 
     // Extract columns by fixed index — matches the expected header order
+    // Column index 1 (city) is intentionally skipped — city is derived from geocoded locality
     String eventName = get(row, 0);
-    String city = get(row, 1); // no dedicated DB column; goes into meta_data
     String organisation = get(row, 2);
     String platform = get(row, 3);
     String eventTypeRaw = get(row, 4);
@@ -127,12 +134,6 @@ public class EventImportService {
       return null;
     }
 
-    // City is not a dedicated column — store it in meta_data so it is not lost
-    Map<String, Object> metaData = new HashMap<>();
-    if (!city.isBlank()) {
-      metaData.put("city", city);
-    }
-
     return EventEntity.builder()
         .eventName(eventName)
         .organisation(organisation)
@@ -142,7 +143,6 @@ public class EventImportService {
         .endTime(parseDateTime(endRaw))
         .address(address.isBlank() ? null : address)
         .link(link.isBlank() ? null : link)
-        .metaData(metaData.isEmpty() ? null : metaData)
         .build();
   }
 
@@ -159,10 +159,18 @@ public class EventImportService {
     if (raw == null || raw.isBlank()) {
       return null;
     }
+    String trimmed = raw.trim();
+    // Try full datetime formats first e.g. "21/02/2026 05:00:00"
+    for (DateTimeFormatter fmt : FULL_DATETIME_FMTS) {
+      try {
+        return LocalDateTime.parse(trimmed, fmt);
+      } catch (DateTimeParseException ignored) {
+      }
+    }
+    // Fall back to "February 21" (stored at midnight of the current year)
     try {
-      MonthDay md = MonthDay.parse(raw.trim(), MONTH_DAY_FMT);
-      LocalDate date = md.atYear(Year.now().getValue());
-      return date.atStartOfDay();
+      MonthDay md = MonthDay.parse(trimmed, MONTH_DAY_FMT);
+      return md.atYear(Year.now().getValue()).atStartOfDay();
     } catch (DateTimeParseException e) {
       log.warn("Could not parse date '{}', skipping", raw);
       return null;

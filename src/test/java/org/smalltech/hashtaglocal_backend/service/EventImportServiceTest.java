@@ -67,16 +67,6 @@ class EventImportServiceTest {
   }
 
   @Test
-  @DisplayName("Stores the city column in meta_data — city has no dedicated DB column")
-  void storesCityInMetaData() throws Exception {
-    eventImportService.importFromCsv(csv("Cleanup,Bengaluru,Org,,,,,,\n"));
-
-    EventEntity event = capturedSavedEvents().get(0);
-    assertNotNull(event.getMetaData());
-    assertEquals("Bengaluru", event.getMetaData().get("city"));
-  }
-
-  @Test
   @DisplayName("Parses 'Month Day' date string to midnight of the current year")
   void parsesMonthDayDate() throws Exception {
     eventImportService.importFromCsv(csv("Event,City,Org,,,February 21,March 1,,\n"));
@@ -88,6 +78,23 @@ class EventImportServiceTest {
     assertEquals(2, event.getStartTime().getMonthValue());
     assertEquals(21, event.getStartTime().getDayOfMonth());
     assertEquals(0, event.getStartTime().getHour()); // stored at midnight
+  }
+
+  @Test
+  @DisplayName("Parses 'dd/MM/yyyy HH:mm:ss' date string preserving the exact time")
+  void parsesFullDatetime() throws Exception {
+    eventImportService.importFromCsv(
+        csv("Event,City,Org,,,21/02/2026 05:00:00,22/02/2026 18:30:00,,\n"));
+
+    EventEntity event = capturedSavedEvents().get(0);
+    assertNotNull(event.getStartTime());
+    assertEquals(2026, event.getStartTime().getYear());
+    assertEquals(2, event.getStartTime().getMonthValue());
+    assertEquals(21, event.getStartTime().getDayOfMonth());
+    assertEquals(5, event.getStartTime().getHour());
+    assertNotNull(event.getEndTime());
+    assertEquals(18, event.getEndTime().getHour());
+    assertEquals(30, event.getEndTime().getMinute());
   }
 
   @Test

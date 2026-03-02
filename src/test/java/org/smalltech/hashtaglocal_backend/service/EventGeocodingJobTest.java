@@ -170,6 +170,10 @@ class EventGeocodingJobTest {
     assertEquals(0, result.total());
     assertEquals(0, result.success());
     assertEquals(0, result.failed());
-    verifyNoInteractions(geocodingService, locationService);
+    // geocoding service is never touched — no addresses to resolve
+    verifyNoInteractions(geocodingService);
+    // locality relinking still runs (it's always the final step)
+    verify(locationService).relinkLocalities();
+    verify(locationService, never()).createAndSaveLocation(any(), any(), any(), any());
   }
 }

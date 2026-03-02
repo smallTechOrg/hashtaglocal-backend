@@ -27,7 +27,7 @@ import org.springframework.web.reactive.function.BodyInserters;
  * <ul>
  *   <li>All valid CSV rows become EventEntity rows in the DB
  *   <li>location_id is null immediately after import — geocoding is a separate step
- *   <li>The city column is stored in meta_data, not a dedicated column
+ *   <li>The city column in the CSV is ignored — city is derived from the geocoded locality
  * </ul>
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
@@ -74,10 +74,8 @@ class EventImportIntegrationTest {
 
     // location is null — geocoding has not been run yet
     assertNull(treePlantation.getLocation(), "location_id should be null until geocoded");
-
-    // city is not a DB column — it lives in meta_data
-    assertNotNull(treePlantation.getMetaData());
-    assertEquals("Bengaluru", treePlantation.getMetaData().get("city"));
+    // city column from CSV is ignored — meta_data is null after import
+    assertNull(treePlantation.getMetaData());
   }
 
   @Test

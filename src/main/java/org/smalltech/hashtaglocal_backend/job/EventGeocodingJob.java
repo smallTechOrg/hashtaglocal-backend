@@ -86,7 +86,12 @@ public class EventGeocodingJob {
       }
     }
 
-    GeocodingJobResult jobResult = new GeocodingJobResult(events.size(), success, failed);
+    // After geocoding, relink localities for any Location rows that still have locality_id = null.
+    // This fixes locations created when the localities table was empty.
+    int localitiesLinked = locationService.relinkLocalities();
+
+    GeocodingJobResult jobResult =
+        new GeocodingJobResult(events.size(), success, failed, localitiesLinked);
     log.info("Event geocoding job completed: {}", jobResult);
     return jobResult;
   }
@@ -94,10 +99,13 @@ public class EventGeocodingJob {
   public record GeocodingJobResult(
       @Schema(example = "100") int total,
       @Schema(example = "95") int success,
-      @Schema(example = "5") int failed) {
+      @Schema(example = "5") int failed,
+      @Schema(example = "90") int localitiesLinked) {
     @Override
     public String toString() {
-      return String.format("Total=%d, Success=%d, Failed=%d", total, success, failed);
+      return String.format(
+          "Total=%d, Success=%d, Failed=%d, LocalitiesLinked=%d",
+          total, success, failed, localitiesLinked);
     }
   }
 }
