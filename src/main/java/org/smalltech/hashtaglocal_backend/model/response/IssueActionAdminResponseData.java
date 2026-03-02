@@ -34,4 +34,10 @@ public class IssueActionAdminResponseData {
 
   /** When the action was submitted. */
   private LocalDateTime createdAt;
+
+  /** When the action was reviewed by an admin (null if still pending). */
+  private LocalDateTime approvedAt;
+
+  /** Username of the admin who reviewed this action (null if still pending). */
+  private String approvedByUsername;
 }

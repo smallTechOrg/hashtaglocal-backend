@@ -140,6 +140,44 @@ public class IssueAdminController {
             .build());
   }
 
+  /** Returns all recently reviewed (APPROVED or REJECTED) actions, ordered newest-first. */
+  @GetMapping("/issue-action/history")
+  @Operation(
+      summary = "List recently reviewed issue actions",
+      description =
+          "Returns all APPROVED and REJECTED actions ordered by review time (newest first).")
+  public ResponseEntity<NewAPIResponse<List<IssueActionAdminResponseData>>> getRecentActions() {
+    List<IssueActionAdminResponseData> items =
+        issueActionAdminService.getRecentlyReviewedActions().stream()
+            .map(
+                action ->
+                    IssueActionAdminResponseData.builder()
+                        .actionId(action.getId())
+                        .issueId(
+                            action.getIssueEntity() != null
+                                ? action.getIssueEntity().getId()
+                                : null)
+                        .submittedByUserId(
+                            action.getUserEntity() != null ? action.getUserEntity().getId() : null)
+                        .submittedByUsername(
+                            action.getUserEntity() != null
+                                ? action.getUserEntity().getUsername()
+                                : null)
+                        .action(action.getAction().name())
+                        .approvalStatus(action.getApprovalStatus().name())
+                        .createdAt(action.getCreatedAt())
+                        .approvedAt(action.getApprovedAt())
+                        .approvedByUsername(
+                            action.getApprovedByUser() != null
+                                ? action.getApprovedByUser().getUsername()
+                                : null)
+                        .build())
+            .toList();
+
+    return ResponseEntity.ok(
+        NewAPIResponse.<List<IssueActionAdminResponseData>>builder().data(items).build());
+  }
+
   /**
    * Returns a summary of a user's issue activity — total issues, status breakdown, and contribution
    * counts. Used by the ops portal to give reviewers context about the submitter.
