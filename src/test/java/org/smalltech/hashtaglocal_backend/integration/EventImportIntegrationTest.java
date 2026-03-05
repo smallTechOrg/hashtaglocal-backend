@@ -21,7 +21,7 @@ import org.springframework.test.web.reactive.server.WebTestClient;
 import reactor.core.publisher.Mono;
 
 /**
- * Integration tests for {@code POST /admin/events/import}.
+ * Integration tests for {@code POST /api/v1/events/import}.
  *
  * <p>Posts a scrape service JSON payload and verifies events are persisted correctly in the
  * database.
@@ -36,7 +36,7 @@ import reactor.core.publisher.Mono;
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
-@DisplayName("POST /admin/events/import")
+@DisplayName("POST /api/v1/events/import")
 class EventImportIntegrationTest {
 
   @Autowired private WebTestClient webTestClient;
@@ -83,7 +83,7 @@ class EventImportIntegrationTest {
 
     webTestClient
         .post()
-        .uri("/admin/events/import")
+        .uri("/api/v1/events/import")
         .contentType(MediaType.APPLICATION_JSON)
         .body(Mono.just(payload(trek, beach)), ScrapeResponseDTO.class)
         .exchange()
@@ -126,7 +126,7 @@ class EventImportIntegrationTest {
     // First import — should persist 1 event
     webTestClient
         .post()
-        .uri("/admin/events/import")
+        .uri("/api/v1/events/import")
         .contentType(MediaType.APPLICATION_JSON)
         .body(Mono.just(payload(trek)), ScrapeResponseDTO.class)
         .exchange()
@@ -138,7 +138,7 @@ class EventImportIntegrationTest {
     // Second import with same event — duplicate must be skipped
     webTestClient
         .post()
-        .uri("/admin/events/import")
+        .uri("/api/v1/events/import")
         .contentType(MediaType.APPLICATION_JSON)
         .body(Mono.just(payload(trek)), ScrapeResponseDTO.class)
         .exchange()
@@ -160,7 +160,7 @@ class EventImportIntegrationTest {
 
     webTestClient
         .post()
-        .uri("/admin/events/import")
+        .uri("/api/v1/events/import")
         .contentType(MediaType.APPLICATION_JSON)
         .body(Mono.just(emptyPayload), ScrapeResponseDTO.class)
         .exchange()

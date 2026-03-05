@@ -67,7 +67,7 @@ public class EventController {
                 mediaType = MediaType.TEXT_PLAIN_VALUE,
                 schema = @Schema(example = "Import failed: ...")))
   })
-  @PostMapping("/admin/events/import")
+  @PostMapping("/api/v1/events/import")
   public ResponseEntity<String> importEvents(@RequestBody ScrapeResponseDTO body) {
     try {
       var events = body.getData() != null ? body.getData().getEvents() : null;
@@ -87,7 +87,7 @@ public class EventController {
   @ApiResponse(
       responseCode = "200",
       description = "Job completed — returns total/success/failed counts")
-  @PostMapping("/admin/events/geocode")
+  @PostMapping("/api/v1/events/geocode")
   public ResponseEntity<EventGeocodingJob.GeocodingJobResult> geocodeEvents() {
     return ResponseEntity.ok(eventGeocodingJob.run());
   }
@@ -98,7 +98,7 @@ public class EventController {
           "Runs the same pipeline as the scheduled cron job: fetches events from the scrape"
               + " service, imports new ones, then geocodes any un-resolved addresses.")
   @ApiResponse(responseCode = "200", description = "Pipeline completed — returns a summary")
-  @PostMapping("/admin/events/ingest")
+  @PostMapping("/api/v1/events/ingest")
   public ResponseEntity<String> triggerIngestion() {
     eventIngestionCronJob.run();
     return ResponseEntity.ok("Ingestion pipeline completed. Check logs for details.");

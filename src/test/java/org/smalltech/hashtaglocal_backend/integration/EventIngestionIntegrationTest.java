@@ -20,7 +20,7 @@ import org.springframework.test.web.reactive.server.WebTestClient;
 
 /**
  * Integration tests for the event ingestion pipeline triggered via {@code POST
- * /admin/events/ingest}.
+ * /api/v1/events/ingest}.
  *
  * <p>The same pipeline runs as the scheduled cron job:
  *
@@ -35,7 +35,7 @@ import org.springframework.test.web.reactive.server.WebTestClient;
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
-@DisplayName("POST /admin/events/ingest — ingestion pipeline")
+@DisplayName("POST /api/v1/events/ingest — ingestion pipeline")
 class EventIngestionIntegrationTest {
 
   @Autowired private WebTestClient webTestClient;
@@ -73,7 +73,7 @@ class EventIngestionIntegrationTest {
     when(scrapeApiClient.fetchEvents())
         .thenReturn(List.of(event("Trek and Plog", t1), event("Beach Cleanup", t2)));
 
-    webTestClient.post().uri("/admin/events/ingest").exchange().expectStatus().isOk();
+    webTestClient.post().uri("/api/v1/events/ingest").exchange().expectStatus().isOk();
 
     assertEquals(2, eventRepository.count());
   }
@@ -84,7 +84,7 @@ class EventIngestionIntegrationTest {
     when(scrapeApiClient.fetchEvents())
         .thenReturn(List.of(event("Trek and Plog", LocalDateTime.of(2026, 4, 1, 9, 0))));
 
-    webTestClient.post().uri("/admin/events/ingest").exchange().expectStatus().isOk();
+    webTestClient.post().uri("/api/v1/events/ingest").exchange().expectStatus().isOk();
 
     verify(eventGeocodingJob, times(1)).run();
   }
@@ -96,11 +96,11 @@ class EventIngestionIntegrationTest {
     when(scrapeApiClient.fetchEvents()).thenReturn(List.of(trek));
 
     // First run — persists 1 event
-    webTestClient.post().uri("/admin/events/ingest").exchange().expectStatus().isOk();
+    webTestClient.post().uri("/api/v1/events/ingest").exchange().expectStatus().isOk();
     assertEquals(1, eventRepository.count());
 
     // Second run — same event, must be deduplicated
-    webTestClient.post().uri("/admin/events/ingest").exchange().expectStatus().isOk();
+    webTestClient.post().uri("/api/v1/events/ingest").exchange().expectStatus().isOk();
     assertEquals(1, eventRepository.count(), "Duplicate must not be re-inserted");
   }
 
@@ -109,7 +109,7 @@ class EventIngestionIntegrationTest {
   void skipsImportAndGeocodeWhenScrapeReturnsEmpty() {
     when(scrapeApiClient.fetchEvents()).thenReturn(List.of());
 
-    webTestClient.post().uri("/admin/events/ingest").exchange().expectStatus().isOk();
+    webTestClient.post().uri("/api/v1/events/ingest").exchange().expectStatus().isOk();
 
     assertEquals(0, eventRepository.count());
     verify(eventGeocodingJob, never()).run();
@@ -123,12 +123,12 @@ class EventIngestionIntegrationTest {
 
     // First run: 1 event
     when(scrapeApiClient.fetchEvents()).thenReturn(List.of(trek));
-    webTestClient.post().uri("/admin/events/ingest").exchange().expectStatus().isOk();
+    webTestClient.post().uri("/api/v1/events/ingest").exchange().expectStatus().isOk();
     assertEquals(1, eventRepository.count());
 
     // Second run: same + 1 new
     when(scrapeApiClient.fetchEvents()).thenReturn(List.of(trek, beach));
-    webTestClient.post().uri("/admin/events/ingest").exchange().expectStatus().isOk();
+    webTestClient.post().uri("/api/v1/events/ingest").exchange().expectStatus().isOk();
     assertEquals(2, eventRepository.count(), "Only the new event should be added");
   }
 }
