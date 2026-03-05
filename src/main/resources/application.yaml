@@ -101,4 +101,4 @@ events:
     url: ${EVENTS_SCRAPE_URL:}
     # Cron expression for the ingestion job (default: every 2 minutes)
     # Use '-' to disable. Override via EVENTS_SCRAPE_CRON env var.
-    cron: ${EVENTS_SCRAPE_CRON:0 */10 * * * * *}
+    cron: ${EVENTS_SCRAPE_CRON:0 */5 * * * *}
