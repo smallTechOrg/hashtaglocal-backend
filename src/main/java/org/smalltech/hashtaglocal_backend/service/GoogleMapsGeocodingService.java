@@ -1,6 +1,8 @@
 package org.smalltech.hashtaglocal_backend.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -29,6 +31,56 @@ public class GoogleMapsGeocodingService {
 
   private static final String REVERSE_GEOCODING_URL =
       "https://maps.googleapis.com/maps/api/geocode/json?latlng=%s,%s&key=%s";
+
+  private static final String FORWARD_GEOCODING_URL =
+      "https://maps.googleapis.com/maps/api/geocode/json?address=%s&key=%s";
+
+  /** Holds the lat/lng coordinates and parsed metadata returned by forward geocoding. */
+  public record ForwardGeocodeResult(double lat, double lng, LocationMetadataDTO metadata) {}
+
+  /**
+   * Perform forward geocoding to get coordinates and location details from an address string.
+   *
+   * @param address the raw address string to geocode
+   * @return {@link ForwardGeocodeResult} with lat, lng, and parsed metadata, or null on failure
+   */
+  public ForwardGeocodeResult forwardGeocode(String address) {
+    try {
+      String encoded = URLEncoder.encode(address, StandardCharsets.UTF_8);
+      String url = String.format(FORWARD_GEOCODING_URL, encoded, googleMapsApiKey);
+      log.debug("Forward geocoding: address='{}'", address);
+
+      String rawResponse = restTemplate.getForObject(url, String.class);
+      log.debug("Google Maps API raw response: {}", rawResponse);
+
+      GoogleMapsLocationDTO response =
+          objectMapper.readValue(rawResponse, GoogleMapsLocationDTO.class);
+
+      if (response == null || !"OK".equals(response.getStatus())) {
+        log.warn(
+            "Google Maps API returned status '{}' for address: '{}'",
+            response != null ? response.getStatus() : "null",
+            address);
+        return null;
+      }
+
+      if (response.getResults() == null || response.getResults().isEmpty()) {
+        log.warn("No geocoding results for address: '{}'", address);
+        return null;
+      }
+
+      GoogleMapsLocationDTO.Result result = response.getResults().get(0);
+      double lat = result.getGeometry().getLocation().getLat();
+      double lng = result.getGeometry().getLocation().getLng();
+      LocationMetadataDTO metadata = extractMetadata(result);
+
+      return new ForwardGeocodeResult(lat, lng, metadata);
+
+    } catch (Exception e) {
+      log.error("Error during forward geocoding for address '{}': {}", address, e.getMessage(), e);
+      return null;
+    }
+  }
 
   /**
    * Perform reverse geocoding to get location details from coordinates.

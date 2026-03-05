@@ -1,0 +1,167 @@
+[
+  {
+    "scenario": "maps_all_fields",
+    "description": "Every DTO field is mapped to the correct EventEntity field",
+    "input": {
+      "name": "Trek and Plog",
+      "organisation": "Test Org",
+      "portal": "Team everest",
+      "type": "TREKANDPLOG",
+      "startTime": "2026-02-21T05:00:00",
+      "endTime": null,
+      "address": "Lalbagh Main Gate, Bengaluru",
+      "link": "https://example.com",
+      "image": "https://example.com/image.jpg"
+    },
+    "expected_entity": {
+      "eventName": "Trek and Plog",
+      "organisation": "Test Org",
+      "portal": "TEAMEVEREST",
+      "eventType": "TREKANDPLOG",
+      "address": "Lalbagh Main Gate, Bengaluru",
+      "link": "https://example.com",
+      "imageUrl": "https://example.com/image.jpg",
+      "location": null
+    }
+  },
+  {
+    "scenario": "beach_cleanup_type_mapping",
+    "description": "Type string 'BEACH_CLEANUP' maps to EventTypeModel.BEACH_CLEANUP",
+    "input": {
+      "name": "Beach Cleanup",
+      "portal": "ivolunteer",
+      "type": "BEACH_CLEANUP",
+      "startTime": "2026-02-21T05:00:00",
+      "address": "Juhu Beach, Mumbai",
+      "link": "https://ivolunteer.in/beach-cleanup"
+    },
+    "expected_entity": {
+      "eventType": "BEACH_CLEANUP"
+    }
+  },
+  {
+    "scenario": "unknown_type_falls_back_to_other",
+    "description": "Unrecognised type string falls back to EventTypeModel.OTHER — no crash",
+    "input": {
+      "name": "Some Event",
+      "portal": "ivolunteer",
+      "type": "UNKNOWN_ACTIVITY",
+      "startTime": "2026-02-21T05:00:00",
+      "address": "Some Address",
+      "link": "https://example.com"
+    },
+    "expected_entity": {
+      "eventType": "OTHER"
+    }
+  },
+  {
+    "scenario": "unknown_portal_maps_to_null",
+    "description": "Unrecognised portal string maps to null portal — no crash, event is still saved",
+    "input": {
+      "name": "Some Event",
+      "portal": "unknown-portal-xyz",
+      "type": "OTHER",
+      "startTime": "2026-02-21T05:00:00",
+      "address": "Some Address",
+      "link": "https://example.com"
+    },
+    "expected_entity": {
+      "portal": null
+    }
+  },
+  {
+    "scenario": "null_end_time_accepted",
+    "description": "Events with no fixed end time are accepted — endTime stored as null",
+    "input": {
+      "name": "Trek and Plog",
+      "organisation": "Org",
+      "startTime": "2026-02-21T05:00:00",
+      "endTime": null
+    },
+    "expected_entity": {
+      "endTime": null
+    }
+  },
+  {
+    "scenario": "duplicate_skipped",
+    "description": "Event with same name + startTime already in DB — skipped, saved count = 0",
+    "input": {
+      "name": "Trek and Plog",
+      "portal": "Team everest",
+      "type": "TREKANDPLOG",
+      "startTime": "2026-02-21T05:00:00",
+      "address": "Lalbagh Main Gate, Bengaluru",
+      "link": "https://example.com"
+    },
+    "repo_stub": {
+      "existsByEventNameAndStartTime": true
+    },
+    "expected": {
+      "saved_count": 0,
+      "saveAll_called_with": []
+    }
+  },
+  {
+    "scenario": "mixed_new_and_duplicate",
+    "description": "Payload has one duplicate and one new event — only the new one is saved",
+    "inputs": [
+      {
+        "name": "Trek and Plog",
+        "type": "TREKANDPLOG",
+        "portal": "Team everest",
+        "startTime": "2026-02-21T05:00:00",
+        "address": "Lalbagh Main Gate, Bengaluru",
+        "link": "https://example.com",
+        "is_duplicate": true
+      },
+      {
+        "name": "Green Touch",
+        "type": "FOREST_CLEANUP",
+        "portal": "ivolunteer",
+        "startTime": "2026-03-07T00:00:00",
+        "address": "Cubbon Park, Bengaluru",
+        "link": "https://ivolunteer.in/green-touch",
+        "is_duplicate": false
+      }
+    ],
+    "expected": {
+      "saved_count": 1,
+      "saved_event_name": "Green Touch"
+    }
+  },
+  {
+    "scenario": "blank_name_skipped",
+    "description": "Event with empty string name is silently skipped — existsByEventNameAndStartTime never called",
+    "input": {
+      "name": "",
+      "organisation": "Org",
+      "startTime": "2026-02-21T05:00:00"
+    },
+    "expected": {
+      "saved_count": 0,
+      "repo_check_called": false
+    }
+  },
+  {
+    "scenario": "null_start_time_skipped",
+    "description": "Event with null startTime is silently skipped — existsByEventNameAndStartTime never called",
+    "input": {
+      "name": "Some Event",
+      "organisation": "Org",
+      "startTime": null
+    },
+    "expected": {
+      "saved_count": 0,
+      "repo_check_called": false
+    }
+  },
+  {
+    "scenario": "null_or_empty_list",
+    "description": "importFromScrapeResponse(null) and importFromScrapeResponse([]) both return 0 immediately — repository never touched",
+    "inputs": [null, []],
+    "expected": {
+      "saved_count": 0,
+      "repo_interactions": 0
+    }
+  }
+]

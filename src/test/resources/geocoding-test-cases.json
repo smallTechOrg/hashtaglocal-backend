@@ -1,0 +1,47 @@
+[
+  {
+    "address": "Lalbagh Main Gate, Bengaluru",
+    "lat": 12.9507,
+    "lng": 77.5848,
+    "city": "Bengaluru",
+    "name": "Lalbagh Botanical Garden",
+    "locality": "South Bengaluru",
+    "localities_linked": 1
+  },
+  {
+    "address": "Juhu Beach, Mumbai",
+    "lat": 19.0896,
+    "lng": 72.8266,
+    "city": "Mumbai",
+    "name": "Juhu Beach",
+    "locality": "Andheri West",
+    "localities_linked": 1
+  },
+  {
+    "address": "India Gate, New Delhi",
+    "lat": 28.6129,
+    "lng": 77.2295,
+    "city": "New Delhi",
+    "name": "India Gate",
+    "locality": "Central Delhi",
+    "localities_linked": 1
+  },
+  {
+    "address": "Gateway of India, Mumbai",
+    "lat": 18.9220,
+    "lng": 72.8347,
+    "city": "Mumbai",
+    "name": "Gateway of India",
+    "locality": "Colaba",
+    "localities_linked": 1
+  },
+  {
+    "address": "Cubbon Park, Bengaluru",
+    "lat": 12.9763,
+    "lng": 77.5929,
+    "city": "Bengaluru",
+    "name": "Cubbon Park",
+    "locality": "Central Bengaluru",
+    "localities_linked": 1
+  }
+]
