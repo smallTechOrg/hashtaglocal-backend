@@ -128,13 +128,13 @@ class EventImportIntegrationTest {
 
     var saved =
         eventRepository.findAll().stream()
-            .filter(e -> "Trek and Plog".equals(e.getEventName()))
+            .filter(e -> "Trek and Plog".equals(e.getName()))
             .findFirst()
             .orElseThrow();
 
     assertEquals("Team Everest", saved.getOrganisation());
     assertEquals(EventPortalModel.TEAMEVEREST, saved.getPortal());
-    assertEquals(EventTypeModel.TREKANDPLOG, saved.getEventType());
+    assertEquals(EventTypeModel.TREKANDPLOG, saved.getType());
     assertEquals("Lalbagh Main gate, Bengaluru", saved.getAddress());
     assertNull(saved.getLocation(), "location_id must be null until geocoding runs");
   }

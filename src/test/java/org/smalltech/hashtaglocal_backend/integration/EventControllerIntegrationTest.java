@@ -130,10 +130,10 @@ class EventControllerIntegrationTest {
 
   private EventEntity ungeocodedEvent(String name, int index) {
     return EventEntity.builder()
-        .eventName(name)
+        .name(name)
         .organisation("Test Org")
         .portal(EventPortalModel.TEAMEVEREST)
-        .eventType(EventTypeModel.TREKANDPLOG)
+        .type(EventTypeModel.TREKANDPLOG)
         .startTime(LocalDateTime.of(2026, 2, 21 + index, 0, 0))
         .address("Lalbagh Main gate, Bengaluru")
         .link("https://example.com/event/" + index)

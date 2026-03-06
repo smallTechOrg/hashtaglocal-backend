@@ -94,12 +94,12 @@ class EventImportServiceTest {
   @MethodSource("typeMappingCases")
   @DisplayName("Type string correctly maps to EventTypeModel")
   void mapsTypeStringToEventTypeModel(String raw, String expected, String description) {
-    when(eventRepository.existsByEventNameAndStartTime(any(), any())).thenReturn(false);
+    when(eventRepository.existsByNameAndStartTime(any(), any())).thenReturn(false);
 
     eventImportService.importFromScrapeResponse(
         List.of(dto("Test Event", raw, "Team everest", START_TIME)));
 
-    assertEquals(EventTypeModel.valueOf(expected), capturedSavedEvents().get(0).getEventType());
+    assertEquals(EventTypeModel.valueOf(expected), capturedSavedEvents().get(0).getType());
   }
 
   // ---------------------------------------------------------------------------
@@ -128,7 +128,7 @@ class EventImportServiceTest {
   @MethodSource("portalMappingCases")
   @DisplayName("Portal string correctly maps to EventPortalModel")
   void mapsPortalStringToEventPortalModel(String raw, String expected, String description) {
-    when(eventRepository.existsByEventNameAndStartTime(any(), any())).thenReturn(false);
+    when(eventRepository.existsByNameAndStartTime(any(), any())).thenReturn(false);
 
     eventImportService.importFromScrapeResponse(
         List.of(dto("Test Event", "TREKANDPLOG", raw, START_TIME)));
@@ -144,15 +144,15 @@ class EventImportServiceTest {
   @Test
   @DisplayName("Maps all DTO fields to the correct EventEntity fields")
   void mapsAllFieldsCorrectly() {
-    when(eventRepository.existsByEventNameAndStartTime(any(), any())).thenReturn(false);
+    when(eventRepository.existsByNameAndStartTime(any(), any())).thenReturn(false);
 
     eventImportService.importFromScrapeResponse(
         List.of(dto("Trek and Plog", "TREKANDPLOG", "Team everest", START_TIME)));
 
     EventEntity saved = capturedSavedEvents().get(0);
-    assertEquals("Trek and Plog", saved.getEventName());
+    assertEquals("Trek and Plog", saved.getName());
     assertEquals("Test Org", saved.getOrganisation());
-    assertEquals(EventTypeModel.TREKANDPLOG, saved.getEventType());
+    assertEquals(EventTypeModel.TREKANDPLOG, saved.getType());
     assertEquals(EventPortalModel.TEAMEVEREST, saved.getPortal());
     assertEquals(START_TIME, saved.getStartTime());
     assertEquals("Lalbagh Main Gate, Bengaluru", saved.getAddress());
@@ -164,7 +164,7 @@ class EventImportServiceTest {
   @Test
   @DisplayName("Null endTime is accepted and stored as null")
   void nullEndTimeIsAccepted() {
-    when(eventRepository.existsByEventNameAndStartTime(any(), any())).thenReturn(false);
+    when(eventRepository.existsByNameAndStartTime(any(), any())).thenReturn(false);
     ScrapeEventDTO noEnd =
         ScrapeEventDTO.builder()
             .name("Trek and Plog")
@@ -189,8 +189,7 @@ class EventImportServiceTest {
   @Test
   @DisplayName("Duplicate event (same name + startTime) is skipped — count = 0")
   void skipsDuplicateEvent() {
-    when(eventRepository.existsByEventNameAndStartTime("Trek and Plog", START_TIME))
-        .thenReturn(true);
+    when(eventRepository.existsByNameAndStartTime("Trek and Plog", START_TIME)).thenReturn(true);
 
     int count =
         eventImportService.importFromScrapeResponse(
@@ -206,8 +205,8 @@ class EventImportServiceTest {
     LocalDateTime t1 = LocalDateTime.of(2026, 2, 21, 5, 0);
     LocalDateTime t2 = LocalDateTime.of(2026, 3, 7, 0, 0);
 
-    when(eventRepository.existsByEventNameAndStartTime("Trek and Plog", t1)).thenReturn(true);
-    when(eventRepository.existsByEventNameAndStartTime("Green Touch", t2)).thenReturn(false);
+    when(eventRepository.existsByNameAndStartTime("Trek and Plog", t1)).thenReturn(true);
+    when(eventRepository.existsByNameAndStartTime("Green Touch", t2)).thenReturn(false);
 
     int count =
         eventImportService.importFromScrapeResponse(
@@ -216,7 +215,7 @@ class EventImportServiceTest {
                 dto("Green Touch", "FOREST_CLEANUP", "ivolunteer", t2)));
 
     assertEquals(1, count);
-    assertEquals("Green Touch", capturedSavedEvents().get(0).getEventName());
+    assertEquals("Green Touch", capturedSavedEvents().get(0).getName());
   }
 
   // ---------------------------------------------------------------------------
@@ -232,7 +231,7 @@ class EventImportServiceTest {
     int count = eventImportService.importFromScrapeResponse(List.of(blankName));
 
     assertEquals(0, count);
-    verify(eventRepository, never()).existsByEventNameAndStartTime(any(), any());
+    verify(eventRepository, never()).existsByNameAndStartTime(any(), any());
   }
 
   @Test
@@ -244,7 +243,7 @@ class EventImportServiceTest {
     int count = eventImportService.importFromScrapeResponse(List.of(noStart));
 
     assertEquals(0, count);
-    verify(eventRepository, never()).existsByEventNameAndStartTime(any(), any());
+    verify(eventRepository, never()).existsByNameAndStartTime(any(), any());
   }
 
   @Test

@@ -52,7 +52,7 @@ class EventGeocodingServiceTest {
   private EventEntity eventWithAddress(long id, String address) {
     return EventEntity.builder()
         .id(id)
-        .eventName("Event " + id)
+        .name("Event " + id)
         .organisation("Org")
         .address(address)
         .startTime(LocalDateTime.now())
