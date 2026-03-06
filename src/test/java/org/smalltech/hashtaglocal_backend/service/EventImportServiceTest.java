@@ -4,11 +4,18 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -22,7 +29,8 @@ import org.smalltech.hashtaglocal_backend.repository.EventRepository;
 /**
  * Unit tests for {@link EventImportService} JSON import logic.
  *
- * <p>These tests cover mapping, deduplication, and edge-case behaviour — not HTTP or the database.
+ * <p>Parameterised type-mapping and portal-mapping tests load their inputs from {@code
+ * event-import-service-test-cases.json} so new cases can be added without touching Java code.
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("EventImportService — JSON import")
@@ -34,6 +42,12 @@ class EventImportServiceTest {
   @InjectMocks private EventImportService eventImportService;
 
   private static final LocalDateTime START_TIME = LocalDateTime.of(2026, 2, 21, 5, 0);
+
+  private static final ObjectMapper MAPPER = new ObjectMapper();
+
+  // ---------------------------------------------------------------------------
+  // Helpers
+  // ---------------------------------------------------------------------------
 
   private ScrapeEventDTO dto(String name, String type, String portal, LocalDateTime start) {
     return ScrapeEventDTO.builder()
@@ -54,6 +68,78 @@ class EventImportServiceTest {
     verify(eventService).saveAll(captor.capture());
     return captor.getValue();
   }
+
+  // ---------------------------------------------------------------------------
+  // Parameterised: type mapping — loaded from event-import-service-test-cases.json
+  // ---------------------------------------------------------------------------
+
+  static Stream<Arguments> typeMappingCases() throws IOException {
+    JsonNode root =
+        MAPPER.readTree(
+            EventImportServiceTest.class.getResourceAsStream(
+                "/event-import-service-test-cases.json"));
+    return Stream.iterate(0, i -> i + 1)
+        .limit(root.get("type_mapping").size())
+        .map(
+            i -> {
+              JsonNode node = root.get("type_mapping").get(i);
+              String raw = node.get("raw").isNull() ? null : node.get("raw").asText();
+              String expected = node.get("expected").asText();
+              String description = node.get("description").asText();
+              return Arguments.of(raw, expected, description);
+            });
+  }
+
+  @ParameterizedTest(name = "{2}")
+  @MethodSource("typeMappingCases")
+  @DisplayName("Type string correctly maps to EventTypeModel")
+  void mapsTypeStringToEventTypeModel(String raw, String expected, String description) {
+    when(eventRepository.existsByEventNameAndStartTime(any(), any())).thenReturn(false);
+
+    eventImportService.importFromScrapeResponse(
+        List.of(dto("Test Event", raw, "Team everest", START_TIME)));
+
+    assertEquals(EventTypeModel.valueOf(expected), capturedSavedEvents().get(0).getEventType());
+  }
+
+  // ---------------------------------------------------------------------------
+  // Parameterised: portal mapping — loaded from event-import-service-test-cases.json
+  // ---------------------------------------------------------------------------
+
+  static Stream<Arguments> portalMappingCases() throws IOException {
+    JsonNode root =
+        MAPPER.readTree(
+            EventImportServiceTest.class.getResourceAsStream(
+                "/event-import-service-test-cases.json"));
+    return Stream.iterate(0, i -> i + 1)
+        .limit(root.get("portal_mapping").size())
+        .map(
+            i -> {
+              JsonNode node = root.get("portal_mapping").get(i);
+              String raw = node.get("raw").isNull() ? null : node.get("raw").asText();
+              String expected =
+                  node.get("expected").isNull() ? null : node.get("expected").asText();
+              String description = node.get("description").asText();
+              return Arguments.of(raw, expected, description);
+            });
+  }
+
+  @ParameterizedTest(name = "{2}")
+  @MethodSource("portalMappingCases")
+  @DisplayName("Portal string correctly maps to EventPortalModel")
+  void mapsPortalStringToEventPortalModel(String raw, String expected, String description) {
+    when(eventRepository.existsByEventNameAndStartTime(any(), any())).thenReturn(false);
+
+    eventImportService.importFromScrapeResponse(
+        List.of(dto("Test Event", "TREKANDPLOG", raw, START_TIME)));
+
+    EventPortalModel expectedPortal = expected != null ? EventPortalModel.valueOf(expected) : null;
+    assertEquals(expectedPortal, capturedSavedEvents().get(0).getPortal());
+  }
+
+  // ---------------------------------------------------------------------------
+  // Field mapping
+  // ---------------------------------------------------------------------------
 
   @Test
   @DisplayName("Maps all DTO fields to the correct EventEntity fields")
@@ -76,39 +162,6 @@ class EventImportServiceTest {
   }
 
   @Test
-  @DisplayName("Maps 'BEACH_CLEANUP' type string to EventTypeModel.BEACH_CLEANUP")
-  void mapsBeachCleanupType() {
-    when(eventRepository.existsByEventNameAndStartTime(any(), any())).thenReturn(false);
-
-    eventImportService.importFromScrapeResponse(
-        List.of(dto("Beach Cleanup", "BEACH_CLEANUP", "ivolunteer", START_TIME)));
-
-    assertEquals(EventTypeModel.BEACH_CLEANUP, capturedSavedEvents().get(0).getEventType());
-  }
-
-  @Test
-  @DisplayName("Unknown type string falls back to EventTypeModel.OTHER")
-  void unknownTypeFallsBackToOther() {
-    when(eventRepository.existsByEventNameAndStartTime(any(), any())).thenReturn(false);
-
-    eventImportService.importFromScrapeResponse(
-        List.of(dto("Some Event", "UNKNOWN_ACTIVITY", "ivolunteer", START_TIME)));
-
-    assertEquals(EventTypeModel.OTHER, capturedSavedEvents().get(0).getEventType());
-  }
-
-  @Test
-  @DisplayName("Unknown portal string maps to null portal — no crash")
-  void unknownPortalMapsToNull() {
-    when(eventRepository.existsByEventNameAndStartTime(any(), any())).thenReturn(false);
-
-    eventImportService.importFromScrapeResponse(
-        List.of(dto("Some Event", "OTHER", "unknown-portal-xyz", START_TIME)));
-
-    assertNull(capturedSavedEvents().get(0).getPortal());
-  }
-
-  @Test
   @DisplayName("Null endTime is accepted and stored as null")
   void nullEndTimeIsAccepted() {
     when(eventRepository.existsByEventNameAndStartTime(any(), any())).thenReturn(false);
@@ -116,14 +169,22 @@ class EventImportServiceTest {
         ScrapeEventDTO.builder()
             .name("Trek and Plog")
             .organisation("Org")
+            .portal("Team everest")
+            .type("TREKANDPLOG")
             .startTime(START_TIME)
             .endTime(null)
+            .address("Lalbagh Main Gate, Bengaluru")
+            .link("https://example.com")
             .build();
 
     eventImportService.importFromScrapeResponse(List.of(noEnd));
 
     assertNull(capturedSavedEvents().get(0).getEndTime());
   }
+
+  // ---------------------------------------------------------------------------
+  // Deduplication
+  // ---------------------------------------------------------------------------
 
   @Test
   @DisplayName("Duplicate event (same name + startTime) is skipped — count = 0")
@@ -157,6 +218,10 @@ class EventImportServiceTest {
     assertEquals(1, count);
     assertEquals("Green Touch", capturedSavedEvents().get(0).getEventName());
   }
+
+  // ---------------------------------------------------------------------------
+  // Skip / edge cases
+  // ---------------------------------------------------------------------------
 
   @Test
   @DisplayName("Event with blank name is silently skipped")

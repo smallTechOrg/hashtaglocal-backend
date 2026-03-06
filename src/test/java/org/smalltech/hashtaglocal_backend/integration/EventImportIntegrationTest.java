@@ -2,173 +2,195 @@ package org.smalltech.hashtaglocal_backend.integration;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.smalltech.hashtaglocal_backend.dto.ScrapeEventDTO;
-import org.smalltech.hashtaglocal_backend.dto.ScrapeResponseDTO;
-import org.smalltech.hashtaglocal_backend.entity.EventEntity;
 import org.smalltech.hashtaglocal_backend.model.EventPortalModel;
 import org.smalltech.hashtaglocal_backend.model.EventTypeModel;
 import org.smalltech.hashtaglocal_backend.repository.EventRepository;
+import org.smalltech.hashtaglocal_backend.service.EventImportService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.web.reactive.server.WebTestClient;
-import reactor.core.publisher.Mono;
 
 /**
- * Integration tests for {@code POST /api/v1/events/import}.
+ * Integration tests for {@link EventImportService}.
  *
- * <p>Posts a scrape service JSON payload and verifies events are persisted correctly in the
- * database.
- *
- * <p>Key behaviours verified:
+ * <p>Calls {@code importFromScrapeResponse()} directly against a real test database to verify:
  *
  * <ul>
- *   <li>All valid events in the payload become EventEntity rows in the DB
- *   <li>location_id is null immediately after import — geocoding is a separate step
- *   <li>Duplicate events (same name + startTime) are not re-inserted on a second call
+ *   <li>Valid events are persisted with correct field mappings
+ *   <li>{@code location_id} is {@code null} immediately after import — geocoding is separate
+ *   <li>Duplicate events (same name + startTime) are not re-inserted
+ *   <li>Events with blank name or null startTime are silently skipped
  * </ul>
+ *
+ * <p>Test scenarios are defined in {@code event-import-integration-test-cases.json}.
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@SpringBootTest
 @ActiveProfiles("test")
-@DisplayName("POST /api/v1/events/import")
+@DisplayName("EventImportService — integration")
 class EventImportIntegrationTest {
 
-  @Autowired private WebTestClient webTestClient;
+  @Autowired private EventImportService eventImportService;
   @Autowired private EventRepository eventRepository;
 
-  private static final LocalDateTime START_TIME = LocalDateTime.of(2026, 2, 21, 5, 0);
+  private static final ObjectMapper MAPPER =
+      new ObjectMapper()
+          .registerModule(new JavaTimeModule())
+          .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
   @BeforeEach
   void cleanUp() {
     eventRepository.deleteAll();
   }
 
-  private ScrapeResponseDTO payload(ScrapeEventDTO... events) {
-    return ScrapeResponseDTO.builder()
-        .data(ScrapeResponseDTO.Data.builder().events(List.of(events)).build())
-        .build();
+  // ---------------------------------------------------------------------------
+  // Records matching event-import-integration-test-cases.json
+  // ---------------------------------------------------------------------------
+
+  record EventInput(
+      String name,
+      String organisation,
+      String portal,
+      String type,
+      @JsonProperty("start_time") LocalDateTime startTime,
+      String address,
+      String link,
+      String image) {}
+
+  record ImportTestCase(
+      String scenario,
+      String description,
+      List<EventInput> events,
+      @JsonProperty("import_twice") boolean importTwice,
+      @JsonProperty("expected_count") int expectedCount) {}
+
+  // ---------------------------------------------------------------------------
+  // Parameterised: all non-dedup scenarios from JSON
+  // ---------------------------------------------------------------------------
+
+  static Stream<Arguments> importScenarios() throws IOException {
+    List<ImportTestCase> cases =
+        MAPPER.readValue(
+            EventImportIntegrationTest.class.getResourceAsStream(
+                "/event-import-integration-test-cases.json"),
+            new TypeReference<>() {});
+    return cases.stream()
+        .filter(tc -> !tc.importTwice())
+        .map(tc -> Arguments.of(tc.scenario(), tc.description(), tc.events(), tc.expectedCount()));
   }
 
+  @ParameterizedTest(name = "{0}")
+  @MethodSource("importScenarios")
+  @DisplayName("Import scenario")
+  void importScenario(
+      String scenario, String description, List<EventInput> inputs, int expectedCount) {
+    int saved = eventImportService.importFromScrapeResponse(toDtos(inputs));
+
+    assertEquals(expectedCount, saved, description);
+    assertEquals(expectedCount, eventRepository.count(), description);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Field mapping
+  // ---------------------------------------------------------------------------
+
   @Test
-  @DisplayName("Imports all events from the payload and persists them to the database")
-  void importsPayloadAndPersistsEvents() {
+  @DisplayName("Imports event and maps all fields correctly — location_id is null until geocoded")
+  void importsEventAndMapsFieldsCorrectly() {
     ScrapeEventDTO trek =
         ScrapeEventDTO.builder()
             .name("Trek and Plog")
             .organisation("Team Everest")
             .portal("Team everest")
             .type("TREKANDPLOG")
-            .startTime(START_TIME)
+            .startTime(LocalDateTime.of(2026, 2, 21, 5, 0))
             .address("Lalbagh Main gate, Bengaluru")
             .link("https://www.teameverest.ngo/events/trek-plog-bengaluru1")
             .image("https://images.unsplash.com/photo-1551632811.jpg")
             .build();
 
-    ScrapeEventDTO beach =
-        ScrapeEventDTO.builder()
-            .name("Beach Cleanup")
-            .organisation("ivolunteer")
-            .portal("ivolunteer")
-            .type("BEACH_CLEANUP")
-            .startTime(LocalDateTime.of(2026, 2, 21, 0, 0))
-            .address("Holy Cross Church, Vile Parle West, Mumbai")
-            .link("https://www.ivolunteer.in/opportunity/beach-cleanup")
-            .build();
+    eventImportService.importFromScrapeResponse(List.of(trek));
 
-    webTestClient
-        .post()
-        .uri("/api/v1/events/import")
-        .contentType(MediaType.APPLICATION_JSON)
-        .body(Mono.just(payload(trek, beach)), ScrapeResponseDTO.class)
-        .exchange()
-        .expectStatus()
-        .isOk()
-        .expectBody(String.class)
-        .value(body -> assertTrue(body.contains("2"), "Response should confirm 2 events imported"));
-
-    List<EventEntity> events = eventRepository.findAll();
-    assertEquals(2, events.size());
-
-    EventEntity trekEntity =
-        events.stream()
+    var saved =
+        eventRepository.findAll().stream()
             .filter(e -> "Trek and Plog".equals(e.getEventName()))
             .findFirst()
-            .orElseThrow(() -> new AssertionError("Trek and Plog event not found in DB"));
+            .orElseThrow();
 
-    assertEquals("Team Everest", trekEntity.getOrganisation());
-    assertEquals(EventPortalModel.TEAMEVEREST, trekEntity.getPortal());
-    assertEquals(EventTypeModel.TREKANDPLOG, trekEntity.getEventType());
-    assertEquals("Lalbagh Main gate, Bengaluru", trekEntity.getAddress());
-    assertNull(trekEntity.getLocation(), "location_id should be null until geocoded");
-    assertNull(trekEntity.getMetaData());
+    assertEquals("Team Everest", saved.getOrganisation());
+    assertEquals(EventPortalModel.TEAMEVEREST, saved.getPortal());
+    assertEquals(EventTypeModel.TREKANDPLOG, saved.getEventType());
+    assertEquals("Lalbagh Main gate, Bengaluru", saved.getAddress());
+    assertNull(saved.getLocation(), "location_id must be null until geocoding runs");
   }
 
-  @Test
-  @DisplayName("Duplicate events are not re-inserted on a second import call")
-  void deduplicatesOnSecondImport() {
-    ScrapeEventDTO trek =
-        ScrapeEventDTO.builder()
-            .name("Trek and Plog")
-            .organisation("Team Everest")
-            .portal("Team everest")
-            .type("TREKANDPLOG")
-            .startTime(START_TIME)
-            .address("Lalbagh Main gate, Bengaluru")
-            .link("https://www.teameverest.ngo/events/trek-plog-bengaluru1")
-            .build();
+  // ---------------------------------------------------------------------------
+  // Parameterised: dedup scenarios (import_twice: true) — loaded from JSON
+  // ---------------------------------------------------------------------------
 
-    // First import — should persist 1 event
-    webTestClient
-        .post()
-        .uri("/api/v1/events/import")
-        .contentType(MediaType.APPLICATION_JSON)
-        .body(Mono.just(payload(trek)), ScrapeResponseDTO.class)
-        .exchange()
-        .expectStatus()
-        .isOk();
-
-    assertEquals(1, eventRepository.count());
-
-    // Second import with same event — duplicate must be skipped
-    webTestClient
-        .post()
-        .uri("/api/v1/events/import")
-        .contentType(MediaType.APPLICATION_JSON)
-        .body(Mono.just(payload(trek)), ScrapeResponseDTO.class)
-        .exchange()
-        .expectStatus()
-        .isOk()
-        .expectBody(String.class)
-        .value(body -> assertTrue(body.contains("0"), "Second import should save 0 new events"));
-
-    assertEquals(1, eventRepository.count(), "DB must still have exactly 1 event after dedup");
+  static Stream<Arguments> dedupScenarios() throws IOException {
+    List<ImportTestCase> cases =
+        MAPPER.readValue(
+            EventImportIntegrationTest.class.getResourceAsStream(
+                "/event-import-integration-test-cases.json"),
+            new TypeReference<>() {});
+    return cases.stream()
+        .filter(ImportTestCase::importTwice)
+        .map(tc -> Arguments.of(tc.scenario(), tc.description(), tc.events(), tc.expectedCount()));
   }
 
-  @Test
-  @DisplayName("Returns 0 count for a payload with an empty events list")
-  void returnsZeroForEmptyEventsList() {
-    ScrapeResponseDTO emptyPayload =
-        ScrapeResponseDTO.builder()
-            .data(ScrapeResponseDTO.Data.builder().events(List.of()).build())
-            .build();
+  @ParameterizedTest(name = "{0}")
+  @MethodSource("dedupScenarios")
+  @DisplayName("Dedup scenario — already-imported event is not re-inserted on second import call")
+  void dedupScenario(
+      String scenario, String description, List<EventInput> inputs, int expectedCount) {
+    List<ScrapeEventDTO> dtos = toDtos(inputs);
 
-    webTestClient
-        .post()
-        .uri("/api/v1/events/import")
-        .contentType(MediaType.APPLICATION_JSON)
-        .body(Mono.just(emptyPayload), ScrapeResponseDTO.class)
-        .exchange()
-        .expectStatus()
-        .isOk()
-        .expectBody(String.class)
-        .value(body -> assertTrue(body.contains("0")));
+    // First import — seeds the DB
+    eventImportService.importFromScrapeResponse(dtos);
+    assertEquals(expectedCount, eventRepository.count(), "First import: " + description);
 
-    assertEquals(0, eventRepository.count());
+    // Second import — same events, must all be recognised as duplicates
+    int secondRun = eventImportService.importFromScrapeResponse(dtos);
+
+    assertEquals(0, secondRun, "Second import must save 0 new rows: " + description);
+    assertEquals(
+        expectedCount, eventRepository.count(), "DB count must not change: " + description);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Helper
+  // ---------------------------------------------------------------------------
+
+  private List<ScrapeEventDTO> toDtos(List<EventInput> inputs) {
+    return inputs.stream()
+        .map(
+            e ->
+                ScrapeEventDTO.builder()
+                    .name(e.name())
+                    .organisation(e.organisation())
+                    .portal(e.portal())
+                    .type(e.type())
+                    .startTime(e.startTime())
+                    .address(e.address())
+                    .link(e.link())
+                    .image(e.image())
+                    .build())
+        .toList();
   }
 }
