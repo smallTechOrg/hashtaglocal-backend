@@ -1,4 +1,4 @@
-package org.smalltech.hashtaglocal_backend.job;
+package org.smalltech.hashtaglocal_backend.service;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
@@ -7,12 +7,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.smalltech.hashtaglocal_backend.entity.EventEntity;
 import org.smalltech.hashtaglocal_backend.entity.Location;
 import org.smalltech.hashtaglocal_backend.repository.EventRepository;
-import org.smalltech.hashtaglocal_backend.service.GoogleMapsGeocodingService;
-import org.smalltech.hashtaglocal_backend.service.LocationService;
 import org.springframework.stereotype.Service;
 
 /**
- * Job that forward-geocodes events whose {@code location_id} is still null.
+ * Service that forward-geocodes events whose {@code location_id} is still null.
  *
  * <p>For each event with a raw {@code address} and no linked {@link Location}, it calls the Google
  * Maps Geocoding API (address → lat/lng), creates a {@link Location} row, and sets the FK on the
@@ -23,7 +21,7 @@ import org.springframework.stereotype.Service;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class EventGeocodingJob {
+public class EventGeocodingService {
 
   private final EventRepository eventRepository;
   private final GoogleMapsGeocodingService geocodingService;
@@ -31,7 +29,7 @@ public class EventGeocodingJob {
 
   private static final long DELAY_BETWEEN_REQUESTS_MS = 100;
 
-  public GeocodingJobResult run() {
+  public GeocodingResult run() {
     List<EventEntity> events = eventRepository.findByLocationIsNullAndAddressIsNotNull();
     log.info("Found {} events without a geocoded location", events.size());
 
@@ -78,7 +76,7 @@ public class EventGeocodingJob {
 
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
-        log.error("Event geocoding job interrupted at {}/{}", i + 1, events.size());
+        log.error("Event geocoding interrupted at {}/{}", i + 1, events.size());
         break;
       } catch (Exception e) {
         log.error("Error geocoding event id={}: {}", event.getId(), e.getMessage());
@@ -90,13 +88,13 @@ public class EventGeocodingJob {
     // This fixes locations created when the localities table was empty.
     int localitiesLinked = locationService.relinkLocalities();
 
-    GeocodingJobResult jobResult =
-        new GeocodingJobResult(events.size(), success, failed, localitiesLinked);
-    log.info("Event geocoding job completed: {}", jobResult);
-    return jobResult;
+    GeocodingResult geocodingResult =
+        new GeocodingResult(events.size(), success, failed, localitiesLinked);
+    log.info("Event geocoding completed: {}", geocodingResult);
+    return geocodingResult;
   }
 
-  public record GeocodingJobResult(
+  public record GeocodingResult(
       @Schema(example = "100") int total,
       @Schema(example = "95") int success,
       @Schema(example = "5") int failed,

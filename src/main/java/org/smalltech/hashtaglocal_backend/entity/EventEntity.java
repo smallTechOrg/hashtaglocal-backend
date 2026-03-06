@@ -32,8 +32,8 @@ public class EventEntity {
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;
 
-  @Column(name = "name", nullable = false)
-  private String eventName;
+  @Column(nullable = false)
+  private String name;
 
   @Column private String organisation;
 
@@ -56,8 +56,8 @@ public class EventEntity {
    * @see EventTypeModel
    */
   @Enumerated(EnumType.STRING)
-  @Column(name = "type", length = 50, nullable = false)
-  private EventTypeModel eventType;
+  @Column(length = 50, nullable = false)
+  private EventTypeModel type;
 
   /** Event start date and time. Required. */
   @Column(nullable = false)

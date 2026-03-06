@@ -58,7 +58,7 @@ public class EventImportService {
           log.debug("Skipping event '{}' — startTime is null", dto.getName());
           continue;
         }
-        if (eventRepository.existsByEventNameAndStartTime(dto.getName(), dto.getStartTime())) {
+        if (eventRepository.existsByNameAndStartTime(dto.getName(), dto.getStartTime())) {
           log.debug("Skipping duplicate event '{}' at {}", dto.getName(), dto.getStartTime());
           continue;
         }
@@ -80,10 +80,10 @@ public class EventImportService {
 
   private EventEntity toEntity(ScrapeEventDTO dto) {
     return EventEntity.builder()
-        .eventName(dto.getName())
+        .name(dto.getName())
         .organisation(dto.getOrganisation())
         .portal(EventPortalModel.fromString(dto.getPortal()))
-        .eventType(parseEventType(dto.getType()))
+        .type(parseEventType(dto.getType()))
         .startTime(dto.getStartTime())
         .endTime(dto.getEndTime())
         .address(dto.getAddress())
