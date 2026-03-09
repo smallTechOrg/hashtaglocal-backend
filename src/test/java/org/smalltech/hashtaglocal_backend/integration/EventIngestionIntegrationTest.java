@@ -59,6 +59,7 @@ class EventIngestionIntegrationTest {
         .startTime(startTime)
         .address("Lalbagh Main gate, Bengaluru")
         .link("https://example.com/event")
+        .image("https://example.com/image.jpg")
         .build();
   }
 
