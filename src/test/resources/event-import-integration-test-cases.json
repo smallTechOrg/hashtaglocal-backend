@@ -34,7 +34,8 @@
         "type": "TREKANDPLOG",
         "start_time": "2026-02-21T05:00:00",
         "address": "Lalbagh Main gate, Bengaluru",
-        "link": "https://www.teameverest.ngo/events/trek-plog-bengaluru1"
+        "link": "https://www.teameverest.ngo/events/trek-plog-bengaluru1",
+        "image": "https://example.com/trek.jpg"
       },
       {
         "name": "Beach Cleanup",
@@ -43,7 +44,8 @@
         "type": "BEACH_CLEANUP",
         "start_time": "2026-02-21T00:00:00",
         "address": "Holy Cross Church, Vile Parle West, Mumbai",
-        "link": "https://www.ivolunteer.in/opportunity/beach-cleanup"
+        "link": "https://www.ivolunteer.in/opportunity/beach-cleanup",
+        "image": "https://example.com/beach.jpg"
       }
     ],
     "expected_count": 2
@@ -91,7 +93,8 @@
         "type": "TREKANDPLOG",
         "start_time": "2026-02-21T05:00:00",
         "address": "Lalbagh Main gate, Bengaluru",
-        "link": "https://www.teameverest.ngo/events/trek-plog-bengaluru1"
+        "link": "https://www.teameverest.ngo/events/trek-plog-bengaluru1",
+        "image": "https://example.com/trek.jpg"
       }
     ],
     "import_twice": true,
@@ -114,7 +117,8 @@
         "type": "TREEPLANTATION",
         "start_time": "2026-03-10T09:00:00",
         "address": "Cubbon Park, Bengaluru",
-        "link": "https://mybharat.gov.in/events/tree-plantation-1"
+        "link": "https://mybharat.gov.in/events/tree-plantation-1",
+        "image": "https://example.com/tree.jpg"
       }
     ],
     "import_twice": true,

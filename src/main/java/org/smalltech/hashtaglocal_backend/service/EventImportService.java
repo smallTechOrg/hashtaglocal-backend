@@ -58,6 +58,10 @@ public class EventImportService {
           log.debug("Skipping event '{}' — startTime is null", dto.getName());
           continue;
         }
+        if (dto.getImage() == null || dto.getImage().isBlank()) {
+          log.debug("Skipping event '{}' — image is null or blank", dto.getName());
+          continue;
+        }
         if (eventRepository.existsByNameAndStartTime(dto.getName(), dto.getStartTime())) {
           log.debug("Skipping duplicate event '{}' at {}", dto.getName(), dto.getStartTime());
           continue;

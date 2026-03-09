@@ -175,6 +175,7 @@ class EventImportServiceTest {
             .endTime(null)
             .address("Lalbagh Main Gate, Bengaluru")
             .link("https://example.com")
+            .image("https://example.com/image.jpg")
             .build();
 
     eventImportService.importFromScrapeResponse(List.of(noEnd));
