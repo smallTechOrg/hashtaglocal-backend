@@ -17,3 +17,6 @@ spring:
 events:
   scrape:
     cron: "-"
+
+portalissue:
+  enabled: false
