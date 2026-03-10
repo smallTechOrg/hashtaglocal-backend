@@ -44,14 +44,14 @@ public class SecurityConfig {
         .csrf(csrf -> csrf.disable())
         .authorizeHttpRequests(
             auth ->
-                auth.requestMatchers("/admin/**")
-                    .hasRole("ADMIN")
-                    .requestMatchers(HttpMethod.POST, "/api/v1/issue")
+                auth.requestMatchers(HttpMethod.POST, "/api/v1/issue")
                     .authenticated()
                     .requestMatchers(HttpMethod.GET, "/api/v1/media/upload-url")
                     .authenticated()
                     .requestMatchers(HttpMethod.PUT, "/api/v1/issue/**")
                     .authenticated()
+                    .requestMatchers("/admin/**")
+                    .hasRole("ADMIN")
                     .anyRequest()
                     .permitAll())
         .exceptionHandling(

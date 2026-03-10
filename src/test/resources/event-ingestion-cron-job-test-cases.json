@@ -2,10 +2,10 @@
   {
     "test_class": "EventIngestionCronJobTest (unit)",
     "scenario": "import_and_geocode_called_when_events_returned",
-    "description": "When the scrape client returns events, the pipeline calls import then geocode in order",
+    "description": "When scrape returns events, the pipeline calls import then geocode in order",
     "scrape_returns": [
-      { "name": "Trek and Plog",  "start_time": "2026-04-01T09:00:00" },
-      { "name": "Beach Cleanup",  "start_time": "2026-04-01T09:00:00" }
+      { "name": "Trek and Plog", "start_time": "2026-04-01T09:00:00" },
+      { "name": "Beach Cleanup", "start_time": "2026-04-02T09:00:00" }
     ],
     "expected": {
       "import_called": true,
@@ -15,31 +15,19 @@
   },
   {
     "test_class": "EventIngestionCronJobTest (unit)",
-    "scenario": "exact_event_list_passed_to_import",
-    "description": "The exact list returned by ScrapeApiClient is forwarded to EventImportService without modification",
-    "scrape_returns": [
-      { "name": "Trek and Plog",  "start_time": "2026-04-01T09:00:00" },
-      { "name": "Beach Cleanup",  "start_time": "2026-04-01T09:00:00" }
-    ],
-    "expected": {
-      "import_receives": "same list reference as scrape output"
-    }
-  },
-  {
-    "test_class": "EventIngestionCronJobTest (unit)",
     "scenario": "skip_import_and_geocode_when_scrape_empty",
-    "description": "When the scrape client returns an empty list, the pipeline exits early — neither import nor geocode is invoked",
+    "description": "When scrape returns an empty list, the pipeline exits early — neither import nor geocode is invoked",
     "scrape_returns": [],
     "expected": {
       "import_called": false,
       "geocode_called": false,
-      "note": "Early return saves DB and Google Maps API quota"
+      "note": "Early return saves DB writes and Google Maps API quota"
     }
   },
   {
     "test_class": "EventIngestionCronJobTest (unit)",
     "scenario": "geocode_runs_even_when_import_saves_zero",
-    "description": "When scrape returns events but all are duplicates (import returns 0), geocode still runs — it may geocode events imported in previous cycles",
+    "description": "When scrape returns events but all are duplicates (import count = 0), geocode still runs — it may geocode events from previous cycles",
     "scrape_returns": [
       { "name": "Trek and Plog", "start_time": "2026-04-01T09:00:00" }
     ],
@@ -52,7 +40,7 @@
   {
     "test_class": "EventIngestionCronJobTest (unit)",
     "scenario": "geocode_called_exactly_once",
-    "description": "Regardless of how many events are scraped, geocode job is invoked exactly once per pipeline run",
+    "description": "Regardless of how many events are scraped, EventGeocodingService.run() is called exactly once per pipeline run",
     "scrape_returns": [
       { "name": "Event A", "start_time": "2026-04-01T09:00:00" },
       { "name": "Event B", "start_time": "2026-04-02T09:00:00" }
@@ -62,9 +50,21 @@
     }
   },
   {
+    "test_class": "EventIngestionCronJobTest (unit)",
+    "scenario": "exact_event_list_passed_to_import",
+    "description": "The exact list returned by ScrapeApiClient is forwarded to EventImportService without modification",
+    "scrape_returns": [
+      { "name": "Trek and Plog", "start_time": "2026-04-01T09:00:00" },
+      { "name": "Beach Cleanup", "start_time": "2026-04-02T09:00:00" }
+    ],
+    "expected": {
+      "import_receives": "same list reference as scrape output"
+    }
+  },
+  {
     "test_class": "EventIngestionIntegrationTest (integration)",
     "scenario": "import_events_and_persist_to_db",
-    "description": "POST /admin/events/ingest — events returned by the (mocked) scrape client are saved to the database",
+    "description": "Cron job run — events returned by the mocked ScrapeApiClient are saved to DB. EventGeocodingService is mocked (no Google Maps calls)",
     "scrape_returns": [
       {
         "name": "Trek and Plog",
@@ -86,16 +86,13 @@
       }
     ],
     "expected": {
-      "status": 200,
-      "db_count": 2,
-      "geocode_mocked": true,
-      "note": "EventGeocodingJob is mocked — no real Google Maps API calls"
+      "db_count": 2
     }
   },
   {
     "test_class": "EventIngestionIntegrationTest (integration)",
-    "scenario": "geocode_called_once_per_trigger",
-    "description": "POST /admin/events/ingest — geocode job is invoked exactly once regardless of import count",
+    "scenario": "geocode_called_once_per_run",
+    "description": "Cron job run — EventGeocodingService.run() is verified to be called exactly once",
     "scrape_returns": [
       {
         "name": "Trek and Plog",
@@ -108,8 +105,8 @@
   },
   {
     "test_class": "EventIngestionIntegrationTest (integration)",
-    "scenario": "deduplication_on_repeated_triggers",
-    "description": "Calling POST /admin/events/ingest twice with the same scrape data must not create duplicate rows — DB stays at 1 event",
+    "scenario": "deduplication_on_repeated_runs",
+    "description": "Running the cron job twice with the same scrape data must not create duplicate rows — DB stays at 1 event",
     "scrape_returns": [
       {
         "name": "Trek and Plog",
@@ -130,10 +127,9 @@
   {
     "test_class": "EventIngestionIntegrationTest (integration)",
     "scenario": "skip_when_scrape_returns_empty",
-    "description": "When the (mocked) scrape client returns no events, the DB remains empty and geocode is never called",
+    "description": "When ScrapeApiClient returns no events, DB stays empty and geocode is never called",
     "scrape_returns": [],
     "expected": {
-      "status": 200,
       "db_count": 0,
       "geocode_called": false
     }
@@ -141,18 +137,21 @@
   {
     "test_class": "EventIngestionIntegrationTest (integration)",
     "scenario": "new_event_picked_up_on_second_run",
-    "description": "First run imports 1 event. Second run returns the same event plus 1 new — only the new event is added, DB ends at 2",
+    "description": "First run imports 1 event. Second run returns the same event + 1 new — only the new one is added, DB ends at 2",
     "first_scrape_returns": [
-      { "name": "Trek and Plog", "start_time": "2026-04-01T09:00:00" }
+      {
+        "name": "Trek and Plog",
+        "start_time": "2026-04-01T09:00:00"
+      }
     ],
     "second_scrape_returns": [
-      { "name": "Trek and Plog",  "start_time": "2026-04-01T09:00:00" },
-      { "name": "Beach Cleanup",  "start_time": "2026-04-02T09:00:00" }
+      { "name": "Trek and Plog", "start_time": "2026-04-01T09:00:00" },
+      { "name": "Beach Cleanup", "start_time": "2026-04-02T09:00:00" }
     ],
     "expected": {
       "db_count_after_first_run": 1,
       "db_count_after_second_run": 2,
-      "note": "Simulates how the real cron behaves — only new events are ever inserted"
+      "note": "Simulates the real cron behaviour — only new events are ever inserted"
     }
   }
 ]
