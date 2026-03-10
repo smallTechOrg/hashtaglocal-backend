@@ -1,5 +1,6 @@
 package org.smalltech.hashtaglocal_backend.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Builder;
 import lombok.Value;
 import lombok.extern.jackson.Jacksonized;
@@ -50,6 +51,7 @@ public class TrackIssueScrapeRequestDTO {
   @Builder
   @Jacksonized
   public static class ActionData {
+    @JsonProperty("tracking_id")
     String trackingId;
   }
 

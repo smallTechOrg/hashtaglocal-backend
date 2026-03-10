@@ -1,8 +1,12 @@
 package org.smalltech.hashtaglocal_backend.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.ArrayList;
 import org.smalltech.hashtaglocal_backend.dto.TrackIssueScrapeRequestDTO;
 import org.smalltech.hashtaglocal_backend.dto.TrackIssueScrapeResponseDTO;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.converter.HttpMessageConverter;
+import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
@@ -18,13 +22,28 @@ public class PortalIssueScrapeClient {
   private final String authPassword;
 
   public PortalIssueScrapeClient(
+      ObjectMapper objectMapper,
       @Value("${portalissue.scrape-url:}") String scrapeUrl,
       @Value("${portalissue.auth.username:placeholder_username}") String authUsername,
       @Value("${portalissue.auth.password:placeholder_password}") String authPassword) {
-    this.restTemplate = new RestTemplate();
+    this.restTemplate = buildRestTemplate(objectMapper);
     this.scrapeUrl = scrapeUrl;
     this.authUsername = authUsername;
     this.authPassword = authPassword;
+  }
+
+  private RestTemplate buildRestTemplate(ObjectMapper objectMapper) {
+    RestTemplate template = new RestTemplate();
+
+    MappingJackson2HttpMessageConverter converter = new MappingJackson2HttpMessageConverter();
+    converter.setObjectMapper(objectMapper);
+
+    var converters = new ArrayList<HttpMessageConverter<?>>(template.getMessageConverters());
+    converters.removeIf(MappingJackson2HttpMessageConverter.class::isInstance);
+    converters.add(0, converter);
+    template.setMessageConverters(converters);
+
+    return template;
   }
 
   public TrackIssueScrapeResponseDTO trackIssue(String portal, String trackingId) {
