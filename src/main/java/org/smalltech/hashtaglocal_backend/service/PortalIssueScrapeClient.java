@@ -1,13 +1,12 @@
 package org.smalltech.hashtaglocal_backend.service;
 
-import java.time.Duration;
-import lombok.extern.slf4j.Slf4j;
 import org.smalltech.hashtaglocal_backend.dto.TrackIssueScrapeRequestDTO;
 import org.smalltech.hashtaglocal_backend.dto.TrackIssueScrapeResponseDTO;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
+
+import lombok.extern.slf4j.Slf4j;
 
 @Service
 @Slf4j
@@ -19,17 +18,10 @@ public class PortalIssueScrapeClient {
   private final String authPassword;
 
   public PortalIssueScrapeClient(
-      RestTemplateBuilder restTemplateBuilder,
-      @Value("${portal-issue-tracking.scrape-url:}") String scrapeUrl,
-      @Value("${portal-issue-tracking.auth.username:placeholder_username}") String authUsername,
-      @Value("${portal-issue-tracking.auth.password:placeholder_password}") String authPassword,
-      @Value("${portal-issue-tracking.http.connect-timeout-ms:5000}") long connectTimeoutMs,
-      @Value("${portal-issue-tracking.http.read-timeout-ms:15000}") long readTimeoutMs) {
-    this.restTemplate =
-        restTemplateBuilder
-            .setConnectTimeout(Duration.ofMillis(connectTimeoutMs))
-            .setReadTimeout(Duration.ofMillis(readTimeoutMs))
-            .build();
+      @Value("${portalissue.scrape-url:}") String scrapeUrl,
+      @Value("${portalissue.auth.username:placeholder_username}") String authUsername,
+      @Value("${portalissue.auth.password:placeholder_password}") String authPassword) {
+    this.restTemplate = new RestTemplate();
     this.scrapeUrl = scrapeUrl;
     this.authUsername = authUsername;
     this.authPassword = authPassword;
@@ -37,7 +29,7 @@ public class PortalIssueScrapeClient {
 
   public TrackIssueScrapeResponseDTO trackIssue(String portal, String trackingId) {
     if (scrapeUrl == null || scrapeUrl.isBlank()) {
-      throw new IllegalStateException("portal-issue-tracking.scrape-url is not configured");
+      throw new IllegalStateException("portalissue.scrape-url is not configured");
     }
 
     TrackIssueScrapeRequestDTO request =

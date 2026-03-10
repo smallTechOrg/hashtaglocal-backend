@@ -22,7 +22,7 @@ public class PortalIssueTrackingService {
   private final GovPortalRepository govPortalRepository;
   private final PortalIssueScrapeClient portalIssueScrapeClient;
 
-  @Value("${portal-issue-tracking.stale-hours:24}")
+  @Value("${portalissue.stale-hours:24}")
   private long staleHours;
 
   public void runCycle() {
