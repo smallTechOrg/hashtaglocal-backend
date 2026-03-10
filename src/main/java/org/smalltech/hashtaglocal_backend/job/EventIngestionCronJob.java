@@ -4,6 +4,7 @@ import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.smalltech.hashtaglocal_backend.dto.ScrapeEventDTO;
+import org.smalltech.hashtaglocal_backend.service.EventGeocodingService;
 import org.smalltech.hashtaglocal_backend.service.EventImportService;
 import org.smalltech.hashtaglocal_backend.service.ScrapeApiClient;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -31,7 +32,7 @@ public class EventIngestionCronJob {
 
   private final ScrapeApiClient scrapeApiClient;
   private final EventImportService eventImportService;
-  private final EventGeocodingJob eventGeocodingJob;
+  private final EventGeocodingService eventGeocodingService;
 
   @Scheduled(cron = "${events.scrape.cron}")
   public void run() {
@@ -50,7 +51,7 @@ public class EventIngestionCronJob {
     log.info("Imported {} new events", imported);
 
     // Step 3: geocode any events that still lack a resolved location
-    EventGeocodingJob.GeocodingJobResult geocodeResult = eventGeocodingJob.run();
+    EventGeocodingService.GeocodingResult geocodeResult = eventGeocodingService.run();
     log.info("Geocoding complete: {}", geocodeResult);
   }
 }

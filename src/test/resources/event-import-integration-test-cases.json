@@ -1,127 +1,127 @@
 [
   {
-    "scenario": "import_multiple_events",
-    "description": "All valid events in the payload are persisted — location_id is null immediately after import",
-    "payload": {
-      "data": {
-        "events": [
-          {
-            "name": "Trek and Plog",
-            "organisation": "Team Everest",
-            "portal": "Team everest",
-            "type": "TREKANDPLOG",
-            "startTime": "2026-02-21T05:00:00",
-            "address": "Lalbagh Main gate, Bengaluru",
-            "link": "https://www.teameverest.ngo/events/trek-plog-bengaluru1",
-            "image": "https://images.unsplash.com/photo-1551632811.jpg"
-          },
-          {
-            "name": "Beach Cleanup",
-            "organisation": "ivolunteer",
-            "portal": "ivolunteer",
-            "type": "BEACH_CLEANUP",
-            "startTime": "2026-02-21T00:00:00",
-            "address": "Holy Cross Church, Vile Parle West, Mumbai",
-            "link": "https://www.ivolunteer.in/opportunity/beach-cleanup"
-          }
-        ]
-      }
-    },
-    "expected": {
-      "status": 200,
-      "imported_count": 2,
-      "db_count": 2,
-      "location_id_null": true,
-      "note": "location_id stays null until POST /admin/events/geocode is called"
-    }
-  },
-  {
-    "scenario": "deduplication_second_import",
-    "description": "The same event sent twice — second import skips the duplicate, DB stays at 1 row",
-    "first_payload": {
-      "data": {
-        "events": [
-          {
-            "name": "Trek and Plog",
-            "organisation": "Team Everest",
-            "portal": "Team everest",
-            "type": "TREKANDPLOG",
-            "startTime": "2026-02-21T05:00:00",
-            "address": "Lalbagh Main gate, Bengaluru",
-            "link": "https://www.teameverest.ngo/events/trek-plog-bengaluru1"
-          }
-        ]
-      }
-    },
-    "second_payload": {
-      "data": {
-        "events": [
-          {
-            "name": "Trek and Plog",
-            "organisation": "Team Everest",
-            "portal": "Team everest",
-            "type": "TREKANDPLOG",
-            "startTime": "2026-02-21T05:00:00",
-            "address": "Lalbagh Main gate, Bengaluru",
-            "link": "https://www.teameverest.ngo/events/trek-plog-bengaluru1"
-          }
-        ]
-      }
-    },
-    "expected": {
-      "first_import_count": 1,
-      "second_import_count": 0,
-      "db_count_after_both": 1,
-      "dedup_key": "name + startTime"
-    }
-  },
-  {
-    "scenario": "empty_events_list",
-    "description": "Payload with an empty events array — import returns 0 and nothing is saved",
-    "payload": {
-      "data": {
-        "events": []
-      }
-    },
-    "expected": {
-      "status": 200,
-      "imported_count": 0,
-      "db_count": 0
-    }
-  },
-  {
-    "scenario": "geocode_skips_already_geocoded_events",
-    "description": "POST /admin/events/geocode — events that already have a location_id set are excluded by the repository query and never sent to Google Maps",
-    "db_seed": [
+    "scenario": "imports_single_valid_event",
+    "description": "One valid event is saved to the database with all fields mapped correctly",
+    "events": [
       {
         "name": "Trek and Plog",
         "organisation": "Team Everest",
-        "portal": "TEAMEVEREST",
+        "portal": "Team everest",
         "type": "TREKANDPLOG",
-        "startTime": "2026-02-21T05:00:00",
+        "start_time": "2026-02-21T05:00:00",
         "address": "Lalbagh Main gate, Bengaluru",
-        "link": "https://teameverest.ngo/events/trek",
-        "has_location": true,
-        "note": "location_id is already set — this event must be excluded from geocoding"
+        "link": "https://www.teameverest.ngo/events/trek-plog-bengaluru1",
+        "image": "https://images.unsplash.com/photo-1551632811.jpg"
       }
     ],
-    "expected": {
-      "status": 200,
-      "total": 0,
-      "success": 0,
-      "failed": 0,
-      "google_maps_calls": 0,
-      "note": "findByLocationIsNullAndAddressIsNotNull returns empty — Google Maps API must not be called"
+    "expected_count": 1,
+    "expected_first_event": {
+      "name": "Trek and Plog",
+      "event_type": "TREKANDPLOG",
+      "portal": "TEAMEVEREST",
+      "address": "Lalbagh Main gate, Bengaluru",
+      "location_null": true
     }
   },
   {
-    "scenario": "portal_normalisation",
-    "description": "Raw portal strings from scraper are normalised to EventPortalModel enum values",
-    "mappings": [
-      { "raw": "Team everest", "enum": "TEAMEVEREST" },
-      { "raw": "ivolunteer",   "enum": "IVOLUNTEER" },
-      { "raw": "mybharat.gov.in", "enum": "MYBHARATGOVIN" }
+    "scenario": "imports_multiple_valid_events",
+    "description": "Two valid events from different portals are both saved to the database",
+    "events": [
+      {
+        "name": "Trek and Plog",
+        "organisation": "Team Everest",
+        "portal": "Team everest",
+        "type": "TREKANDPLOG",
+        "start_time": "2026-02-21T05:00:00",
+        "address": "Lalbagh Main gate, Bengaluru",
+        "link": "https://www.teameverest.ngo/events/trek-plog-bengaluru1",
+        "image": "https://example.com/trek.jpg"
+      },
+      {
+        "name": "Beach Cleanup",
+        "organisation": "ivolunteer",
+        "portal": "ivolunteer",
+        "type": "BEACH_CLEANUP",
+        "start_time": "2026-02-21T00:00:00",
+        "address": "Holy Cross Church, Vile Parle West, Mumbai",
+        "link": "https://www.ivolunteer.in/opportunity/beach-cleanup",
+        "image": "https://example.com/beach.jpg"
+      }
     ],
-    "note": "EventPortalModel.fromString() handles case-insensitive normalisation"
+    "expected_count": 2
+  },
+  {
+    "scenario": "skips_event_with_blank_name",
+    "description": "Event with an empty name is silently skipped — nothing is persisted",
+    "events": [
+      {
+        "name": "",
+        "organisation": "Org",
+        "portal": "ivolunteer",
+        "type": "OTHER",
+        "start_time": "2026-02-21T05:00:00",
+        "address": "Some Address, Bengaluru",
+        "link": "https://example.com/event"
+      }
+    ],
+    "expected_count": 0
+  },
+  {
+    "scenario": "skips_event_with_null_start_time",
+    "description": "Event with a null start_time is silently skipped — nothing is persisted",
+    "events": [
+      {
+        "name": "Valid Name Event",
+        "organisation": "Org",
+        "portal": "ivolunteer",
+        "type": "OTHER",
+        "start_time": null,
+        "address": "Some Address, Bengaluru",
+        "link": "https://example.com/event"
+      }
+    ],
+    "expected_count": 0
+  },
+  {
+    "scenario": "skips_duplicate_event",
+    "description": "Calling import twice with the same event keeps only 1 row in the DB (dedup by name + start_time)",
+    "events": [
+      {
+        "name": "Trek and Plog",
+        "organisation": "Team Everest",
+        "portal": "Team everest",
+        "type": "TREKANDPLOG",
+        "start_time": "2026-02-21T05:00:00",
+        "address": "Lalbagh Main gate, Bengaluru",
+        "link": "https://www.teameverest.ngo/events/trek-plog-bengaluru1",
+        "image": "https://example.com/trek.jpg"
+      }
+    ],
+    "import_twice": true,
+    "expected_count": 1
+  },
+  {
+    "scenario": "returns_zero_for_empty_list",
+    "description": "Importing an empty events list saves nothing and returns 0",
+    "events": [],
+    "expected_count": 0
+  },
+  {
+    "scenario": "already_geocoded_event_not_reimported",
+    "description": "An event that is already in the DB (even if its location has been geocoded) is not re-inserted — dedup fires on name + start_time regardless of location status",
+    "events": [
+      {
+        "name": "Tree Plantation Drive",
+        "organisation": "Green India",
+        "portal": "mybharat.gov.in",
+        "type": "TREEPLANTATION",
+        "start_time": "2026-03-10T09:00:00",
+        "address": "Cubbon Park, Bengaluru",
+        "link": "https://mybharat.gov.in/events/tree-plantation-1",
+        "image": "https://example.com/tree.jpg"
+      }
+    ],
+    "import_twice": true,
+    "expected_count": 1
   }
 ]

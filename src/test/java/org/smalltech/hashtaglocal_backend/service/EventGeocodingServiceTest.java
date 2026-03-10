@@ -24,36 +24,35 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.smalltech.hashtaglocal_backend.dto.LocationMetadataDTO;
 import org.smalltech.hashtaglocal_backend.entity.EventEntity;
 import org.smalltech.hashtaglocal_backend.entity.Location;
-import org.smalltech.hashtaglocal_backend.job.EventGeocodingJob;
 import org.smalltech.hashtaglocal_backend.repository.EventRepository;
 
 /**
- * Unit tests for {@link EventGeocodingJob} geocoding logic.
+ * Unit tests for {@link EventGeocodingService} geocoding logic.
  *
- * <p>The job queries for un-geocoded events (location_id IS NULL), calls the Google Maps API for
- * each address, creates a Location row, and links it back to the event. These tests verify that
+ * <p>The service queries for un-geocoded events (location_id IS NULL), calls the Google Maps API
+ * for each address, creates a Location row, and links it back to the event. These tests verify that
  * flow without hitting the database or the real API.
  *
  * <p>Locality linking: after geocoding, {@code locationService.relinkLocalities()} is always called
  * as a final step to attach a Locality polygon to any Location rows whose locality_id is still
  * null. The tests verify the count is propagated in {@link
- * EventGeocodingJob.GeocodingJobResult#localitiesLinked()} and that the call happens even when
+ * EventGeocodingService.GeocodingResult#localitiesLinked()} and that the call happens even when
  * geocoding fails or there are no events.
  */
 @ExtendWith(MockitoExtension.class)
-@DisplayName("EventGeocodingJob — geocoding logic")
-class EventGeocodingJobTest {
+@DisplayName("EventGeocodingService — geocoding logic")
+class EventGeocodingServiceTest {
 
   @Mock private EventRepository eventRepository;
   @Mock private GoogleMapsGeocodingService geocodingService;
   @Mock private LocationService locationService;
 
-  @InjectMocks private EventGeocodingJob geocodingJob;
+  @InjectMocks private EventGeocodingService geocodingService2;
 
   private EventEntity eventWithAddress(long id, String address) {
     return EventEntity.builder()
         .id(id)
-        .eventName("Event " + id)
+        .name("Event " + id)
         .organisation("Org")
         .address(address)
         .startTime(LocalDateTime.now())
@@ -64,6 +63,8 @@ class EventGeocodingJobTest {
   // Parameterized: address → lat/lng + locality — test cases live in geocoding-test-cases.json
   // ---------------------------------------------------------------------------
 
+  private static final ObjectMapper MAPPER = new ObjectMapper();
+
   record GeocodingTestCase(
       String address,
       double lat,
@@ -73,12 +74,21 @@ class EventGeocodingJobTest {
       String locality,
       @JsonProperty("localities_linked") int localitiesLinked) {}
 
+  record SkipScenario(
+      String scenario,
+      String description,
+      @JsonProperty("repository_returns_count") int repositoryReturnsCount,
+      @JsonProperty("expected_google_maps_calls") int expectedGoogleMapsCalls) {}
+
   static Stream<Arguments> geocodingTestCases() throws IOException {
     List<GeocodingTestCase> cases =
-        new ObjectMapper()
-            .readValue(
-                EventGeocodingJobTest.class.getResourceAsStream("/geocoding-test-cases.json"),
-                new TypeReference<>() {});
+        MAPPER.convertValue(
+            MAPPER
+                .readTree(
+                    EventGeocodingServiceTest.class.getResourceAsStream(
+                        "/geocoding-test-cases.json"))
+                .get("address_geocoding"),
+            new TypeReference<>() {});
     return cases.stream()
         .map(
             tc ->
@@ -90,6 +100,18 @@ class EventGeocodingJobTest {
                     tc.name(),
                     tc.locality(),
                     tc.localitiesLinked()));
+  }
+
+  static Stream<Arguments> skipScenarios() throws IOException {
+    List<SkipScenario> cases =
+        MAPPER.convertValue(
+            MAPPER
+                .readTree(
+                    EventGeocodingServiceTest.class.getResourceAsStream(
+                        "/geocoding-test-cases.json"))
+                .get("skip_scenarios"),
+            new TypeReference<>() {});
+    return cases.stream().map(tc -> Arguments.of(tc.scenario(), tc.description()));
   }
 
   @ParameterizedTest(name = "{0}")
@@ -118,7 +140,7 @@ class EventGeocodingJobTest {
         .thenReturn(savedLocation);
     when(locationService.relinkLocalities()).thenReturn(expectedLocalitiesLinked);
 
-    EventGeocodingJob.GeocodingJobResult result = geocodingJob.run();
+    EventGeocodingService.GeocodingResult result = geocodingService2.run();
 
     assertEquals(1, result.success());
     assertEquals(0, result.failed());
@@ -127,6 +149,24 @@ class EventGeocodingJobTest {
         result.localitiesLinked(),
         "localitiesLinked should match — locality=" + locality);
     verify(eventRepository).save(argThat(e -> savedLocation.equals(e.getLocation())));
+  }
+
+  // ---------------------------------------------------------------------------
+  // Parameterized: skip scenarios — already-geocoded events, no events in DB
+  // ---------------------------------------------------------------------------
+
+  @ParameterizedTest(name = "{0}")
+  @MethodSource("skipScenarios")
+  @DisplayName("Google Maps API is never called when no events need geocoding")
+  void googleMapsNotCalledForSkipScenario(String scenario, String description) {
+    // repository returns empty list — simulates all events already having a location
+    when(eventRepository.findByLocationIsNullAndAddressIsNotNull()).thenReturn(List.of());
+
+    geocodingService2.run();
+
+    verify(geocodingService, never()).forwardGeocode(anyString());
+    verify(locationService, never()).createAndSaveLocation(any(), any(), any(), any());
+    verify(eventRepository, never()).save(any());
   }
 
   // ---------------------------------------------------------------------------
@@ -150,12 +190,11 @@ class EventGeocodingJobTest {
     when(locationService.createAndSaveLocation(eq(12.9716), eq(77.5946), any(), eq("Lalbagh")))
         .thenReturn(savedLocation);
 
-    EventGeocodingJob.GeocodingJobResult result = geocodingJob.run();
+    EventGeocodingService.GeocodingResult result = geocodingService2.run();
 
     assertEquals(1, result.total());
     assertEquals(1, result.success());
     assertEquals(0, result.failed());
-    // event should be saved with the location linked
     verify(eventRepository).save(argThat(e -> savedLocation.equals(e.getLocation())));
   }
 
@@ -166,12 +205,12 @@ class EventGeocodingJobTest {
     when(eventRepository.findByLocationIsNullAndAddressIsNotNull()).thenReturn(List.of(event));
     when(geocodingService.forwardGeocode(anyString())).thenReturn(null);
 
-    EventGeocodingJob.GeocodingJobResult result = geocodingJob.run();
+    EventGeocodingService.GeocodingResult result = geocodingService2.run();
 
     assertEquals(1, result.total());
     assertEquals(0, result.success());
     assertEquals(1, result.failed());
-    verify(eventRepository, never()).save(any()); // event must not be saved
+    verify(eventRepository, never()).save(any());
   }
 
   @Test
@@ -187,7 +226,7 @@ class EventGeocodingJobTest {
     when(geocodingService.metadataToMap(any())).thenReturn(Map.of());
     when(locationService.createAndSaveLocation(any(), any(), any(), any())).thenReturn(null);
 
-    EventGeocodingJob.GeocodingJobResult result = geocodingJob.run();
+    EventGeocodingService.GeocodingResult result = geocodingService2.run();
 
     assertEquals(0, result.success());
     assertEquals(1, result.failed());
@@ -199,14 +238,12 @@ class EventGeocodingJobTest {
   void returnsZeroCountsWhenNoEventsNeedGeocoding() {
     when(eventRepository.findByLocationIsNullAndAddressIsNotNull()).thenReturn(List.of());
 
-    EventGeocodingJob.GeocodingJobResult result = geocodingJob.run();
+    EventGeocodingService.GeocodingResult result = geocodingService2.run();
 
     assertEquals(0, result.total());
     assertEquals(0, result.success());
     assertEquals(0, result.failed());
-    // geocoding service is never touched — no addresses to resolve
     verifyNoInteractions(geocodingService);
-    // locality relinking still runs (it's always the final step)
     verify(locationService).relinkLocalities();
     verify(locationService, never()).createAndSaveLocation(any(), any(), any(), any());
   }
@@ -216,7 +253,7 @@ class EventGeocodingJobTest {
   // ---------------------------------------------------------------------------
 
   @Test
-  @DisplayName("localitiesLinked count from relinkLocalities() is propagated in job result")
+  @DisplayName("localitiesLinked count from relinkLocalities() is propagated in result")
   void localitiesLinkedCountIsPropagatedInResult() {
     EventEntity event = eventWithAddress(1L, "Lalbagh Main Gate, Bengaluru");
     when(eventRepository.findByLocationIsNullAndAddressIsNotNull()).thenReturn(List.of(event));
@@ -231,7 +268,7 @@ class EventGeocodingJobTest {
         .thenReturn(Location.builder().id(10L).name("Lalbagh").build());
     when(locationService.relinkLocalities()).thenReturn(3);
 
-    EventGeocodingJob.GeocodingJobResult result = geocodingJob.run();
+    EventGeocodingService.GeocodingResult result = geocodingService2.run();
 
     assertEquals(3, result.localitiesLinked());
   }
@@ -245,7 +282,7 @@ class EventGeocodingJobTest {
                 eventWithAddress(1L, "Bad Address One"), eventWithAddress(2L, "Bad Address Two")));
     when(geocodingService.forwardGeocode(anyString())).thenReturn(null);
 
-    geocodingJob.run();
+    geocodingService2.run();
 
     verify(locationService).relinkLocalities();
   }
@@ -266,13 +303,13 @@ class EventGeocodingJobTest {
         .thenReturn(Location.builder().id(11L).name("Juhu Beach").build());
     when(locationService.relinkLocalities()).thenReturn(0);
 
-    EventGeocodingJob.GeocodingJobResult result = geocodingJob.run();
+    EventGeocodingService.GeocodingResult result = geocodingService2.run();
 
     assertEquals(0, result.localitiesLinked(), "No localities in DB — nothing can be linked");
   }
 
   @Test
-  @DisplayName("relinkLocalities() is called exactly once per job run regardless of event count")
+  @DisplayName("relinkLocalities() is called exactly once per run regardless of event count")
   void relinkLocalitiesIsCalledExactlyOncePerRun() {
     when(eventRepository.findByLocationIsNullAndAddressIsNotNull())
         .thenReturn(
@@ -288,7 +325,7 @@ class EventGeocodingJobTest {
     when(locationService.createAndSaveLocation(any(), any(), any(), any()))
         .thenReturn(Location.builder().id(10L).build());
 
-    geocodingJob.run();
+    geocodingService2.run();
 
     verify(locationService, times(1)).relinkLocalities();
   }

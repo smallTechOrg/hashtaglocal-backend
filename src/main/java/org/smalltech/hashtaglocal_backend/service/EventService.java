@@ -87,11 +87,11 @@ public class EventService {
 
     return EventData.builder()
         .id(entity.getId())
-        .name(entity.getEventName())
+        .name(entity.getName())
         .organisation(entity.getOrganisation())
         .imageUrl(entity.getImageUrl())
         .portal(entity.getPortal() != null ? entity.getPortal().name() : null)
-        .type(entity.getEventType() != null ? entity.getEventType().name() : null)
+        .type(entity.getType() != null ? entity.getType().name() : null)
         .startTime(entity.getStartTime())
         .endTime(entity.getEndTime())
         .location(locationData)

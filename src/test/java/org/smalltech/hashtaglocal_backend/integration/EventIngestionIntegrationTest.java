@@ -9,48 +9,45 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.smalltech.hashtaglocal_backend.dto.ScrapeEventDTO;
-import org.smalltech.hashtaglocal_backend.job.EventGeocodingJob;
+import org.smalltech.hashtaglocal_backend.job.EventIngestionCronJob;
 import org.smalltech.hashtaglocal_backend.repository.EventRepository;
+import org.smalltech.hashtaglocal_backend.service.EventGeocodingService;
 import org.smalltech.hashtaglocal_backend.service.ScrapeApiClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.web.reactive.server.WebTestClient;
 
 /**
- * Integration tests for the event ingestion pipeline triggered via {@code POST
- * /admin/events/ingest}.
+ * Integration tests for the {@link EventIngestionCronJob}.
  *
- * <p>The same pipeline runs as the scheduled cron job:
+ * <p>Calls the cron job directly (no HTTP) to verify the full pipeline:
  *
  * <ol>
  *   <li>Fetch events from {@link ScrapeApiClient} (mocked)
  *   <li>Import new events into the database
- *   <li>Geocode addresses via {@link EventGeocodingJob} (mocked — no Google Maps calls)
+ *   <li>Geocode addresses via {@link EventGeocodingService} (mocked — no Google Maps calls)
  * </ol>
- *
- * <p>These tests verify that the pipeline wires together correctly and that DB state is correct
- * after each run.
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@SpringBootTest
 @ActiveProfiles("test")
-@DisplayName("POST /admin/events/ingest — ingestion pipeline")
+@DisplayName("EventIngestionCronJob — ingestion pipeline")
 class EventIngestionIntegrationTest {
 
-  @Autowired private WebTestClient webTestClient;
+  @Autowired private EventIngestionCronJob eventIngestionCronJob;
   @Autowired private EventRepository eventRepository;
 
   // Mocked so we control what raw events the pipeline receives
   @MockitoBean private ScrapeApiClient scrapeApiClient;
 
   // Mocked to avoid hitting the real Google Maps API
-  @MockitoBean private EventGeocodingJob eventGeocodingJob;
+  @MockitoBean private EventGeocodingService eventGeocodingService;
 
   @BeforeEach
   void setUp() {
     eventRepository.deleteAll();
-    when(eventGeocodingJob.run()).thenReturn(new EventGeocodingJob.GeocodingJobResult(0, 0, 0, 0));
+    when(eventGeocodingService.run())
+        .thenReturn(new EventGeocodingService.GeocodingResult(0, 0, 0, 0));
   }
 
   private ScrapeEventDTO event(String name, LocalDateTime startTime) {
@@ -62,6 +59,7 @@ class EventIngestionIntegrationTest {
         .startTime(startTime)
         .address("Lalbagh Main gate, Bengaluru")
         .link("https://example.com/event")
+        .image("https://example.com/image.jpg")
         .build();
   }
 
@@ -73,7 +71,7 @@ class EventIngestionIntegrationTest {
     when(scrapeApiClient.fetchEvents())
         .thenReturn(List.of(event("Trek and Plog", t1), event("Beach Cleanup", t2)));
 
-    webTestClient.post().uri("/admin/events/ingest").exchange().expectStatus().isOk();
+    eventIngestionCronJob.run();
 
     assertEquals(2, eventRepository.count());
   }
@@ -84,9 +82,9 @@ class EventIngestionIntegrationTest {
     when(scrapeApiClient.fetchEvents())
         .thenReturn(List.of(event("Trek and Plog", LocalDateTime.of(2026, 4, 1, 9, 0))));
 
-    webTestClient.post().uri("/admin/events/ingest").exchange().expectStatus().isOk();
+    eventIngestionCronJob.run();
 
-    verify(eventGeocodingJob, times(1)).run();
+    verify(eventGeocodingService, times(1)).run();
   }
 
   @Test
@@ -96,11 +94,11 @@ class EventIngestionIntegrationTest {
     when(scrapeApiClient.fetchEvents()).thenReturn(List.of(trek));
 
     // First run — persists 1 event
-    webTestClient.post().uri("/admin/events/ingest").exchange().expectStatus().isOk();
+    eventIngestionCronJob.run();
     assertEquals(1, eventRepository.count());
 
     // Second run — same event, must be deduplicated
-    webTestClient.post().uri("/admin/events/ingest").exchange().expectStatus().isOk();
+    eventIngestionCronJob.run();
     assertEquals(1, eventRepository.count(), "Duplicate must not be re-inserted");
   }
 
@@ -109,10 +107,10 @@ class EventIngestionIntegrationTest {
   void skipsImportAndGeocodeWhenScrapeReturnsEmpty() {
     when(scrapeApiClient.fetchEvents()).thenReturn(List.of());
 
-    webTestClient.post().uri("/admin/events/ingest").exchange().expectStatus().isOk();
+    eventIngestionCronJob.run();
 
     assertEquals(0, eventRepository.count());
-    verify(eventGeocodingJob, never()).run();
+    verify(eventGeocodingService, never()).run();
   }
 
   @Test
@@ -123,12 +121,12 @@ class EventIngestionIntegrationTest {
 
     // First run: 1 event
     when(scrapeApiClient.fetchEvents()).thenReturn(List.of(trek));
-    webTestClient.post().uri("/admin/events/ingest").exchange().expectStatus().isOk();
+    eventIngestionCronJob.run();
     assertEquals(1, eventRepository.count());
 
     // Second run: same + 1 new
     when(scrapeApiClient.fetchEvents()).thenReturn(List.of(trek, beach));
-    webTestClient.post().uri("/admin/events/ingest").exchange().expectStatus().isOk();
+    eventIngestionCronJob.run();
     assertEquals(2, eventRepository.count(), "Only the new event should be added");
   }
 }

@@ -24,7 +24,7 @@ public interface EventRepository extends JpaRepository<EventEntity, Long> {
   List<EventEntity> findByPortal(EventPortalModel portal);
 
   /** Returns all events matching the given activity type. */
-  List<EventEntity> findByEventType(EventTypeModel eventType);
+  List<EventEntity> findByType(EventTypeModel type);
 
   /** Returns all events whose start time is on or after the given date-time. */
   List<EventEntity> findByStartTimeGreaterThanEqual(LocalDateTime dateTime);
@@ -38,5 +38,5 @@ public interface EventRepository extends JpaRepository<EventEntity, Long> {
    * <p>Used for deduplication during import — prevents re-inserting events that were already
    * imported from a previous scrape of the same portal.
    */
-  boolean existsByEventNameAndStartTime(String eventName, LocalDateTime startTime);
+  boolean existsByNameAndStartTime(String name, LocalDateTime startTime);
 }
