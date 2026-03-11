@@ -2,6 +2,7 @@ package org.smalltech.hashtaglocal_backend.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.ArrayList;
+import lombok.extern.slf4j.Slf4j;
 import org.smalltech.hashtaglocal_backend.dto.TrackIssueScrapeRequestDTO;
 import org.smalltech.hashtaglocal_backend.dto.TrackIssueScrapeResponseDTO;
 import org.springframework.beans.factory.annotation.Value;
@@ -9,8 +10,6 @@ import org.springframework.http.converter.HttpMessageConverter;
 import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
-
-import lombok.extern.slf4j.Slf4j;
 
 @Service
 @Slf4j

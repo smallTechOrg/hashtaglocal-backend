@@ -6,6 +6,7 @@ import org.smalltech.hashtaglocal_backend.entity.IssueActionEntity;
 import org.smalltech.hashtaglocal_backend.entity.IssueEntity;
 import org.smalltech.hashtaglocal_backend.entity.MediaEntity;
 import org.smalltech.hashtaglocal_backend.entity.UserEntity;
+import org.smalltech.hashtaglocal_backend.model.GovPortalData;
 import org.smalltech.hashtaglocal_backend.model.Issue;
 import org.smalltech.hashtaglocal_backend.model.IssueActionApprovalStatus;
 import org.smalltech.hashtaglocal_backend.model.IssueActionModel;
@@ -15,6 +16,7 @@ import org.smalltech.hashtaglocal_backend.model.Media;
 import org.smalltech.hashtaglocal_backend.model.User;
 import org.smalltech.hashtaglocal_backend.model.ViewerContext;
 import org.smalltech.hashtaglocal_backend.model.response.IssueResponseData;
+import org.smalltech.hashtaglocal_backend.repository.GovPortalRepository;
 import org.smalltech.hashtaglocal_backend.repository.IssueActionRepository;
 import org.smalltech.hashtaglocal_backend.service.GCSService;
 import org.springframework.security.core.Authentication;
@@ -44,6 +46,7 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class IssueViewMapper {
 
+  private final GovPortalRepository govPortalRepository;
   private final IssueActionRepository issueActionRepository;
   private final GCSService gcsService;
 
@@ -176,6 +179,20 @@ public class IssueViewMapper {
                 })
             .toList();
 
+    List<GovPortalData> govPortalData =
+        govPortalRepository.findByIssueEntityId(entity.getId()).stream()
+            .map(
+                portal ->
+                    GovPortalData.builder()
+                        .trackingId(portal.getTrackingId())
+                        .status(portal.getStatus())
+                        .portalName(portal.getPortal().name())
+                        .portalTrackLink(portal.getUrl())
+                        .metaData(portal.getMetaData())
+                        .updatedAt(portal.getUpdatedAt())
+                        .build())
+            .toList();
+
     int verifyCount =
         issueActionRepository.countDistinctUserByIssueAndAction(entity, IssueActionModel.VERIFY);
 
@@ -190,6 +207,7 @@ public class IssueViewMapper {
             .description(entity.getDescription())
             .createdAt(entity.getCreatedAt())
             .mediaUrls(mediaList)
+            .govPortalData(govPortalData)
             .voteCount(0)
             .verifyCount(verifyCount)
             .status(entity.getStatus().name())
