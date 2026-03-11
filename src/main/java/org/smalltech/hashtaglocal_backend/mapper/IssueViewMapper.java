@@ -189,6 +189,7 @@ public class IssueViewMapper {
                         .portalName(portal.getPortal().name())
                         .portalTrackLink(portal.getUrl())
                         .metaData(portal.getMetaData())
+                        .createdAt(portal.getCreatedAt())
                         .updatedAt(portal.getUpdatedAt())
                         .build())
             .toList();
