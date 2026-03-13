@@ -101,12 +101,12 @@ events:
     url: ${EVENTS_SCRAPE_URL:}
     # Cron expression for the ingestion job (default: every 2 minutes)
     # Use '-' to disable. Override via EVENTS_SCRAPE_CRON env var.
-    cron: ${EVENTS_SCRAPE_CRON:0 */5 * * * *}
+    cron: ${EVENTS_SCRAPE_CRON:0 0 0 * * *}
 
 portalissue:
   enabled: ${PORTALISSUE_ENABLED:true}
   # Uses cron syntax despite the key name.
-  fixed-delay-ms: ${EVENTS_SCRAPE_CRON:0 */30 * * * *}
+  fixed-delay-ms: ${EVENTS_SCRAPE_CRON:0 0 1 * * *}
   stale-hours: ${PORTALISSUE_STALE_HOURS:24}
   scrape-url: ${PORTALISSUE_SCRAPE_URL:https://staging.api.smalltech.in/webscrapestaging/api/v1/scrape}
   auth:
