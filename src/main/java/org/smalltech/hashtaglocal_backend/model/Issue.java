@@ -2,7 +2,10 @@ package org.smalltech.hashtaglocal_backend.model;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 @Data
 @NoArgsConstructor
@@ -16,6 +19,7 @@ public class Issue {
   private String description;
   private LocalDateTime createdAt;
   private List<Media> mediaUrls;
+  private List<GovPortalData> govPortalData;
   private int voteCount;
   private int verifyCount;
   private String status;
