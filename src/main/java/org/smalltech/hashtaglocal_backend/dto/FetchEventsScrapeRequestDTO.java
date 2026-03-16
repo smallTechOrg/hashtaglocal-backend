@@ -4,30 +4,33 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Builder;
 import lombok.Value;
 import lombok.extern.jackson.Jacksonized;
+import org.smalltech.hashtaglocal_backend.model.EventPortalModel;
 import org.smalltech.hashtaglocal_backend.model.ScrapeActionType;
 import org.smalltech.hashtaglocal_backend.model.ScrapeSource;
 
 @Value
 @Builder
 @Jacksonized
-public class TrackIssueScrapeRequestDTO {
+public class FetchEventsScrapeRequestDTO {
 
   String source;
   Context context;
 
-  public static TrackIssueScrapeRequestDTO of(
-      String portal, String trackingId, String username, String password) {
-    return TrackIssueScrapeRequestDTO.builder()
-        .source(ScrapeSource.GOV_ISSUE_PORTAL.name())
+  public static FetchEventsScrapeRequestDTO of(EventPortalModel portal) {
+    return FetchEventsScrapeRequestDTO.builder()
+        .source(ScrapeSource.EVENT_PORTAL.name())
         .context(
             Context.builder()
-                .portal(portal)
+                .portal(portal.name())
                 .action(
                     Action.builder()
-                        .type(ScrapeActionType.TRACK_ISSUE.name())
-                        .data(ActionData.builder().trackingId(trackingId).build())
+                        .type(ScrapeActionType.FETCH_EVENTS.name())
+                        .data(
+                            ActionData.builder()
+                                .eventFilter(portal.getEventFilter())
+                                .categoryFilter(portal.getCategoryFilter())
+                                .build())
                         .build())
-                .auth(Auth.builder().username(username).password(password).build())
                 .build())
         .build();
   }
@@ -38,7 +41,6 @@ public class TrackIssueScrapeRequestDTO {
   public static class Context {
     String portal;
     Action action;
-    Auth auth;
   }
 
   @Value
@@ -53,15 +55,10 @@ public class TrackIssueScrapeRequestDTO {
   @Builder
   @Jacksonized
   public static class ActionData {
-    @JsonProperty("tracking_id")
-    String trackingId;
-  }
+    @JsonProperty("event_filter")
+    String eventFilter;
 
-  @Value
-  @Builder
-  @Jacksonized
-  public static class Auth {
-    String username;
-    String password;
+    @JsonProperty("category_filter")
+    String categoryFilter;
   }
 }

@@ -19,7 +19,7 @@ spring:
       hibernate:
         format_sql: true
         dialect: org.hibernate.dialect.PostgreSQLDialect
-  
+
   sql:
     init:
       mode: always
@@ -85,7 +85,6 @@ gcs:
   project:
     id: ${GCS_PROJECT_ID:}
 
-
 geonames:
   username: ${GEONAMES_USERNAME:mmk1}
 
@@ -98,10 +97,9 @@ auth:
 events:
   scrape:
     # URL of the external scrape service that provides raw event data
-    url: ${EVENTS_SCRAPE_URL:}
-    # Cron expression for the ingestion job (default: every 2 minutes)
-    # Use '-' to disable. Override via EVENTS_SCRAPE_CRON env var.
-    cron: ${EVENTS_SCRAPE_CRON:0 0 0 * * *}
+    url: ${EVENTS_SCRAPE_URL:https://staging.api.smalltech.in/webscrapestaging/api/v1/scrape}
+    # Cron expression for the ingestion job. Use '-' to disable. Override via EVENTS_SCRAPE_CRON env var.
+    cron: ${EVENTS_SCRAPE_CRON:0 */5 * * * *}
 
 portalissue:
   enabled: ${PORTALISSUE_ENABLED:true}
