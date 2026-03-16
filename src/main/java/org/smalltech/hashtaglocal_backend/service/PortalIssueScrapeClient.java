@@ -2,9 +2,12 @@ package org.smalltech.hashtaglocal_backend.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.ArrayList;
+import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
-import org.smalltech.hashtaglocal_backend.dto.TrackIssueScrapeRequestDTO;
+import org.smalltech.hashtaglocal_backend.dto.ScrapeRequestDTO;
 import org.smalltech.hashtaglocal_backend.dto.TrackIssueScrapeResponseDTO;
+import org.smalltech.hashtaglocal_backend.model.ScrapeActionType;
+import org.smalltech.hashtaglocal_backend.model.ScrapeSource;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.converter.HttpMessageConverter;
 import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
@@ -50,8 +53,13 @@ public class PortalIssueScrapeClient {
       throw new IllegalStateException("portalissue.scrape-url is not configured");
     }
 
-    TrackIssueScrapeRequestDTO request =
-        TrackIssueScrapeRequestDTO.of(portal, trackingId, authUsername, authPassword);
+    ScrapeRequestDTO request =
+        ScrapeRequestDTO.of(
+            ScrapeSource.GOV_ISSUE_PORTAL,
+            ScrapeActionType.TRACK_ISSUE,
+            portal,
+            Map.of("tracking_id", trackingId),
+            ScrapeRequestDTO.Auth.builder().username(authUsername).password(authPassword).build());
 
     log.debug("Calling portal scrape API for portal={} trackingId={}", portal, trackingId);
     TrackIssueScrapeResponseDTO response =

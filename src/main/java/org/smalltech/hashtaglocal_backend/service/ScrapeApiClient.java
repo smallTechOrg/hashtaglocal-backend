@@ -4,12 +4,15 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.smalltech.hashtaglocal_backend.dto.FetchEventsScrapeRequestDTO;
 import org.smalltech.hashtaglocal_backend.dto.ScrapeEventDTO;
+import org.smalltech.hashtaglocal_backend.dto.ScrapeRequestDTO;
 import org.smalltech.hashtaglocal_backend.dto.ScrapeResponseDTO;
 import org.smalltech.hashtaglocal_backend.model.EventPortalModel;
+import org.smalltech.hashtaglocal_backend.model.ScrapeActionType;
+import org.smalltech.hashtaglocal_backend.model.ScrapeSource;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ResourceLoader;
 import org.springframework.http.HttpEntity;
@@ -54,20 +57,30 @@ public class ScrapeApiClient {
     List<ScrapeEventDTO> all = new ArrayList<>();
     for (EventPortalModel portal : EventPortalModel.values()) {
       if (portal.supportsFetchEvents()) {
-        all.addAll(fetchForPortal(portal));
+        all.addAll(
+            fetchForPortal(portal, ScrapeSource.EVENT_PORTAL, ScrapeActionType.FETCH_EVENTS));
       }
     }
     return all;
   }
 
-  private List<ScrapeEventDTO> fetchForPortal(EventPortalModel portal) {
+  private List<ScrapeEventDTO> fetchForPortal(
+      EventPortalModel portal, ScrapeSource source, ScrapeActionType actionType) {
     try {
       log.debug("Fetching events for portal {} from {}", portal, scrapeUrl);
 
+      ScrapeRequestDTO body =
+          ScrapeRequestDTO.of(
+              source,
+              actionType,
+              portal.name(),
+              Map.of(
+                  "event_filter", portal.getEventFilter(),
+                  "category_filter", portal.getCategoryFilter()));
+
       HttpHeaders headers = new HttpHeaders();
       headers.setContentType(MediaType.APPLICATION_JSON);
-      HttpEntity<FetchEventsScrapeRequestDTO> request =
-          new HttpEntity<>(FetchEventsScrapeRequestDTO.of(portal), headers);
+      HttpEntity<ScrapeRequestDTO> request = new HttpEntity<>(body, headers);
 
       ScrapeResponseDTO response =
           restTemplate.postForObject(scrapeUrl, request, ScrapeResponseDTO.class);
