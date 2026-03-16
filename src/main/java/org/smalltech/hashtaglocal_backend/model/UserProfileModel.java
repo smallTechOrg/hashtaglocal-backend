@@ -13,6 +13,7 @@ public class UserProfileModel {
 
   private String username;
   private String picture;
+  private String userRole;
   private String hashtag;
   private UserSummaryModel userSummary;
 }
