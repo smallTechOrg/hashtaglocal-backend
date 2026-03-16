@@ -8,6 +8,7 @@ import org.smalltech.hashtaglocal_backend.entity.IssueActionEntity;
 import org.smalltech.hashtaglocal_backend.model.IssueActionApprovalStatus;
 import org.smalltech.hashtaglocal_backend.model.IssueActionModel;
 import org.smalltech.hashtaglocal_backend.model.IssueStatusModel;
+import org.smalltech.hashtaglocal_backend.model.UserRole;
 import org.smalltech.hashtaglocal_backend.model.request.IssueVerifyRequest;
 import org.smalltech.hashtaglocal_backend.repository.IssueActionRepository;
 import org.smalltech.hashtaglocal_backend.repository.IssueRepository;
@@ -75,10 +76,11 @@ public class IssueActionService {
     if (issueActionModel == IssueActionModel.REJECT) {
       Long ownerId =
           issueEntity.getUserEntity() != null ? issueEntity.getUserEntity().getId() : null;
+      boolean isAdmin = UserRole.ADMIN.equals(userEntity.getRole());
 
-      if (ownerId == null || !ownerId.equals(userId)) {
+      if (!isAdmin && (ownerId == null || !ownerId.equals(userId))) {
         throw new ResponseStatusException(
-            HttpStatus.FORBIDDEN, "Only the issue owner can reject the issue");
+            HttpStatus.FORBIDDEN, "Only the issue owner or an admin can reject the issue");
       }
     }
 

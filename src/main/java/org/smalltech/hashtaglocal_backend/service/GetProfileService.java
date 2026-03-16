@@ -2,6 +2,7 @@ package org.smalltech.hashtaglocal_backend.service;
 
 import java.util.List;
 import java.util.Optional;
+
 import org.smalltech.hashtaglocal_backend.entity.UserAuthSessionEntity;
 import org.smalltech.hashtaglocal_backend.entity.UserEntity;
 import org.smalltech.hashtaglocal_backend.model.IssueActionModel;
@@ -93,6 +94,7 @@ public class GetProfileService {
     return UserProfileModel.builder()
         .username(user.getUsername())
         .picture(user.getProfilePicture())
+        .userRole(user.getRole().name())
         .hashtag(hashtag)
         .userSummary(userSummary)
         .build();

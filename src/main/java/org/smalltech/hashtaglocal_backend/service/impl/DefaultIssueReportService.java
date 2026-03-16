@@ -70,17 +70,11 @@ public class DefaultIssueReportService implements IssueReportService {
     if (issueReq.getMediaUrls() != null && !issueReq.getMediaUrls().isEmpty()) {
       for (MediaRequest mediaReq : issueReq.getMediaUrls()) {
 
-        var mediaLocReq = mediaReq.getLocation();
-
-        Location mediaLocation =
-            locationService.createAndSaveLocation(
-                mediaLocReq.getLat(), mediaLocReq.getLng(), mediaLocReq.getMetaData(), "Unknown");
-
         MediaEntity media =
             MediaEntity.builder()
                 .type(MediaTypeModel.valueOf(mediaReq.getType()))
                 .url(mediaReq.getUrl())
-                .location(mediaLocation)
+                .location(issueLocation)
                 .createdAt(LocalDateTime.now())
                 .build();
 
