@@ -10,6 +10,7 @@ import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Stream;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -19,11 +20,14 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.smalltech.hashtaglocal_backend.dto.ScrapeEventDTO;
 import org.smalltech.hashtaglocal_backend.entity.EventEntity;
+import org.smalltech.hashtaglocal_backend.entity.MediaEntity;
 import org.smalltech.hashtaglocal_backend.model.EventPortalModel;
 import org.smalltech.hashtaglocal_backend.model.EventTypeModel;
+import org.smalltech.hashtaglocal_backend.model.MediaTypeModel;
 import org.smalltech.hashtaglocal_backend.repository.EventRepository;
 
 /**
@@ -38,12 +42,23 @@ class EventImportServiceTest {
 
   @Mock private EventService eventService;
   @Mock private EventRepository eventRepository;
+  @Mock private EventImageService eventImageService;
 
   @InjectMocks private EventImportService eventImportService;
 
   private static final LocalDateTime START_TIME = LocalDateTime.of(2026, 2, 21, 5, 0);
 
   private static final ObjectMapper MAPPER = new ObjectMapper();
+
+  @BeforeEach
+  void stubImageService() {
+    MediaEntity mockMedia =
+        MediaEntity.builder()
+            .type(MediaTypeModel.PHOTO)
+            .url("https://example.com/image.jpg")
+            .build();
+    Mockito.lenient().when(eventImageService.downloadAndStore(any())).thenReturn(mockMedia);
+  }
 
   // ---------------------------------------------------------------------------
   // Helpers
@@ -157,7 +172,7 @@ class EventImportServiceTest {
     assertEquals(START_TIME, saved.getStartTime());
     assertEquals("Lalbagh Main Gate, Bengaluru", saved.getAddress());
     assertEquals("https://example.com", saved.getLink());
-    assertEquals("https://example.com/image.jpg", saved.getImageUrl());
+    assertEquals("https://example.com/image.jpg", saved.getMedia().getUrl());
     assertNull(saved.getLocation(), "location_id should be null until geocoding runs");
   }
 

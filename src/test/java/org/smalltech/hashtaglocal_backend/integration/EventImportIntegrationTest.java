@@ -17,14 +17,20 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.mockito.Mockito;
 import org.smalltech.hashtaglocal_backend.dto.ScrapeEventDTO;
+import org.smalltech.hashtaglocal_backend.entity.MediaEntity;
 import org.smalltech.hashtaglocal_backend.model.EventPortalModel;
 import org.smalltech.hashtaglocal_backend.model.EventTypeModel;
+import org.smalltech.hashtaglocal_backend.model.MediaTypeModel;
 import org.smalltech.hashtaglocal_backend.repository.EventRepository;
+import org.smalltech.hashtaglocal_backend.repository.MediaRepository;
+import org.smalltech.hashtaglocal_backend.service.EventImageService;
 import org.smalltech.hashtaglocal_backend.service.EventImportService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
  * Integration tests for {@link EventImportService}.
@@ -47,6 +53,8 @@ class EventImportIntegrationTest {
 
   @Autowired private EventImportService eventImportService;
   @Autowired private EventRepository eventRepository;
+  @Autowired private MediaRepository mediaRepository;
+  @MockitoBean private EventImageService eventImageService;
 
   private static final ObjectMapper MAPPER =
       new ObjectMapper()
@@ -56,6 +64,16 @@ class EventImportIntegrationTest {
   @BeforeEach
   void cleanUp() {
     eventRepository.deleteAll();
+    mediaRepository.deleteAll();
+    MediaEntity savedMedia =
+        mediaRepository.save(
+            MediaEntity.builder()
+                .type(MediaTypeModel.PHOTO)
+                .url("https://example.com/image.jpg")
+                .build());
+    Mockito.lenient()
+        .when(eventImageService.downloadAndStore(Mockito.any()))
+        .thenReturn(savedMedia);
   }
 
   // ---------------------------------------------------------------------------

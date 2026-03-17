@@ -98,6 +98,11 @@ public class GCSService {
     return gcsPath;
   }
 
+  /** Deletes an object from GCS by its gs:// path or bare object name. */
+  public void deleteObject(String gcsPath) {
+    storage.delete(bucketName, extractObjectPath(gcsPath));
+  }
+
   /** Uploads content to the configured GCS bucket and returns the gs:// path. */
   public String uploadObject(String objectName, byte[] data, String contentType) {
     if (objectName == null || objectName.isBlank()) {

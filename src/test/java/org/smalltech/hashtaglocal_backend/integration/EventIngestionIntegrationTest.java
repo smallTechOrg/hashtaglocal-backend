@@ -9,9 +9,13 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.smalltech.hashtaglocal_backend.dto.ScrapeEventDTO;
+import org.smalltech.hashtaglocal_backend.entity.MediaEntity;
 import org.smalltech.hashtaglocal_backend.job.EventIngestionCronJob;
+import org.smalltech.hashtaglocal_backend.model.MediaTypeModel;
 import org.smalltech.hashtaglocal_backend.repository.EventRepository;
+import org.smalltech.hashtaglocal_backend.repository.MediaRepository;
 import org.smalltech.hashtaglocal_backend.service.EventGeocodingService;
+import org.smalltech.hashtaglocal_backend.service.EventImageService;
 import org.smalltech.hashtaglocal_backend.service.ScrapeApiClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -36,6 +40,7 @@ class EventIngestionIntegrationTest {
 
   @Autowired private EventIngestionCronJob eventIngestionCronJob;
   @Autowired private EventRepository eventRepository;
+  @Autowired private MediaRepository mediaRepository;
 
   // Mocked so we control what raw events the pipeline receives
   @MockitoBean private ScrapeApiClient scrapeApiClient;
@@ -43,11 +48,22 @@ class EventIngestionIntegrationTest {
   // Mocked to avoid hitting the real Google Maps API
   @MockitoBean private EventGeocodingService eventGeocodingService;
 
+  // Mocked to avoid hitting external image URLs and GCS
+  @MockitoBean private EventImageService eventImageService;
+
   @BeforeEach
   void setUp() {
     eventRepository.deleteAll();
+    mediaRepository.deleteAll();
     when(eventGeocodingService.run())
         .thenReturn(new EventGeocodingService.GeocodingResult(0, 0, 0, 0));
+    MediaEntity savedMedia =
+        mediaRepository.save(
+            MediaEntity.builder()
+                .type(MediaTypeModel.PHOTO)
+                .url("https://example.com/image.jpg")
+                .build());
+    when(eventImageService.downloadAndStore(any())).thenReturn(savedMedia);
   }
 
   private ScrapeEventDTO event(String name, LocalDateTime startTime) {

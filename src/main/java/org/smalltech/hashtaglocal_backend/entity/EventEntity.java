@@ -37,9 +37,11 @@ public class EventEntity {
 
   @Column private String organisation;
 
-  /** URL to the event banner/thumbnail image provided by the source portal. */
-  @Column(length = 2048)
-  private String imageUrl;
+  // Replaces the old imageUrl string — CDN URLs expire, so images are now stored in GCS and
+  // referenced via this FK. The signed URL is generated at read time in EventService.
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "media_id")
+  private MediaEntity media;
 
   /**
    * Source portal stored as VARCHAR in DB, enforced as enum in Java.
