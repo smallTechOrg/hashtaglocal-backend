@@ -52,6 +52,9 @@ public class PortalIssueScrapeClient {
     if (scrapeUrl == null || scrapeUrl.isBlank()) {
       throw new IllegalStateException("portalissue.scrape-url is not configured");
     }
+    if (trackingId == null) {
+      throw new IllegalArgumentException("trackingId must not be null for portal: " + portal);
+    }
 
     ScrapeRequestDTO request =
         ScrapeRequestDTO.of(

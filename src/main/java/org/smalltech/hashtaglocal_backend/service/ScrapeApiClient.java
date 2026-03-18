@@ -3,6 +3,7 @@ package org.smalltech.hashtaglocal_backend.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
@@ -69,14 +70,12 @@ public class ScrapeApiClient {
     try {
       log.debug("Fetching events for portal {} from {}", portal, scrapeUrl);
 
-      ScrapeRequestDTO body =
-          ScrapeRequestDTO.of(
-              source,
-              actionType,
-              portal.name(),
-              Map.of(
-                  "event_filter", portal.getEventFilter(),
-                  "category_filter", portal.getCategoryFilter()));
+      Map<String, Object> data = new HashMap<>();
+      data.put("event_filter", portal.getEventFilter());
+      if (portal.getCategoryFilter() != null) {
+        data.put("category_filter", portal.getCategoryFilter());
+      }
+      ScrapeRequestDTO body = ScrapeRequestDTO.of(source, actionType, portal.name(), data);
 
       HttpHeaders headers = new HttpHeaders();
       headers.setContentType(MediaType.APPLICATION_JSON);

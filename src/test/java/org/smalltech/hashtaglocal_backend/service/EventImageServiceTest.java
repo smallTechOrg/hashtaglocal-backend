@@ -111,16 +111,17 @@ class EventImageServiceTest {
             i -> {
               JsonNode node = root.get("skip_scenarios").get(i);
               boolean throwsEx = node.get("throws").asBoolean();
-              boolean nullBytes = node.get("bytes").isNull() || node.get("bytes").size() == 0;
-              return Arguments.of(throwsEx, nullBytes, node.get("description").asText());
+              // Preserve null vs empty distinction so both branches of the
+              // (bytes == null || bytes.length == 0) guard are actually exercised.
+              byte[] bytes = node.get("bytes").isNull() ? null : new byte[0];
+              return Arguments.of(throwsEx, bytes, node.get("description").asText());
             });
   }
 
   @ParameterizedTest(name = "{2}")
   @MethodSource("skipScenarioCases")
   @DisplayName("No GCS upload when download fails or returns empty")
-  void noGcsUploadOnDownloadFailure(
-      boolean throwsException, boolean nullBytes, String description) {
+  void noGcsUploadOnDownloadFailure(boolean throwsException, byte[] bytes, String description) {
     String url = "https://cdn.example.com/image.jpg";
 
     if (throwsException) {
@@ -134,7 +135,7 @@ class EventImageServiceTest {
                   null,
                   null));
     } else {
-      when(restTemplate.getForObject(url, byte[].class)).thenReturn(nullBytes ? null : new byte[0]);
+      when(restTemplate.getForObject(url, byte[].class)).thenReturn(bytes);
     }
 
     MediaEntity result = eventImageService.downloadAndStore(url);

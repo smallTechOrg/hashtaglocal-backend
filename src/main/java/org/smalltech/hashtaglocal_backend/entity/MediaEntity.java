@@ -54,8 +54,11 @@ public class MediaEntity {
   private LocalDateTime createdAt;
 
   // createdAt is non-nullable but has no setter — populate it automatically before every INSERT.
+  // Only set when null so explicitly provided timestamps (e.g. historical imports) are preserved.
   @PrePersist
   protected void onCreate() {
-    createdAt = LocalDateTime.now();
+    if (createdAt == null) {
+      createdAt = LocalDateTime.now();
+    }
   }
 }
