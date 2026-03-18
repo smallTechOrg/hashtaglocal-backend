@@ -1,0 +1,18 @@
+{
+  "extension_detection": [
+    { "description": "JPEG URL — .jpg extension",              "url": "https://cdn.example.com/photos/event.jpg",              "expected_ext": "jpg",  "expected_content_type": "image/jpeg"  },
+    { "description": "JPEG URL — .jpeg extension",             "url": "https://cdn.example.com/photos/event.jpeg",             "expected_ext": "jpeg", "expected_content_type": "image/jpeg"  },
+    { "description": "PNG URL",                                "url": "https://cdn.example.com/photos/banner.png",             "expected_ext": "png",  "expected_content_type": "image/png"   },
+    { "description": "WebP URL",                               "url": "https://cdn.example.com/photos/banner.webp",            "expected_ext": "webp", "expected_content_type": "image/webp"  },
+    { "description": "GIF URL",                                "url": "https://cdn.example.com/photos/anim.gif",               "expected_ext": "gif",  "expected_content_type": "image/gif"   },
+    { "description": "URL with query params — extension still detected", "url": "https://cdn.example.com/img.png?X-Amz-Expires=900&token=abc", "expected_ext": "png", "expected_content_type": "image/png" },
+    { "description": "Signed Airtable URL with query params",  "url": "https://v5.airtableusercontent.com/photo.jpg?token=xyz","expected_ext": "jpg",  "expected_content_type": "image/jpeg"  },
+    { "description": "Unknown extension — defaults to jpg",    "url": "https://cdn.example.com/photos/image.bmp",              "expected_ext": "jpg",  "expected_content_type": "image/jpeg"  },
+    { "description": "No extension in path — defaults to jpg", "url": "https://cdn.example.com/photos/image",                  "expected_ext": "jpg",  "expected_content_type": "image/jpeg"  }
+  ],
+  "skip_scenarios": [
+    { "description": "Download returns null bytes — no GCS upload",    "bytes": null,  "throws": false },
+    { "description": "Download returns empty bytes — no GCS upload",   "bytes": [],    "throws": false },
+    { "description": "Download throws exception (e.g. 404) — no GCS upload", "bytes": null, "throws": true }
+  ]
+}

@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.smalltech.hashtaglocal_backend.dto.ScrapeEventDTO;
 import org.smalltech.hashtaglocal_backend.entity.EventEntity;
+import org.smalltech.hashtaglocal_backend.entity.MediaEntity;
 import org.smalltech.hashtaglocal_backend.model.EventPortalModel;
 import org.smalltech.hashtaglocal_backend.model.EventTypeModel;
 import org.smalltech.hashtaglocal_backend.repository.EventRepository;
@@ -33,6 +34,7 @@ public class EventImportService {
 
   private final EventService eventService;
   private final EventRepository eventRepository;
+  private final EventImageService eventImageService;
 
   /**
    * Processes a list of events from the scrape service, deduplicates against the database, and
@@ -67,7 +69,15 @@ public class EventImportService {
           continue;
         }
 
-        toSave.add(toEntity(dto));
+        // Download the CDN image, upload to GCS, and persist a MediaEntity row.
+        // Skip the event if the image can't be stored — an event without a valid image is unusable.
+        MediaEntity media = eventImageService.downloadAndStore(dto.getImage());
+        if (media == null) {
+          log.debug("Skipping event '{}' — image download/upload failed", dto.getName());
+          continue;
+        }
+
+        toSave.add(toEntity(dto, media));
       } catch (Exception e) {
         log.warn("Skipping event '{}' due to error: {}", dto.getName(), e.getMessage());
       }
@@ -82,7 +92,7 @@ public class EventImportService {
     return toSave.size();
   }
 
-  private EventEntity toEntity(ScrapeEventDTO dto) {
+  private EventEntity toEntity(ScrapeEventDTO dto, MediaEntity media) {
     return EventEntity.builder()
         .name(dto.getName())
         .organisation(dto.getOrganisation())
@@ -92,7 +102,7 @@ public class EventImportService {
         .endTime(dto.getEndTime())
         .address(dto.getAddress())
         .link(dto.getLink())
-        .imageUrl(dto.getImage())
+        .media(media)
         .build();
   }
 

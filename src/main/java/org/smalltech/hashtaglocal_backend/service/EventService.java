@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import org.smalltech.hashtaglocal_backend.entity.EventEntity;
 import org.smalltech.hashtaglocal_backend.entity.Locality;
 import org.smalltech.hashtaglocal_backend.entity.Location;
+import org.smalltech.hashtaglocal_backend.entity.MediaEntity;
 import org.smalltech.hashtaglocal_backend.model.response.EventData;
 import org.smalltech.hashtaglocal_backend.repository.EventRepository;
 import org.springframework.stereotype.Service;
@@ -22,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class EventService {
 
   private final EventRepository eventRepository;
+  private final GCSService gcsService;
 
   /**
    * Returns all events in the database.
@@ -85,11 +87,15 @@ public class EventService {
             .locality(localityData)
             .build();
 
+    // Generate a fresh signed URL each time — GCS paths in DB never expire, but signed URLs do.
+    MediaEntity media = entity.getMedia();
+    String imageUrl = media != null ? gcsService.generateSignedUrl(media.getUrl()) : null;
+
     return EventData.builder()
         .id(entity.getId())
         .name(entity.getName())
         .organisation(entity.getOrganisation())
-        .imageUrl(entity.getImageUrl())
+        .imageUrl(imageUrl)
         .portal(entity.getPortal() != null ? entity.getPortal().name() : null)
         .type(entity.getType() != null ? entity.getType().name() : null)
         .startTime(entity.getStartTime())
