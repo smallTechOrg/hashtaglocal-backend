@@ -23,7 +23,7 @@ public enum EventPortalModel {
           + " plantation",
       ""),
   IVOLUNTEER(null, null),
-  MYBHARATGOVIN(null, null),
+  MYBHARATGOVIN("civic volunteering, cleanliness drive, tree plantation", "civic engagement"),
   TWITTER(null, null);
 
   /** The event_filter sent in the FETCH_EVENTS POST body. {@code null} = portal not yet enabled. */
