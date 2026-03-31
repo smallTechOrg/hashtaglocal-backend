@@ -6,6 +6,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.smalltech.hashtaglocal_backend.mapper.IssueViewMapper;
+import org.smalltech.hashtaglocal_backend.model.IssueActionResult;
 import org.smalltech.hashtaglocal_backend.model.NewAPIResponse;
 import org.smalltech.hashtaglocal_backend.model.request.IssuePatchRequest;
 import org.smalltech.hashtaglocal_backend.model.request.IssueReportRequest;
@@ -82,11 +83,15 @@ public class IssueController {
       @PathVariable Long issueId,
       @AuthenticationPrincipal Long userId,
       @Valid @RequestBody IssueVerifyRequest request) {
-    Long updatedIssueId = issueActionService.handle(issueId, userId, request);
+    IssueActionResult result = issueActionService.handle(issueId, userId, request);
 
     NewAPIResponse<IssueActionResponseData> response =
         NewAPIResponse.<IssueActionResponseData>builder()
-            .data(IssueActionResponseData.builder().issueId(updatedIssueId).build())
+            .data(
+                IssueActionResponseData.builder()
+                    .issueId(result.getIssueId())
+                    .karmaAwarded(result.getKarmaAwarded())
+                    .build())
             .build();
 
     return ResponseEntity.ok(response);
@@ -108,11 +113,15 @@ public class IssueController {
   @Operation(summary = "Create issue", description = "Creates a new issue with the given details.")
   public ResponseEntity<NewAPIResponse<IssueActionResponseData>> createIssue(
       @AuthenticationPrincipal Long userId, @Valid @RequestBody IssueReportRequest request) {
-    Long issueId = issueReportService.createIssue(userId, request);
+    IssueActionResult result = issueReportService.createIssue(userId, request);
 
     NewAPIResponse<IssueActionResponseData> response =
         NewAPIResponse.<IssueActionResponseData>builder()
-            .data(IssueActionResponseData.builder().issueId(issueId).build())
+            .data(
+                IssueActionResponseData.builder()
+                    .issueId(result.getIssueId())
+                    .karmaAwarded(result.getKarmaAwarded())
+                    .build())
             .build();
 
     return ResponseEntity.ok(response);
