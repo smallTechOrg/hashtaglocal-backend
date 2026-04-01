@@ -46,6 +46,8 @@ public class SecurityConfig {
             auth ->
                 auth.requestMatchers(HttpMethod.POST, "/api/v1/issue")
                     .authenticated()
+                  .requestMatchers(HttpMethod.POST, "/api/v1/report_complaint")
+                  .authenticated()
                     .requestMatchers(HttpMethod.GET, "/api/v1/media/upload-url")
                     .authenticated()
                     .requestMatchers(HttpMethod.PUT, "/api/v1/issue/**")

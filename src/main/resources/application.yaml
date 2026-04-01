@@ -107,6 +107,10 @@ portalissue:
   fixed-delay-ms: ${EVENTS_SCRAPE_CRON:0 0 1 * * *}
   stale-hours: ${PORTALISSUE_STALE_HOURS:24}
   scrape-url: ${PORTALISSUE_SCRAPE_URL:https://staging.api.smalltech.in/webscrapestaging/api/v1/scrape}
+  report:
+    scrape-url: ${PORTALISSUE_REPORT_SCRAPE_URL:https://staging.api.smalltech.in/webscraperstaging/api/v1/scrape}
+    connect-timeout-seconds: ${PORTALISSUE_REPORT_CONNECT_TIMEOUT_SECONDS:15}
+    read-timeout-seconds: ${PORTALISSUE_REPORT_READ_TIMEOUT_SECONDS:305}
   auth:
     username: ${PORTALISSUE_AUTH_USERNAME:placeholder_username}
     password: ${PORTALISSUE_AUTH_PASSWORD:placeholder_password}
