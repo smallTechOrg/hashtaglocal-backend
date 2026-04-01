@@ -49,7 +49,7 @@ public enum EventPortalModel {
    *
    * <ul>
    *   <li>"Team everest" → {@link #TEAMEVEREST}
-   *   <li>"ivolunteer" → {@link #IVOLUNTEER}
+   *   <li>"ivolunteer" / "ivolunteer.in" → {@link #IVOLUNTEERIN}
    *   <li>"mybharat.gov.in" → {@link #MYBHARATGOVIN}
    *   <li>"Twitter" → {@link #TWITTER}
    * </ul>
@@ -63,8 +63,7 @@ public enum EventPortalModel {
     String normalized = raw.toLowerCase().replaceAll("[\\s.\\-_]+", "");
     return switch (normalized) {
       case "teameverest" -> TEAMEVEREST;
-      case "ivolunteer" -> IVOLUNTEER;
-      case "ivolunteerin" -> IVOLUNTEERIN;
+      case "ivolunteer", "ivolunteerin" -> IVOLUNTEERIN;
       case "mybharatgovin" -> MYBHARATGOVIN;
       case "twitter" -> TWITTER;
       default -> null;
