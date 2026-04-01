@@ -13,11 +13,13 @@ import org.smalltech.hashtaglocal_backend.model.request.IssueVerifyRequest;
 import org.smalltech.hashtaglocal_backend.model.response.IssueActionResponseData;
 import org.smalltech.hashtaglocal_backend.model.response.IssueListResponseData;
 import org.smalltech.hashtaglocal_backend.model.response.IssueResponseData;
+import org.smalltech.hashtaglocal_backend.model.response.IssueStoriesResponseData;
 import org.smalltech.hashtaglocal_backend.service.IssueActionService;
 import org.smalltech.hashtaglocal_backend.service.IssueHomeService;
 import org.smalltech.hashtaglocal_backend.service.IssuePatchService;
 import org.smalltech.hashtaglocal_backend.service.IssueQueryService;
 import org.smalltech.hashtaglocal_backend.service.IssueReportService;
+import org.smalltech.hashtaglocal_backend.service.IssueStoryService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -41,6 +43,7 @@ public class IssueController {
   private final IssuePatchService issuePatchService;
   private final IssueQueryService issueQueryService;
   private final IssueReportService issueReportService;
+  private final IssueStoryService issueStoryService;
   private final IssueViewMapper issueViewMapper;
 
   @GetMapping("/issue/{issueId}")
@@ -101,6 +104,20 @@ public class IssueController {
       @AuthenticationPrincipal Long viewerUserId,
       @RequestParam(value = "locality", required = false) String localityHashtag) {
     return issueHomeAssembler.getHome(localityHashtag, viewerUserId);
+  }
+
+  @GetMapping("/issues/stories")
+  @Operation(
+      summary = "Get resolved issue stories",
+      description =
+          "Returns resolved issues with timeline data showing how they progressed from reported to resolved. Optionally filter by locality hashtag.")
+  public NewAPIResponse<IssueStoriesResponseData> getIssueStories(
+      @RequestParam(value = "locality", required = false) String localityHashtag,
+      @RequestParam(value = "limit", required = false, defaultValue = "5") int limit) {
+    var stories = issueStoryService.getStories(localityHashtag, limit);
+    return NewAPIResponse.<IssueStoriesResponseData>builder()
+        .data(IssueStoriesResponseData.builder().stories(stories).build())
+        .build();
   }
 
   @PostMapping("/issue")

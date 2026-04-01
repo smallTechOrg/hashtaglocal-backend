@@ -74,4 +74,7 @@ public interface IssueActionRepository extends JpaRepository<IssueActionEntity, 
    */
   List<IssueActionEntity> findByApprovalStatusInOrderByApprovedAtDesc(
       List<IssueActionApprovalStatus> statuses);
+
+  List<IssueActionEntity> findByIssueEntityAndActionAndApprovalStatus(
+      IssueEntity issueEntity, IssueActionModel action, IssueActionApprovalStatus approvalStatus);
 }
