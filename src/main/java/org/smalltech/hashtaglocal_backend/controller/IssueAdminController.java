@@ -194,11 +194,12 @@ public class IssueAdminController {
       @PathVariable Long userId) {
 
     // Verify user exists
-    if (userRepository.findById(userId).isEmpty()) {
+    var userOpt = userRepository.findById(userId);
+    if (userOpt.isEmpty()) {
       return ResponseEntity.notFound().build();
     }
 
-    UserSummaryModel summary = getProfileService.buildUserSummary(userId);
+    UserSummaryModel summary = getProfileService.buildUserSummary(userOpt.get());
     return ResponseEntity.ok(NewAPIResponse.<UserSummaryModel>builder().data(summary).build());
   }
 }

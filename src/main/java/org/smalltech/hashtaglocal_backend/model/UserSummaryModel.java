@@ -12,4 +12,6 @@ import lombok.NoArgsConstructor;
 public class UserSummaryModel {
 
   private IssueCountModel issueCount;
+  private int karmaEarned;
+  private int karmaPending;
 }

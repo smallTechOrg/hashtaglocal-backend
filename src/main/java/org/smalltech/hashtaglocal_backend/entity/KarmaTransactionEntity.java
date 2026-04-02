@@ -8,6 +8,7 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
@@ -17,54 +18,46 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
-import org.smalltech.hashtaglocal_backend.model.UserRole;
+import org.smalltech.hashtaglocal_backend.model.KarmaTransactionStatus;
+import org.smalltech.hashtaglocal_backend.model.KarmaTransactionType;
 
 @Entity
-@Table(name = "users")
+@Table(
+    name = "karma_transactions",
+    indexes = {
+      @Index(name = "idx_karma_user_status", columnList = "user_id, status"),
+      @Index(name = "idx_karma_reference_action", columnList = "reference_action_id")
+    })
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class UserEntity {
+public class KarmaTransactionEntity {
 
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;
 
-  // Human-readable issue key (optional)
-  @Column(unique = true, length = 100)
-  private String username;
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "user_id", nullable = false)
+  private UserEntity userEntity;
 
-  private String profilePicture;
+  @Column(nullable = false)
+  private int points;
 
-  /** The role of this user. Defaults to {@code USER}; set to {@code ADMIN} for administrators. */
+  @Enumerated(EnumType.STRING)
+  @Column(nullable = false, length = 40)
+  private KarmaTransactionType type;
+
   @Enumerated(EnumType.STRING)
   @Column(nullable = false, length = 20)
-  @Builder.Default
-  private UserRole role = UserRole.USER;
+  private KarmaTransactionStatus status;
 
-  @Column(nullable = false, length = 100)
-  private String locale;
-
-  @Column(nullable = false)
-  @Builder.Default
-  private int karmaEarned = 0;
-
-  @Column(nullable = false)
-  @Builder.Default
-  private int karmaPending = 0;
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "reference_action_id")
+  private IssueActionEntity referenceAction;
 
   @CreationTimestamp
   @Column(nullable = false, updatable = false)
   private LocalDateTime createdAt;
-
-  @UpdateTimestamp
-  @Column(nullable = false)
-  private LocalDateTime updatedAt;
-
-  // Primary location of the user
-  @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "location_id")
-  private Location location;
 }

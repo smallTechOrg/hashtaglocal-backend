@@ -7,4 +7,5 @@ import lombok.Data;
 @Builder
 public class IssueActionResponseData {
   private Long issueId;
+  private Integer karmaAwarded;
 }

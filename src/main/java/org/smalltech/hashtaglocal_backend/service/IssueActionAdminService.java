@@ -39,6 +39,7 @@ public class IssueActionAdminService {
   private final IssueActionRepository issueActionRepository;
   private final IssueRepository issueRepository;
   private final UserRepository userRepository;
+  private final KarmaService karmaService;
 
   /**
    * Approves or rejects a pending issue action.
@@ -97,6 +98,7 @@ public class IssueActionAdminService {
                   a.setApprovedByUser(admin);
                   a.setApprovedAt(LocalDateTime.now());
                   issueActionRepository.save(a);
+                  karmaService.revokeKarma(a);
                 });
       }
       issueEntity.setUpdatedAt(LocalDateTime.now());
@@ -126,6 +128,22 @@ public class IssueActionAdminService {
     action.setApprovedByUser(admin);
     action.setApprovedAt(LocalDateTime.now());
     issueActionRepository.save(action);
+
+    // --- Karma: confirm or revoke based on decision ---
+    if (decision == IssueActionApprovalStatus.APPROVED) {
+      karmaService.confirmKarma(action);
+
+      // If a VERIFY action was approved, award REPORTED_ISSUE_VERIFIED karma to the issue reporter
+      if (actionType == IssueActionModel.VERIFY) {
+        UserEntity issueReporter = issueEntity.getUserEntity();
+        if (issueReporter != null
+            && !issueReporter.getId().equals(action.getUserEntity().getId())) {
+          karmaService.awardReportedIssueVerifiedKarma(issueReporter, action);
+        }
+      }
+    } else {
+      karmaService.revokeKarma(action);
+    }
 
     return issueEntity.getId();
   }

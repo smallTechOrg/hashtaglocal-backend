@@ -7,6 +7,7 @@ import org.smalltech.hashtaglocal_backend.config.CustomProperties;
 import org.smalltech.hashtaglocal_backend.entity.IssueActionEntity;
 import org.smalltech.hashtaglocal_backend.model.IssueActionApprovalStatus;
 import org.smalltech.hashtaglocal_backend.model.IssueActionModel;
+import org.smalltech.hashtaglocal_backend.model.IssueActionResult;
 import org.smalltech.hashtaglocal_backend.model.IssueStatusModel;
 import org.smalltech.hashtaglocal_backend.model.UserRole;
 import org.smalltech.hashtaglocal_backend.model.request.IssueVerifyRequest;
@@ -33,7 +34,7 @@ public class IssueActionService {
   private final GeoFenceService geoFenceService;
   private final LocationService locationService;
 
-  public Long handle(Long issueId, Long userId, IssueVerifyRequest request) {
+  public IssueActionResult handle(Long issueId, Long userId, IssueVerifyRequest request) {
 
     if (request == null || request.getIssueAction() == null) {
       throw new ResponseStatusException(
@@ -192,6 +193,6 @@ public class IssueActionService {
     issueEntity.setUpdatedAt(LocalDateTime.now());
     issueRepository.save(issueEntity);
 
-    return issueId;
+    return IssueActionResult.builder().issueId(issueId).karmaAwarded(0).build();
   }
 }

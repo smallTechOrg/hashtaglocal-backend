@@ -31,7 +31,8 @@ public enum EventPortalModel {
       "environment, education, civic engagement, community service, child welfare, health, hunger,"
           + " disability, animal welfare, elderly care, sanitation"),
   MYBHARATGOVIN("civic volunteering, cleanliness drive, tree plantation", "civic engagement"),
-  TWITTER(null, null);
+  TWITTER(null, null),
+  INSTAGRAM(null, null);
 
   /** The event_filter sent in the FETCH_EVENTS POST body. {@code null} = portal not yet enabled. */
   private final String eventFilter;
@@ -66,6 +67,7 @@ public enum EventPortalModel {
       case "ivolunteer", "ivolunteerin" -> IVOLUNTEERIN;
       case "mybharatgovin" -> MYBHARATGOVIN;
       case "twitter" -> TWITTER;
+      case "instagram" -> INSTAGRAM;
       default -> null;
     };
   }
