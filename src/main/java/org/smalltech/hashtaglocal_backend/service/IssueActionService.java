@@ -205,7 +205,9 @@ public class IssueActionService {
               issueEntity, IssueActionApprovalStatus.PENDING);
       var latestAction =
           pendingActions.stream()
-              .filter(a -> a.getUserEntity().getId().equals(userId) && a.getAction() == issueActionModel)
+              .filter(
+                  a ->
+                      a.getUserEntity().getId().equals(userId) && a.getAction() == issueActionModel)
               .reduce((first, second) -> second) // get last (most recent)
               .orElse(null);
 

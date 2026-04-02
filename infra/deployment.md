@@ -287,11 +287,11 @@ gcloud compute ssh hashtaglocalbackend --zone=us-central1-f \
 ## Staging
 
 ```bash
-gcloud compute scp build/libs/hashtaglocal-backend-0.0.1-SNAPSHOT.jar ai-agent-staging:/tmp/hashtaglocal-backend.jar --zone=us-central1-c
+gcloud compute scp build/libs/hashtaglocal-backend-0.0.1-SNAPSHOT.jar staging-instance:/tmp/hashtaglocal-backend.jar --zone=us-central1-f
 
-gcloud compute ssh ai-agent-staging --zone=us-central1-c --command="sudo mv /tmp/hashtaglocal-backend.jar /opt/hashtaglocal-backend/hashtaglocal-backend.jar && sudo systemctl restart hashtaglocal-backend" 
+gcloud compute ssh staging-instance --zone=us-central1-f --command="sudo mv /tmp/hashtaglocal-backend.jar /opt/hashtaglocal-backend/hashtaglocal-backend.jar && sudo systemctl restart hashtaglocal-backend" 
 
-gcloud compute ssh ai-agent-staging --zone=us-central1-c \
+gcloud compute ssh staging-instance --zone=us-central1-f \
   --command="sudo journalctl -u hashtaglocal-backend -f"
 
 gcloud compute scp gcs-key.json \

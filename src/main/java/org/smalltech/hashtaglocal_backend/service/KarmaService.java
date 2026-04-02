@@ -83,8 +83,8 @@ public class KarmaService {
   }
 
   /**
-   * Confirm pending karma (move from PENDING → EARNED) when an admin approves an action.
-   * All PENDING transactions tied to the given action are confirmed.
+   * Confirm pending karma (move from PENDING → EARNED) when an admin approves an action. All
+   * PENDING transactions tied to the given action are confirmed.
    */
   @Transactional
   public void confirmKarma(IssueActionEntity action) {
@@ -111,8 +111,8 @@ public class KarmaService {
   }
 
   /**
-   * Revoke pending karma (move from PENDING → REVOKED) when an admin rejects an action.
-   * All PENDING transactions tied to the given action are revoked.
+   * Revoke pending karma (move from PENDING → REVOKED) when an admin rejects an action. All PENDING
+   * transactions tied to the given action are revoked.
    */
   @Transactional
   public void revokeKarma(IssueActionEntity action) {
@@ -138,8 +138,8 @@ public class KarmaService {
   }
 
   /**
-   * Award 1 earned karma to the issue reporter when someone else's VERIFY action on their
-   * issue is approved.
+   * Award 1 earned karma to the issue reporter when someone else's VERIFY action on their issue is
+   * approved.
    */
   @Transactional
   public void awardReportedIssueVerifiedKarma(

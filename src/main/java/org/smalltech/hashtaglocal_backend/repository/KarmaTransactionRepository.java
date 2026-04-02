@@ -10,8 +10,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 @Repository
-public interface KarmaTransactionRepository
-    extends JpaRepository<KarmaTransactionEntity, Long> {
+public interface KarmaTransactionRepository extends JpaRepository<KarmaTransactionEntity, Long> {
 
   List<KarmaTransactionEntity> findByReferenceActionAndStatus(
       IssueActionEntity referenceAction, KarmaTransactionStatus status);
