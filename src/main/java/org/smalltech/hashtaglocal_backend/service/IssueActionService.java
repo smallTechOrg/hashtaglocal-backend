@@ -9,7 +9,6 @@ import org.smalltech.hashtaglocal_backend.model.IssueActionApprovalStatus;
 import org.smalltech.hashtaglocal_backend.model.IssueActionModel;
 import org.smalltech.hashtaglocal_backend.model.IssueActionResult;
 import org.smalltech.hashtaglocal_backend.model.IssueStatusModel;
-import org.smalltech.hashtaglocal_backend.model.KarmaTransactionType;
 import org.smalltech.hashtaglocal_backend.model.UserRole;
 import org.smalltech.hashtaglocal_backend.model.request.IssueVerifyRequest;
 import org.smalltech.hashtaglocal_backend.repository.IssueActionRepository;
@@ -34,7 +33,6 @@ public class IssueActionService {
   private final UserRepository userRepository;
   private final GeoFenceService geoFenceService;
   private final LocationService locationService;
-  private final KarmaService karmaService;
 
   public IssueActionResult handle(Long issueId, Long userId, IssueVerifyRequest request) {
 
@@ -195,31 +193,6 @@ public class IssueActionService {
     issueEntity.setUpdatedAt(LocalDateTime.now());
     issueRepository.save(issueEntity);
 
-    // Award pending karma for VERIFY/RESOLVE actions
-    int karmaAwarded = 0;
-    if (issueActionModel == IssueActionModel.VERIFY
-        || issueActionModel == IssueActionModel.RESOLVE) {
-      // Find the first PENDING action we just created for this user on this issue
-      var pendingActions =
-          issueActionRepository.findByIssueEntityAndApprovalStatus(
-              issueEntity, IssueActionApprovalStatus.PENDING);
-      var latestAction =
-          pendingActions.stream()
-              .filter(
-                  a ->
-                      a.getUserEntity().getId().equals(userId) && a.getAction() == issueActionModel)
-              .reduce((first, second) -> second) // get last (most recent)
-              .orElse(null);
-
-      if (latestAction != null) {
-        KarmaTransactionType karmaType =
-            issueActionModel == IssueActionModel.VERIFY
-                ? KarmaTransactionType.VERIFY
-                : KarmaTransactionType.RESOLVE;
-        karmaAwarded = karmaService.awardPendingKarma(userEntity, karmaType, latestAction);
-      }
-    }
-
-    return IssueActionResult.builder().issueId(issueId).karmaAwarded(karmaAwarded).build();
+    return IssueActionResult.builder().issueId(issueId).karmaAwarded(0).build();
   }
 }
