@@ -10,6 +10,8 @@ import org.smalltech.hashtaglocal_backend.dto.ReportComplaintResponseDTO;
 import org.smalltech.hashtaglocal_backend.model.NewAPIResponse;
 import org.smalltech.hashtaglocal_backend.service.PortalComplaintReportingService;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -23,16 +25,20 @@ public class ComplaintController {
 
   private final PortalComplaintReportingService portalComplaintReportingService;
 
-  @PostMapping("/report_complaint")
+  @PostMapping("/portal/{type}")
   @SecurityRequirement(name = "bearerAuth")
   @Operation(
-      summary = "Report complaint",
+      summary = "Portal complaint action",
       description =
-          "Accepts complaint details, validates request payload, forwards it to the external government portal scrape API, and returns tracking_id on success.")
+          "Accepts complaint details, validates request payload, forwards it to the external government portal scrape API, persists portal tracking data locally, and returns tracking_id on success.")
   public ResponseEntity<NewAPIResponse<ReportComplaintResponseDTO>> reportComplaint(
+      @PathVariable String type,
+      @AuthenticationPrincipal Long adminUserId,
       @Valid @RequestBody ReportComplaintRequestDTO request) {
-    ReportComplaintResponseDTO response = portalComplaintReportingService.reportComplaint(request);
+    ReportComplaintResponseDTO response =
+        portalComplaintReportingService.reportComplaint(type, adminUserId, request);
 
-    return ResponseEntity.ok(NewAPIResponse.<ReportComplaintResponseDTO>builder().data(response).build());
+    return ResponseEntity.ok(
+        NewAPIResponse.<ReportComplaintResponseDTO>builder().data(response).build());
   }
 }
