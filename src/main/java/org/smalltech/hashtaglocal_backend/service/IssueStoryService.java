@@ -31,19 +31,40 @@ public class IssueStoryService {
 
   public List<IssueStory> getStories(String localityHashtag, int limit) {
     LocalDateTime startDate = LocalDateTime.now().minusYears(2);
-    List<IssueStatusModel> statuses = List.of(IssueStatusModel.RESOLVED);
+    List<IssueStatusModel> statuses = List.of(IssueStatusModel.RESOLVED, IssueStatusModel.OPEN);
 
-    List<IssueEntity> resolvedIssues;
+    List<IssueEntity> candidates;
     if (localityHashtag != null && !localityHashtag.isBlank()) {
-      resolvedIssues =
+      candidates =
           issueRepository.findByStatusInAndCreatedAtAfterAndLocalityHashtagOrderByCreatedAtDesc(
               statuses, startDate, localityHashtag);
     } else {
-      resolvedIssues =
+      candidates =
           issueRepository.findByStatusInAndCreatedAtAfterOrderByCreatedAtDesc(statuses, startDate);
     }
 
-    return resolvedIssues.stream().limit(limit).map(this::buildStory).toList();
+    // Keep resolved issues + open issues that have at least one approved verification
+    List<IssueEntity> storyWorthy =
+        candidates.stream()
+            .filter(
+                issue ->
+                    issue.getStatus() == IssueStatusModel.RESOLVED
+                        || issueActionRepository.countDistinctUserByIssueAndAction(
+                                issue, IssueActionModel.VERIFY)
+                            > 0)
+            .toList();
+
+    // Resolved first, then open-verified, each group ordered by createdAt desc
+    List<IssueEntity> resolved =
+        storyWorthy.stream().filter(i -> i.getStatus() == IssueStatusModel.RESOLVED).toList();
+    List<IssueEntity> openVerified =
+        storyWorthy.stream().filter(i -> i.getStatus() != IssueStatusModel.RESOLVED).toList();
+
+    List<IssueEntity> ordered = new ArrayList<>();
+    ordered.addAll(resolved);
+    ordered.addAll(openVerified);
+
+    return ordered.stream().limit(limit).map(this::buildStory).toList();
   }
 
   private IssueStory buildStory(IssueEntity issueEntity) {
@@ -92,31 +113,39 @@ public class IssueStoryService {
               .build());
     }
 
-    // 4. RESOLVED — approved RESOLVE action
-    List<IssueActionEntity> resolveActions =
-        issueActionRepository.findByIssueEntityAndActionAndApprovalStatus(
-            issueEntity, IssueActionModel.RESOLVE, IssueActionApprovalStatus.APPROVED);
-    LocalDateTime resolvedAt = issueEntity.getUpdatedAt();
-    if (!resolveActions.isEmpty()) {
-      IssueActionEntity resolveAction = resolveActions.get(0);
-      resolvedAt =
-          resolveAction.getApprovedAt() != null
-              ? resolveAction.getApprovedAt()
-              : resolveAction.getCreatedAt();
-    }
-    timeline.add(
-        TimelineEvent.builder()
-            .event("RESOLVED")
-            .timestamp(resolvedAt)
-            .details("Issue resolved")
-            .build());
+    // 4. RESOLVED — approved RESOLVE action (only for resolved issues)
+    Integer resolutionDays = null;
+    if (issueEntity.getStatus() == IssueStatusModel.RESOLVED) {
+      List<IssueActionEntity> resolveActions =
+          issueActionRepository.findByIssueEntityAndActionAndApprovalStatus(
+              issueEntity, IssueActionModel.RESOLVE, IssueActionApprovalStatus.APPROVED);
+      LocalDateTime resolvedAt = issueEntity.getUpdatedAt();
+      if (!resolveActions.isEmpty()) {
+        IssueActionEntity resolveAction = resolveActions.get(0);
+        resolvedAt =
+            resolveAction.getApprovedAt() != null
+                ? resolveAction.getApprovedAt()
+                : resolveAction.getCreatedAt();
+      }
+      timeline.add(
+          TimelineEvent.builder()
+              .event("RESOLVED")
+              .timestamp(resolvedAt)
+              .details("Issue resolved")
+              .build());
 
-    int resolutionDays = (int) ChronoUnit.DAYS.between(issueEntity.getCreatedAt(), resolvedAt);
+      resolutionDays =
+          Math.max((int) ChronoUnit.DAYS.between(issueEntity.getCreatedAt(), resolvedAt), 1);
+    }
+
+    int daysSinceReported =
+        Math.max((int) ChronoUnit.DAYS.between(issueEntity.getCreatedAt(), LocalDateTime.now()), 1);
 
     return IssueStory.builder()
         .issue(issue)
         .timeline(timeline)
-        .resolutionDays(Math.max(resolutionDays, 1))
+        .resolutionDays(resolutionDays)
+        .daysSinceReported(daysSinceReported)
         .build();
   }
 }

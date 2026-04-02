@@ -14,5 +14,6 @@ public class IssueStory {
 
   private Issue issue;
   private List<TimelineEvent> timeline;
-  private int resolutionDays;
+  private Integer resolutionDays;
+  private int daysSinceReported;
 }
