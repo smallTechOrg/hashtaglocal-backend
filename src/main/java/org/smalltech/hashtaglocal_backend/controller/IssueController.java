@@ -117,9 +117,8 @@ public class IssueController {
       description =
           "Returns resolved issues with timeline data showing how they progressed from reported to resolved. Optionally filter by locality hashtag.")
   public NewAPIResponse<IssueStoriesResponseData> getIssueStories(
-      @RequestParam(value = "locality", required = false) String localityHashtag,
-      @RequestParam(value = "limit", required = false, defaultValue = "5") int limit) {
-    var stories = issueStoryService.getStories(localityHashtag, limit);
+      @RequestParam(value = "locality", required = false) String localityHashtag) {
+    var stories = issueStoryService.getStories(localityHashtag);
     return NewAPIResponse.<IssueStoriesResponseData>builder()
         .data(IssueStoriesResponseData.builder().stories(stories).build())
         .build();

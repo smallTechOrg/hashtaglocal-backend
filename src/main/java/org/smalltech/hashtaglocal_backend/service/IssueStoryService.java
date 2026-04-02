@@ -4,7 +4,11 @@ import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.smalltech.hashtaglocal_backend.entity.GovPortalEntity;
 import org.smalltech.hashtaglocal_backend.entity.IssueActionEntity;
 import org.smalltech.hashtaglocal_backend.entity.IssueEntity;
 import org.smalltech.hashtaglocal_backend.mapper.IssueViewMapper;
@@ -15,6 +19,7 @@ import org.smalltech.hashtaglocal_backend.model.IssueStatusModel;
 import org.smalltech.hashtaglocal_backend.model.IssueStory;
 import org.smalltech.hashtaglocal_backend.model.TimelineEvent;
 import org.smalltech.hashtaglocal_backend.model.response.IssueResponseData;
+import org.smalltech.hashtaglocal_backend.repository.GovPortalRepository;
 import org.smalltech.hashtaglocal_backend.repository.IssueActionRepository;
 import org.smalltech.hashtaglocal_backend.repository.IssueRepository;
 import org.springframework.stereotype.Service;
@@ -27,9 +32,10 @@ public class IssueStoryService {
 
   private final IssueRepository issueRepository;
   private final IssueActionRepository issueActionRepository;
+  private final GovPortalRepository govPortalRepository;
   private final IssueViewMapper issueViewMapper;
 
-  public List<IssueStory> getStories(String localityHashtag, int limit) {
+  public List<IssueStory> getStories(String localityHashtag) {
     LocalDateTime startDate = LocalDateTime.now().minusYears(2);
     List<IssueStatusModel> statuses = List.of(IssueStatusModel.RESOLVED, IssueStatusModel.OPEN);
 
@@ -43,28 +49,66 @@ public class IssueStoryService {
           issueRepository.findByStatusInAndCreatedAtAfterOrderByCreatedAtDesc(statuses, startDate);
     }
 
-    // Keep resolved issues + open issues that have at least one approved verification
-    List<IssueEntity> storyWorthy =
-        candidates.stream()
-            .filter(
-                issue ->
-                    issue.getStatus() == IssueStatusModel.RESOLVED
-                        || issueActionRepository.countDistinctUserByIssueAndAction(
-                                issue, IssueActionModel.VERIFY)
-                            > 0)
-            .toList();
+    // Pre-load portal data and verification flags for all candidates in two bulk queries
+    Set<Long> candidateIds =
+        candidates.stream().map(IssueEntity::getId).collect(Collectors.toSet());
+    List<GovPortalEntity> allPortalEntities = govPortalRepository.findByIssueIds(candidateIds);
+    Map<Long, List<GovPortalEntity>> portalByIssueId =
+        allPortalEntities.stream().collect(Collectors.groupingBy(p -> p.getIssueEntity().getId()));
+    Set<Long> verifiedIssueIds = issueActionRepository.findVerifiedIssueIds(candidateIds);
 
-    // Resolved first, then open-verified, each group ordered by createdAt desc
-    List<IssueEntity> resolved =
-        storyWorthy.stream().filter(i -> i.getStatus() == IssueStatusModel.RESOLVED).toList();
-    List<IssueEntity> openVerified =
-        storyWorthy.stream().filter(i -> i.getStatus() != IssueStatusModel.RESOLVED).toList();
+    // Classify into priority buckets
+    // Excluded: issues with 0 verifications AND no portal entry
+    List<IssueEntity> bucket1Resolved = new ArrayList<>(); // Resolved on our platform
+    List<IssueEntity> bucket2PortalResolved =
+        new ArrayList<>(); // Open here, resolved on gov portal
+    List<IssueEntity> bucket3PortalOpen = new ArrayList<>(); // Open here AND on gov portal
+    List<IssueEntity> bucket4Verified = new ArrayList<>(); // Open, verified, no portal (max 10)
+
+    for (IssueEntity issue : candidates) {
+      if (issue.getStatus() == IssueStatusModel.RESOLVED) {
+        bucket1Resolved.add(issue);
+        continue;
+      }
+
+      List<GovPortalEntity> portalEntries = portalByIssueId.get(issue.getId());
+      boolean hasPortal = portalEntries != null && !portalEntries.isEmpty();
+      boolean hasVerifications = verifiedIssueIds.contains(issue.getId());
+
+      // Skip issues with neither portal entry nor verifications
+      if (!hasPortal && !hasVerifications) {
+        continue;
+      }
+
+      if (hasPortal) {
+        boolean portalResolved =
+            portalEntries.stream()
+                .anyMatch(
+                    p -> {
+                      String s = p.getStatus();
+                      if (s == null) return false;
+                      String lower = s.toLowerCase();
+                      return lower.contains("resolved")
+                          || lower.contains("closed")
+                          || lower.contains("completed");
+                    });
+        if (portalResolved) {
+          bucket2PortalResolved.add(issue);
+        } else {
+          bucket3PortalOpen.add(issue);
+        }
+      } else if (bucket4Verified.size() < 10) {
+        bucket4Verified.add(issue);
+      }
+    }
 
     List<IssueEntity> ordered = new ArrayList<>();
-    ordered.addAll(resolved);
-    ordered.addAll(openVerified);
+    ordered.addAll(bucket1Resolved);
+    ordered.addAll(bucket2PortalResolved);
+    ordered.addAll(bucket3PortalOpen);
+    ordered.addAll(bucket4Verified);
 
-    return ordered.stream().limit(limit).map(this::buildStory).toList();
+    return ordered.stream().map(this::buildStory).toList();
   }
 
   private IssueStory buildStory(IssueEntity issueEntity) {
@@ -81,20 +125,17 @@ public class IssueStoryService {
             .details("Issue reported by " + issue.getUser().getUsername())
             .build());
 
-    // 2. VERIFIED — first approved VERIFY action
+    // 2. VERIFIED — earliest VERIFY action (use createdAt = when user submitted, not approvedAt)
     List<IssueActionEntity> verifyActions =
         issueActionRepository.findByIssueEntityAndActionAndApprovalStatus(
             issueEntity, IssueActionModel.VERIFY, IssueActionApprovalStatus.APPROVED);
     if (!verifyActions.isEmpty()) {
-      IssueActionEntity firstVerify = verifyActions.get(0);
-      LocalDateTime verifiedAt =
-          firstVerify.getApprovedAt() != null
-              ? firstVerify.getApprovedAt()
-              : firstVerify.getCreatedAt();
+      IssueActionEntity firstVerify =
+          verifyActions.stream().min((a, b) -> a.getCreatedAt().compareTo(b.getCreatedAt())).get();
       timeline.add(
           TimelineEvent.builder()
               .event("VERIFIED")
-              .timestamp(verifiedAt)
+              .timestamp(firstVerify.getCreatedAt())
               .details("Verified by community")
               .build());
     }
@@ -113,7 +154,7 @@ public class IssueStoryService {
               .build());
     }
 
-    // 4. RESOLVED — approved RESOLVE action (only for resolved issues)
+    // 4. RESOLVED — use createdAt of RESOLVE action (when user submitted, not admin approval)
     Integer resolutionDays = null;
     if (issueEntity.getStatus() == IssueStatusModel.RESOLVED) {
       List<IssueActionEntity> resolveActions =
@@ -121,11 +162,11 @@ public class IssueStoryService {
               issueEntity, IssueActionModel.RESOLVE, IssueActionApprovalStatus.APPROVED);
       LocalDateTime resolvedAt = issueEntity.getUpdatedAt();
       if (!resolveActions.isEmpty()) {
-        IssueActionEntity resolveAction = resolveActions.get(0);
         resolvedAt =
-            resolveAction.getApprovedAt() != null
-                ? resolveAction.getApprovedAt()
-                : resolveAction.getCreatedAt();
+            resolveActions.stream()
+                .min((a, b) -> a.getCreatedAt().compareTo(b.getCreatedAt()))
+                .get()
+                .getCreatedAt();
       }
       timeline.add(
           TimelineEvent.builder()
