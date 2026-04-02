@@ -55,7 +55,7 @@
                     const authData = authResponse.data;
 
                     // Build deep link with auth tokens
-                    const deepLink = `hashtaglocalfrontend://auth/callback?` +
+                    const deepLink = `hashtaglocal://auth/callback?` +
                         `access_token=${encodeURIComponent(authData.access_token.value)}` +
                         `&refresh_token=${encodeURIComponent(authData.refresh_token.value)}` +
                         `&access_expiry=${authData.access_token.expiry}` +

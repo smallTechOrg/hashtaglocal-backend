@@ -35,6 +35,8 @@ class GetProfileServiceTest {
 
   @Mock private IssueActionRepository issueActionRepository;
 
+  @Mock private KarmaService karmaService;
+
   @InjectMocks private GetProfileService profileService;
 
   @BeforeEach
@@ -437,7 +439,13 @@ class GetProfileServiceTest {
       // Arrange
       String accessToken = "valid-token";
       UserEntity user =
-          UserEntity.builder().id(1L).username("testuser").profilePicture("pic.jpg").build();
+          UserEntity.builder()
+              .id(1L)
+              .username("testuser")
+              .profilePicture("pic.jpg")
+              .karmaEarned(25)
+              .karmaPending(5)
+              .build();
       UserAuthSessionEntity session = createValidSession(user, accessToken);
 
       when(userAuthSessionRepository.findByAccessToken(accessToken))
@@ -467,6 +475,11 @@ class GetProfileServiceTest {
       assertEquals(2, issueCount.getResolved());
       assertEquals(5, issueCount.getVerify());
       assertEquals(4, issueCount.getResolvedOthers());
+
+      // Karma assertions
+      assertEquals(25, result.get().getUserSummary().getKarmaEarned());
+      assertEquals(5, result.get().getUserSummary().getKarmaPending());
+      verify(karmaService).tryAwardDailyLoginKarma(user);
     }
 
     @Test
