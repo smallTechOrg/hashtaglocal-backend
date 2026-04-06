@@ -1,17 +1,19 @@
-Use this prompt for backend:
+# Gov Portal Complaint Reporting API - Backend Spec
 
-Backend Task: Implement Gov Portal Complaint Reporting API
+## Objective
+Implement and document a bastion API that accepts complaint payloads from frontend, validates them, forwards them to the staging scraper endpoint, and returns a tracking ID.
 
-Please implement and document an endpoint for reporting an issue to the government portal.
+## Endpoint
+- Method: `POST`
+- Path: `/api/v1/report_complaint`
+- Auth: Reuse the same authentication mechanism currently used by ops/admin review APIs (if applicable in current backend design).
 
-Endpoint
-1. Method: POST
-2. Path: /api/v1/report_complaint
-3. Auth: same auth mechanism currently used by ops/admin review APIs (if required in your backend design)
+## Request Contract
 
-Request Body
+### Request JSON
+```json
 {
-  "source": "GOV_PORTAL_ISSUE",
+  "source": "GOV_ISSUE_PORTAL",
   "context": {
     "portal": "SMARTONEBLR",
     "action": {
@@ -31,41 +33,82 @@ Request Body
     }
   }
 }
+```
 
-Validation Rules
-1. source is required and should accept GOV_PORTAL_ISSUE (optionally also accept GOV_ISSUE_PORTAL for backward compatibility).
-2. context.portal is required.
-3. context.action.type is required and fixed to REPORT_ISSUE.
-4. category and sub_category are required.
-5. username and password are required.
-6. description, media_url, latitude, longitude can be accepted as strings.
+### Validation Rules
+1. `source` is required.
+2. `source` accepted values:
+   - `GOV_PORTAL_ISSUE` (primary)
+   - `GOV_ISSUE_PORTAL` (optional backward compatibility)
+3. `context.portal` is required (non-empty string).
+4. `context.action.type` is required and must be exactly `REPORT_ISSUE`.
+5. `context.action.data.category` is required.
+6. `context.action.data.sub_category` is required.
+7. `context.auth.username` is required.
+8. `context.auth.password` is required.
+9. `description`, `media_url`, `latitude`, `longitude` are optional and accepted as strings.
 
+## Downstream Forwarding
+- Forward validated request to:
+  - `https://staging.api.smalltech.in/webscraperstaging/api/v1/scrape`
+- Behavior:
+  - This endpoint acts as a pass-through bastion with validation.
+  - Preserve the complaint intent payload needed by downstream.
+  - Parse downstream success body and extract `tracking_id`.
 
-you will send this to https://staging.api.smalltech.in/webscraperstaging/api/v1/scrape
-and will get tracking id on correct response. this is kind of bastion request where you take the request from frontend, verify and send to correct endpoint. 
-Success Response
-1. HTTP 200
-2. Body:
+## Success Response
+- HTTP `200 OK`
+- Response JSON:
+
+```json
 {
   "data": {
     "tracking_id": 232
   }
 }
+```
 
+Notes:
+- `tracking_id` must be numeric.
 
-Failure Response
-1. Return proper non-200 codes with clear error body/message if validation fails or downstream portal call fails.
-2. If downstream portal is slow/unreachable, return a meaningful timeout/failure response.
+## Error Handling
+Return non-200 status codes with clear, debuggable messages.
 
-Timing Expectation
-1. This API can take long due to external gov portal latency.
-2. Frontend waits up to 300 seconds for response.
-3. Please ensure server/proxy timeouts allow long-running request handling up to 300 seconds where possible.
+Recommended mapping:
+- `400 Bad Request`: payload validation failures.
+- `401/403`: auth failure, if endpoint-level auth applies.
+- `502 Bad Gateway`: downstream returns error/invalid response.
+- `504 Gateway Timeout`: downstream did not respond in configured timeout window.
 
-Acceptance Criteria
-1. Endpoint accepts payload in the above structure.
-2. On successful portal submission, returns HTTP 200 with numeric tracking_id.
-3. Error scenarios are consistent and debuggable.
-4. API contract is documented (request fields, validation, success/error responses).
+Recommended error body:
+```json
+{
+  "error": {
+    "code": "DOWNSTREAM_TIMEOUT",
+    "message": "Government portal request timed out",
+    "details": null
+  }
+}
+```
 
-If you want, I can also give you a stricter OpenAPI-ready version of this prompt with exact schemas and error models.
+## Timeout and Long-Running Behavior
+- External gov workflow can be slow.
+- Frontend wait budget: up to `300 seconds`.
+- Configure app HTTP client timeout and relevant proxy/gateway timeout settings to support up to 300 seconds where possible.
+- Ensure timeout errors are deterministic and return a meaningful response body.
+
+## Acceptance Criteria
+1. Endpoint accepts payload in the contract above.
+2. Successful downstream submission returns `200` with numeric `tracking_id`.
+3. Validation and downstream failures return consistent, actionable error responses.
+4. Contract is fully documented: fields, validation, success, and error models.
+
+## Implementation Notes (Suggested)
+- Add DTO-level validation for required fields.
+- Add service-layer guard for fixed enum-like values (`source`, `action.type`).
+- Add integration tests for:
+  - happy path (returns tracking ID)
+  - invalid source
+  - missing required fields
+  - downstream 5xx
+  - downstream timeout

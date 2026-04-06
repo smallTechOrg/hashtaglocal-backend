@@ -2,19 +2,21 @@ package org.smalltech.hashtaglocal_backend.service;
 
 import java.time.Duration;
 import lombok.extern.slf4j.Slf4j;
+import org.locationtech.jts.geom.Point;
 import org.smalltech.hashtaglocal_backend.dto.ReportComplaintRequestDTO;
 import org.smalltech.hashtaglocal_backend.dto.ReportComplaintResponseDTO;
 import org.smalltech.hashtaglocal_backend.dto.ReportComplaintScrapeResponseDTO;
 import org.smalltech.hashtaglocal_backend.entity.GovPortalEntity;
 import org.smalltech.hashtaglocal_backend.entity.IssueEntity;
 import org.smalltech.hashtaglocal_backend.entity.Locality;
-import org.smalltech.hashtaglocal_backend.entity.Location;
 import org.smalltech.hashtaglocal_backend.exception.DownstreamServiceException;
 import org.smalltech.hashtaglocal_backend.model.IssueStatusModel;
 import org.smalltech.hashtaglocal_backend.model.PortalEnum;
 import org.smalltech.hashtaglocal_backend.repository.GovPortalRepository;
 import org.smalltech.hashtaglocal_backend.repository.IssueRepository;
+import org.smalltech.hashtaglocal_backend.repository.LocalityRepository;
 import org.smalltech.hashtaglocal_backend.repository.UserRepository;
+import org.smalltech.hashtaglocal_backend.util.LocationUtil;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.http.HttpEntity;
@@ -31,6 +33,7 @@ import org.springframework.web.client.RestTemplate;
 public class PortalComplaintReportingService {
 
   private static final String SUPPORTED_TYPE = "report_issue";
+  private static final String BENGALURU_HASHTAG = "#bengaluru";
   private static final String INITIAL_PORTAL_STATUS = IssueStatusModel.OPEN.name();
   private static final String PORTAL_URL =
       "https://www.smartoneblr.com/WssBBMPComplaintRequestDetails.htm";
@@ -39,12 +42,14 @@ public class PortalComplaintReportingService {
   private final String scrapeUrl;
   private final UserRepository userRepository;
   private final IssueRepository issueRepository;
+  private final LocalityRepository localityRepository;
   private final GovPortalRepository govPortalRepository;
 
   public PortalComplaintReportingService(
       RestTemplateBuilder restTemplateBuilder,
       UserRepository userRepository,
       IssueRepository issueRepository,
+      LocalityRepository localityRepository,
       GovPortalRepository govPortalRepository,
       @Value(
               "${portalissue.report.scrape-url:https://staging.api.smalltech.in/webscraperstaging/api/v1/scrape}")
@@ -53,6 +58,7 @@ public class PortalComplaintReportingService {
       @Value("${portalissue.report.read-timeout-seconds:305}") long readTimeoutSeconds) {
     this.userRepository = userRepository;
     this.issueRepository = issueRepository;
+    this.localityRepository = localityRepository;
     this.govPortalRepository = govPortalRepository;
     this.scrapeUrl = scrapeUrl;
     this.restTemplate =
@@ -68,7 +74,6 @@ public class PortalComplaintReportingService {
             .build();
   }
 
-  @Transactional
   public ReportComplaintResponseDTO reportComplaint(
       String type, Long issueId, Long adminUserId, ReportComplaintRequestDTO request) {
     validateType(type);
@@ -87,6 +92,8 @@ public class PortalComplaintReportingService {
           "CONFIGURATION",
           "portalissue.report.scrape-url is not configured");
     }
+
+    validateBengaluruCoordinates(request);
 
     HttpHeaders headers = new HttpHeaders();
     headers.setContentType(MediaType.APPLICATION_JSON);
@@ -118,6 +125,7 @@ public class PortalComplaintReportingService {
     }
   }
 
+  @Transactional
   private void persistPortalIssue(
       Long issueId, Long adminUserId, ReportComplaintRequestDTO request, Long trackingId) {
     userRepository
@@ -134,7 +142,7 @@ public class PortalComplaintReportingService {
             .issueEntity(issue)
             .trackingId(String.valueOf(trackingId))
             .portal(resolvePortal(request.getContext().getPortal()))
-            .url(resolvePortalUrl(issue))
+            .url(resolvePortalUrl())
             .status(INITIAL_PORTAL_STATUS)
             .build();
 
@@ -155,36 +163,60 @@ public class PortalComplaintReportingService {
     throw new IllegalArgumentException("Unsupported portal: " + portal);
   }
 
-  private String resolvePortalUrl(IssueEntity issue) {
-    if (isBengaluruIssue(issue)) {
-      return PORTAL_URL;
-    }
-
-    throw new IllegalArgumentException(
-        "Locality is not Bengaluru and given locality is not added to report_issue scraper");
+  private String resolvePortalUrl() {
+    return PORTAL_URL;
   }
 
-  private boolean isBengaluruIssue(IssueEntity issue) {
-    if (issue == null) {
-      return false;
+  private void validateBengaluruCoordinates(ReportComplaintRequestDTO request) {
+    if (request == null
+        || request.getContext() == null
+        || request.getContext().getAction() == null
+        || request.getContext().getAction().getData() == null) {
+      throw new IllegalArgumentException(
+          "Missing latitude or longitude in request context action data");
     }
 
-    Location location = issue.getLocation();
-    if (location == null) {
-      return false;
+    String latitudeRaw = request.getContext().getAction().getData().getLatitude();
+    String longitudeRaw = request.getContext().getAction().getData().getLongitude();
+
+    if (latitudeRaw == null || longitudeRaw == null) {
+      throw new IllegalArgumentException(
+          "Missing latitude or longitude in request context action data");
     }
 
-    Locality locality = location.getLocality();
-    if (locality == null) {
-      return false;
+    final double latitude;
+    final double longitude;
+    try {
+      latitude = Double.parseDouble(latitudeRaw.trim());
+      longitude = Double.parseDouble(longitudeRaw.trim());
+    } catch (NumberFormatException ex) {
+      throw new IllegalArgumentException(
+          "Invalid latitude or longitude format in request context action data");
     }
 
-    String localityName = locality.getName();
-    if (localityName == null) {
-      return false;
+    Point point = LocationUtil.createPoint(latitude, longitude);
+    Locality bengaluruLocality = localityRepository.findByHashtag(BENGALURU_HASHTAG).orElse(null);
+    if (bengaluruLocality != null
+        && bengaluruLocality.getGeoBoundary() != null
+        && bengaluruLocality.getGeoBoundary().covers(point)) {
+      return;
     }
 
-    String normalized = localityName.trim().toLowerCase();
-    return normalized.contains("bengaluru");
+    Locality locality =
+        localityRepository
+            .findContainingLocality(latitude, longitude)
+            .or(() -> localityRepository.findNearestLocality(latitude, longitude))
+            .orElse(null);
+
+    if (locality == null || locality.getName() == null) {
+      throw new IllegalArgumentException(
+          "Locality is not Bengaluru and given locality is not added to report_issue scraper");
+    }
+
+    String normalized = locality.getName().trim().toLowerCase();
+    if (!normalized.contains("bengaluru")) {
+      throw new IllegalArgumentException(
+          "Locality is not Bengaluru and given locality is not added to report_issue scraper");
+    }
   }
 }

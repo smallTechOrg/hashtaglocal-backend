@@ -97,16 +97,15 @@ auth:
 events:
   scrape:
     # URL of the external scrape service that provides raw event data
-    url: ${EVENTS_SCRAPE_URL:https://staging.api.smalltech.in/webscrapestaging/api/v1/scrape}
+    url: ${EVENTS_SCRAPE_URL:https://staging.api.smalltech.in/webscraperstaging/api/v1/scrape}
     # Cron expression for the ingestion job. Use '-' to disable. Override via EVENTS_SCRAPE_CRON env var.
     cron: ${EVENTS_SCRAPE_CRON:0 */5 * * * *}
 
 portalissue:
   enabled: ${PORTALISSUE_ENABLED:true}
-  # Uses cron syntax despite the key name.
-  fixed-delay-ms: ${EVENTS_SCRAPE_CRON:0 0 1 * * *}
+  cron: ${PORTALISSUE_CRON:0 0 1 * * *}
   stale-hours: ${PORTALISSUE_STALE_HOURS:24}
-  scrape-url: ${PORTALISSUE_SCRAPE_URL:https://staging.api.smalltech.in/webscrapestaging/api/v1/scrape}
+  scrape-url: ${PORTALISSUE_SCRAPE_URL:https://staging.api.smalltech.in/webscraperstaging/api/v1/scrape}
   report:
     scrape-url: ${PORTALISSUE_REPORT_SCRAPE_URL:https://staging.api.smalltech.in/webscraperstaging/api/v1/scrape}
     connect-timeout-seconds: ${PORTALISSUE_REPORT_CONNECT_TIMEOUT_SECONDS:15}

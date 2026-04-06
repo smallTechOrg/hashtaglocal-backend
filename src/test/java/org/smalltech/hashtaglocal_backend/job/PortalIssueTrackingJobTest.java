@@ -12,12 +12,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.util.ReflectionTestUtils;
 
 @SpringBootTest(classes = PortalIssueTrackingJob.class)
-@TestPropertySource(
-    properties = {
-      "portalissue.enabled=true",
-      "portalissue.cron=0 */7 * * * *",
-      "portalissue.fixed-delay-ms=0 */29 * * * *"
-    })
+@TestPropertySource(properties = {"portalissue.enabled=true", "portalissue.cron=0 */7 * * * *"})
 @DisplayName("PortalIssueTrackingJob configuration")
 class PortalIssueTrackingJobTest {
 
@@ -26,7 +21,7 @@ class PortalIssueTrackingJobTest {
   @MockitoBean private PortalIssueTrackingService portalIssueTrackingService;
 
   @Test
-  @DisplayName("Uses portalissue.cron when both new and legacy properties are present")
+  @DisplayName("Uses portalissue.cron for scheduler expression")
   void usesDedicatedPortalIssueCronProperty() {
     Object scheduleExpression =
         ReflectionTestUtils.getField(portalIssueTrackingJob, "scheduleExpression");
