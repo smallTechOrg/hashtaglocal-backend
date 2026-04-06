@@ -1,20 +1,16 @@
 package org.smalltech.hashtaglocal_backend.service;
 
 import java.time.Duration;
-import java.time.LocalDateTime;
-import java.util.LinkedHashMap;
-import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 import org.smalltech.hashtaglocal_backend.dto.ReportComplaintRequestDTO;
 import org.smalltech.hashtaglocal_backend.dto.ReportComplaintResponseDTO;
 import org.smalltech.hashtaglocal_backend.dto.ReportComplaintScrapeResponseDTO;
 import org.smalltech.hashtaglocal_backend.entity.GovPortalEntity;
 import org.smalltech.hashtaglocal_backend.entity.IssueEntity;
+import org.smalltech.hashtaglocal_backend.entity.Locality;
 import org.smalltech.hashtaglocal_backend.entity.Location;
-import org.smalltech.hashtaglocal_backend.entity.UserEntity;
 import org.smalltech.hashtaglocal_backend.exception.DownstreamServiceException;
 import org.smalltech.hashtaglocal_backend.model.IssueStatusModel;
-import org.smalltech.hashtaglocal_backend.model.IssueTypeModel;
 import org.smalltech.hashtaglocal_backend.model.PortalEnum;
 import org.smalltech.hashtaglocal_backend.repository.GovPortalRepository;
 import org.smalltech.hashtaglocal_backend.repository.IssueRepository;
@@ -34,19 +30,19 @@ import org.springframework.web.client.RestTemplate;
 @Slf4j
 public class PortalComplaintReportingService {
 
-  private static final String SUPPORTED_TYPE = "report_complaint";
-  private static final String INITIAL_PORTAL_STATUS = "REPORTED";
+  private static final String SUPPORTED_TYPE = "report_issue";
+  private static final String INITIAL_PORTAL_STATUS = IssueStatusModel.OPEN.name();
+  private static final String PORTAL_URL =
+      "https://www.smartoneblr.com/WssBBMPComplaintRequestDetails.htm";
 
   private final RestTemplate restTemplate;
   private final String scrapeUrl;
-  private final LocationService locationService;
   private final UserRepository userRepository;
   private final IssueRepository issueRepository;
   private final GovPortalRepository govPortalRepository;
 
   public PortalComplaintReportingService(
       RestTemplateBuilder restTemplateBuilder,
-      LocationService locationService,
       UserRepository userRepository,
       IssueRepository issueRepository,
       GovPortalRepository govPortalRepository,
@@ -55,7 +51,6 @@ public class PortalComplaintReportingService {
           String scrapeUrl,
       @Value("${portalissue.report.connect-timeout-seconds:15}") long connectTimeoutSeconds,
       @Value("${portalissue.report.read-timeout-seconds:305}") long readTimeoutSeconds) {
-    this.locationService = locationService;
     this.userRepository = userRepository;
     this.issueRepository = issueRepository;
     this.govPortalRepository = govPortalRepository;
@@ -75,8 +70,12 @@ public class PortalComplaintReportingService {
 
   @Transactional
   public ReportComplaintResponseDTO reportComplaint(
-      String type, Long adminUserId, ReportComplaintRequestDTO request) {
+      String type, Long issueId, Long adminUserId, ReportComplaintRequestDTO request) {
     validateType(type);
+
+    if (issueId == null) {
+      throw new IllegalArgumentException("Query parameter issue_id is required");
+    }
 
     if (adminUserId == null) {
       throw new IllegalArgumentException("Authenticated admin user is required");
@@ -96,16 +95,20 @@ public class PortalComplaintReportingService {
     ReportComplaintScrapeResponseDTO response =
         restTemplate.postForObject(scrapeUrl, entity, ReportComplaintScrapeResponseDTO.class);
 
-    if (response == null || response.getData() == null || response.getData().getTrackingId() == null) {
+    if (response == null
+        || response.getData() == null
+        || response.getData().getTrackingId() == null) {
       throw new DownstreamServiceException(
           HttpStatus.BAD_GATEWAY,
           "DOWNSTREAM_ERROR",
           "Portal complaint API returned invalid response: missing tracking_id");
     }
 
-    persistPortalIssue(adminUserId, request, response.getData().getTrackingId());
+    persistPortalIssue(issueId, adminUserId, request, response.getData().getTrackingId());
 
-    return ReportComplaintResponseDTO.builder().trackingId(response.getData().getTrackingId()).build();
+    return ReportComplaintResponseDTO.builder()
+        .trackingId(response.getData().getTrackingId())
+        .build();
   }
 
   private void validateType(String type) {
@@ -116,42 +119,23 @@ public class PortalComplaintReportingService {
   }
 
   private void persistPortalIssue(
-      Long adminUserId, ReportComplaintRequestDTO request, Long trackingId) {
-    UserEntity adminUser =
-        userRepository
-            .findById(adminUserId)
-            .orElseThrow(
-                () -> new IllegalArgumentException("Admin user not found: " + adminUserId));
-
-    ReportComplaintRequestDTO.Data requestData = request.getContext().getAction().getData();
-    Location location =
-        locationService.createAndSaveLocation(
-            parseCoordinate(requestData.getLatitude(), "latitude"),
-            parseCoordinate(requestData.getLongitude(), "longitude"),
-            buildLocationMetaData(request),
-            buildFallbackLocationName(requestData));
+      Long issueId, Long adminUserId, ReportComplaintRequestDTO request, Long trackingId) {
+    userRepository
+        .findById(adminUserId)
+        .orElseThrow(() -> new IllegalArgumentException("Admin user not found: " + adminUserId));
 
     IssueEntity issue =
-        IssueEntity.builder()
-            .userEntity(adminUser)
-            .description(buildIssueDescription(requestData))
-            .type(resolveIssueType(requestData))
-            .status(IssueStatusModel.OPEN)
-            .location(location)
-            .createdAt(LocalDateTime.now())
-            .updatedAt(LocalDateTime.now())
-            .build();
-
-    IssueEntity savedIssue = issueRepository.save(issue);
+        issueRepository
+            .findById(issueId)
+            .orElseThrow(() -> new IllegalArgumentException("Issue not found: " + issueId));
 
     GovPortalEntity portalIssue =
         GovPortalEntity.builder()
-            .issueEntity(savedIssue)
+            .issueEntity(issue)
             .trackingId(String.valueOf(trackingId))
             .portal(resolvePortal(request.getContext().getPortal()))
-            .url(scrapeUrl)
+            .url(resolvePortalUrl(issue))
             .status(INITIAL_PORTAL_STATUS)
-            .metaData(buildPortalMetaData(adminUserId, request, trackingId))
             .build();
 
     govPortalRepository.save(portalIssue);
@@ -171,85 +155,36 @@ public class PortalComplaintReportingService {
     throw new IllegalArgumentException("Unsupported portal: " + portal);
   }
 
-  private Double parseCoordinate(String rawValue, String fieldName) {
-    if (rawValue == null || rawValue.isBlank()) {
-      return null;
+  private String resolvePortalUrl(IssueEntity issue) {
+    if (isBengaluruIssue(issue)) {
+      return PORTAL_URL;
     }
 
-    if (!rawValue.matches("[-+]?\\d+(\\.\\d+)?")) {
-      throw new IllegalArgumentException(fieldName + " must be a valid decimal string");
-    }
-
-    return Double.valueOf(rawValue);
+    throw new IllegalArgumentException(
+        "Locality is not Bengaluru and given locality is not added to report_issue scraper");
   }
 
-  private IssueTypeModel resolveIssueType(ReportComplaintRequestDTO.Data requestData) {
-    String normalized =
-        ((requestData.getSubCategory() == null ? "" : requestData.getSubCategory())
-                + " "
-                + (requestData.getCategory() == null ? "" : requestData.getCategory()))
-            .toLowerCase();
-
-    if (normalized.contains("pothole")) {
-      return IssueTypeModel.POTHOLE;
-    }
-    if (normalized.contains("waste") || normalized.contains("garbage")) {
-      return IssueTypeModel.WASTE;
-    }
-    if (normalized.contains("footpath") || normalized.contains("sidewalk")) {
-      return IssueTypeModel.FOOTPATH;
-    }
-    if (normalized.contains("pollution") || normalized.contains("smoke")) {
-      return IssueTypeModel.POLLUTION;
-    }
-    if (normalized.contains("hygiene") || normalized.contains("sanitation")) {
-      return IssueTypeModel.HYGIENE;
-    }
-    if (normalized.contains("safety") || normalized.contains("street light")) {
-      return IssueTypeModel.SAFETY;
-    }
-    return IssueTypeModel.OTHER;
-  }
-
-  private String buildIssueDescription(ReportComplaintRequestDTO.Data requestData) {
-    if (requestData.getDescription() != null && !requestData.getDescription().isBlank()) {
-      return requestData.getDescription();
+  private boolean isBengaluruIssue(IssueEntity issue) {
+    if (issue == null) {
+      return false;
     }
 
-    return requestData.getCategory() + " / " + requestData.getSubCategory();
-  }
+    Location location = issue.getLocation();
+    if (location == null) {
+      return false;
+    }
 
-  private String buildFallbackLocationName(ReportComplaintRequestDTO.Data requestData) {
-    return requestData.getCategory() + " - " + requestData.getSubCategory();
-  }
+    Locality locality = location.getLocality();
+    if (locality == null) {
+      return false;
+    }
 
-  private Map<String, Object> buildLocationMetaData(ReportComplaintRequestDTO request) {
-    ReportComplaintRequestDTO.Data requestData = request.getContext().getAction().getData();
+    String localityName = locality.getName();
+    if (localityName == null) {
+      return false;
+    }
 
-    Map<String, Object> metaData = new LinkedHashMap<>();
-    metaData.put("portal", request.getContext().getPortal());
-    metaData.put("category", requestData.getCategory());
-    metaData.put("sub_category", requestData.getSubCategory());
-    metaData.put("media_url", requestData.getMediaUrl());
-    return metaData;
-  }
-
-  private Map<String, Object> buildPortalMetaData(
-      Long adminUserId, ReportComplaintRequestDTO request, Long trackingId) {
-    ReportComplaintRequestDTO.Data requestData = request.getContext().getAction().getData();
-
-    Map<String, Object> metaData = new LinkedHashMap<>();
-    metaData.put("reported_by_user_id", adminUserId);
-    metaData.put("source", request.getSource());
-    metaData.put("portal", request.getContext().getPortal());
-    metaData.put("action_type", request.getContext().getAction().getType());
-    metaData.put("tracking_id", trackingId);
-    metaData.put("category", requestData.getCategory());
-    metaData.put("sub_category", requestData.getSubCategory());
-    metaData.put("description", requestData.getDescription());
-    metaData.put("media_url", requestData.getMediaUrl());
-    metaData.put("latitude", requestData.getLatitude());
-    metaData.put("longitude", requestData.getLongitude());
-    return metaData;
+    String normalized = localityName.trim().toLowerCase();
+    return normalized.contains("bengaluru");
   }
 }
