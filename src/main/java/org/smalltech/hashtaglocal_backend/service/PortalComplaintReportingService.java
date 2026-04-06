@@ -28,9 +28,6 @@ import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.client.HttpStatusCodeException;
-import org.springframework.web.client.ResourceAccessException;
-import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
 @Service
@@ -96,44 +93,19 @@ public class PortalComplaintReportingService {
     headers.setContentType(MediaType.APPLICATION_JSON);
     HttpEntity<ReportComplaintRequestDTO> entity = new HttpEntity<>(request, headers);
 
-    try {
-      ReportComplaintScrapeResponseDTO response =
-          restTemplate.postForObject(scrapeUrl, entity, ReportComplaintScrapeResponseDTO.class);
+    ReportComplaintScrapeResponseDTO response =
+        restTemplate.postForObject(scrapeUrl, entity, ReportComplaintScrapeResponseDTO.class);
 
-      if (response == null
-          || response.getData() == null
-          || response.getData().getTrackingId() == null) {
-        throw new DownstreamServiceException(
-            HttpStatus.BAD_GATEWAY,
-            "DOWNSTREAM_ERROR",
-            "Portal complaint API returned invalid response: missing tracking_id");
-      }
-
-      persistPortalIssue(adminUserId, request, response.getData().getTrackingId());
-
-      return ReportComplaintResponseDTO.builder()
-          .trackingId(response.getData().getTrackingId())
-          .build();
-    } catch (HttpStatusCodeException ex) {
-      log.warn(
-          "Portal complaint report failed with status={} body={}",
-          ex.getStatusCode(),
-          ex.getResponseBodyAsString());
+    if (response == null || response.getData() == null || response.getData().getTrackingId() == null) {
       throw new DownstreamServiceException(
           HttpStatus.BAD_GATEWAY,
           "DOWNSTREAM_ERROR",
-          "Portal complaint API call failed with status " + ex.getStatusCode().value());
-    } catch (ResourceAccessException ex) {
-      log.warn("Portal complaint report timed out/unreachable: {}", ex.getMessage());
-      throw new DownstreamServiceException(
-          HttpStatus.GATEWAY_TIMEOUT,
-          "DOWNSTREAM_TIMEOUT",
-          "Portal complaint API timed out or was unreachable");
-    } catch (RestClientException ex) {
-      log.warn("Portal complaint report call failed: {}", ex.getMessage());
-      throw new DownstreamServiceException(
-          HttpStatus.BAD_GATEWAY, "DOWNSTREAM_ERROR", "Portal complaint API call failed");
+          "Portal complaint API returned invalid response: missing tracking_id");
     }
+
+    persistPortalIssue(adminUserId, request, response.getData().getTrackingId());
+
+    return ReportComplaintResponseDTO.builder().trackingId(response.getData().getTrackingId()).build();
   }
 
   private void validateType(String type) {
@@ -186,11 +158,17 @@ public class PortalComplaintReportingService {
   }
 
   private PortalEnum resolvePortal(String portal) {
-    try {
-      return PortalEnum.valueOf(portal);
-    } catch (IllegalArgumentException ex) {
+    if (portal == null || portal.isBlank()) {
       throw new IllegalArgumentException("Unsupported portal: " + portal);
     }
+
+    for (PortalEnum portalEnum : PortalEnum.values()) {
+      if (portalEnum.name().equalsIgnoreCase(portal)) {
+        return portalEnum;
+      }
+    }
+
+    throw new IllegalArgumentException("Unsupported portal: " + portal);
   }
 
   private Double parseCoordinate(String rawValue, String fieldName) {
@@ -198,11 +176,11 @@ public class PortalComplaintReportingService {
       return null;
     }
 
-    try {
-      return Double.valueOf(rawValue);
-    } catch (NumberFormatException ex) {
+    if (!rawValue.matches("[-+]?\\d+(\\.\\d+)?")) {
       throw new IllegalArgumentException(fieldName + " must be a valid decimal string");
     }
+
+    return Double.valueOf(rawValue);
   }
 
   private IssueTypeModel resolveIssueType(ReportComplaintRequestDTO.Data requestData) {
