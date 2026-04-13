@@ -17,7 +17,7 @@
   "portal_mapping": [
     { "raw": "Team everest",       "expected": "TEAMEVEREST",   "description": "Team Everest display name" },
     { "raw": "team everest",       "expected": "TEAMEVEREST",   "description": "Team Everest lowercase" },
-    { "raw": "ivolunteer",         "expected": "IVOLUNTEER",    "description": "ivolunteer lowercase" },
+    { "raw": "ivolunteerin",       "expected": "IVOLUNTEERIN", "description": "ivolunteerin lowercase" },
     { "raw": "mybharat.gov.in",    "expected": "MYBHARATGOVIN", "description": "MyBharat domain name with dots" },
     { "raw": "Twitter",            "expected": "TWITTER",       "description": "Twitter capitalised" },
     { "raw": "unknown-portal-xyz", "expected": null,            "description": "Unknown portal maps to null" },

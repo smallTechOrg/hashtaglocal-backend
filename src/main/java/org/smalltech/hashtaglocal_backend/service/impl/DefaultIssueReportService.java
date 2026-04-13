@@ -9,8 +9,10 @@ import org.smalltech.hashtaglocal_backend.entity.MediaEntity;
 import org.smalltech.hashtaglocal_backend.entity.UserEntity;
 import org.smalltech.hashtaglocal_backend.model.IssueActionApprovalStatus;
 import org.smalltech.hashtaglocal_backend.model.IssueActionModel;
+import org.smalltech.hashtaglocal_backend.model.IssueActionResult;
 import org.smalltech.hashtaglocal_backend.model.IssueStatusModel;
 import org.smalltech.hashtaglocal_backend.model.IssueTypeModel;
+import org.smalltech.hashtaglocal_backend.model.KarmaTransactionType;
 import org.smalltech.hashtaglocal_backend.model.MediaTypeModel;
 import org.smalltech.hashtaglocal_backend.model.request.IssueReportRequest;
 import org.smalltech.hashtaglocal_backend.model.request.MediaRequest;
@@ -19,6 +21,7 @@ import org.smalltech.hashtaglocal_backend.repository.IssueRepository;
 import org.smalltech.hashtaglocal_backend.repository.MediaRepository;
 import org.smalltech.hashtaglocal_backend.repository.UserRepository;
 import org.smalltech.hashtaglocal_backend.service.IssueReportService;
+import org.smalltech.hashtaglocal_backend.service.KarmaService;
 import org.smalltech.hashtaglocal_backend.service.LocationService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,9 +36,10 @@ public class DefaultIssueReportService implements IssueReportService {
   private final UserRepository userRepository;
   private final LocationService locationService;
   private final IssueActionRepository issueActionRepository;
+  private final KarmaService karmaService;
 
   @Override
-  public Long createIssue(Long userId, IssueReportRequest request) {
+  public IssueActionResult createIssue(Long userId, IssueReportRequest request) {
     var issueReq = request.getIssue();
 
     UserEntity user =
@@ -105,9 +109,23 @@ public class DefaultIssueReportService implements IssueReportService {
               .approvalStatus(IssueActionApprovalStatus.PENDING)
               .createdAt(LocalDateTime.now())
               .build();
-      issueActionRepository.save(reportAction);
+      reportAction = issueActionRepository.save(reportAction);
     }
 
-    return issue.getId();
+    // Award pending karma for reporting — use the first PENDING action as reference
+    IssueActionEntity firstPendingAction =
+        issueActionRepository
+            .findByIssueEntityAndApprovalStatus(issue, IssueActionApprovalStatus.PENDING)
+            .stream()
+            .findFirst()
+            .orElse(null);
+
+    int karmaAwarded = 0;
+    if (firstPendingAction != null) {
+      karmaAwarded =
+          karmaService.awardPendingKarma(user, KarmaTransactionType.REPORT, firstPendingAction);
+    }
+
+    return IssueActionResult.builder().issueId(issue.getId()).karmaAwarded(karmaAwarded).build();
   }
 }

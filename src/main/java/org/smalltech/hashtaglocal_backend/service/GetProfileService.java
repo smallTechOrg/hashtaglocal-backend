@@ -23,6 +23,7 @@ public class GetProfileService {
   private final LocalityRepository localityRepository;
   private final IssueRepository issueRepository;
   private final IssueActionRepository issueActionRepository;
+  private final KarmaService karmaService;
   private static final String DEFAULT_HASHTAG = "#local";
 
   public GetProfileService(
@@ -30,11 +31,13 @@ public class GetProfileService {
       UserAuthSessionRepository userAuthSessionRepository,
       LocalityRepository localityRepository,
       IssueRepository issueRepository,
-      IssueActionRepository issueActionRepository) {
+      IssueActionRepository issueActionRepository,
+      KarmaService karmaService) {
     this.userAuthSessionRepository = userAuthSessionRepository;
     this.localityRepository = localityRepository;
     this.issueRepository = issueRepository;
     this.issueActionRepository = issueActionRepository;
+    this.karmaService = karmaService;
   }
 
   /**
@@ -88,7 +91,10 @@ public class GetProfileService {
       }
     }
 
-    UserSummaryModel userSummary = buildUserSummary(user.getId());
+    // Award daily login karma (idempotent)
+    karmaService.tryAwardDailyLoginKarma(user);
+
+    UserSummaryModel userSummary = buildUserSummary(user);
 
     return UserProfileModel.builder()
         .username(user.getUsername())
@@ -99,8 +105,9 @@ public class GetProfileService {
         .build();
   }
 
-  /** Build user summary with issue counts */
-  public UserSummaryModel buildUserSummary(Long userId) {
+  /** Build user summary with issue counts and karma */
+  public UserSummaryModel buildUserSummary(UserEntity user) {
+    Long userId = user.getId();
     long total = issueRepository.countByUserExcludingRejected(userId);
     long onhold = issueRepository.countByUserAndStatus(userId, IssueStatusModel.ONHOLD);
     long open =
@@ -124,6 +131,10 @@ public class GetProfileService {
             .resolvedOthers(resolvedOthers)
             .build();
 
-    return UserSummaryModel.builder().issueCount(issueCount).build();
+    return UserSummaryModel.builder()
+        .issueCount(issueCount)
+        .karmaEarned(user.getKarmaEarned())
+        .karmaPending(user.getKarmaPending())
+        .build();
   }
 }

@@ -1,6 +1,8 @@
 package org.smalltech.hashtaglocal_backend.repository;
 
+import java.util.Collection;
 import java.util.List;
+import java.util.Set;
 import org.smalltech.hashtaglocal_backend.entity.IssueActionEntity;
 import org.smalltech.hashtaglocal_backend.entity.IssueEntity;
 import org.smalltech.hashtaglocal_backend.model.IssueActionApprovalStatus;
@@ -74,4 +76,15 @@ public interface IssueActionRepository extends JpaRepository<IssueActionEntity, 
    */
   List<IssueActionEntity> findByApprovalStatusInOrderByApprovedAtDesc(
       List<IssueActionApprovalStatus> statuses);
+
+  List<IssueActionEntity> findByIssueEntityAndActionAndApprovalStatus(
+      IssueEntity issueEntity, IssueActionModel action, IssueActionApprovalStatus approvalStatus);
+
+  /** Bulk: returns the subset of issueIds that have at least one approved VERIFY action. */
+  @Query(
+      "SELECT DISTINCT ia.issueEntity.id FROM IssueActionEntity ia "
+          + "WHERE ia.issueEntity.id IN :issueIds "
+          + "AND ia.action = org.smalltech.hashtaglocal_backend.model.IssueActionModel.VERIFY "
+          + "AND ia.approvalStatus = org.smalltech.hashtaglocal_backend.model.IssueActionApprovalStatus.APPROVED")
+  Set<Long> findVerifiedIssueIds(@Param("issueIds") Collection<Long> issueIds);
 }

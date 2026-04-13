@@ -28,6 +28,7 @@ import org.smalltech.hashtaglocal_backend.model.IssueActionModel;
 import org.smalltech.hashtaglocal_backend.model.UserRole;
 import org.smalltech.hashtaglocal_backend.repository.IssueActionRepository;
 import org.smalltech.hashtaglocal_backend.repository.IssueRepository;
+import org.smalltech.hashtaglocal_backend.repository.KarmaTransactionRepository;
 import org.smalltech.hashtaglocal_backend.repository.LocalityRepository;
 import org.smalltech.hashtaglocal_backend.repository.LocationRepository;
 import org.smalltech.hashtaglocal_backend.repository.MediaRepository;
@@ -69,6 +70,7 @@ class IssueWorkflowIntegrationTest {
   @Autowired private UserAuthProviderRepository userAuthProviderRepository;
   @Autowired private LocalityRepository localityRepository;
   @Autowired private LocationRepository locationRepository;
+  @Autowired private KarmaTransactionRepository karmaTransactionRepository;
 
   // Per-scenario state
   private String userToken;
@@ -101,6 +103,7 @@ class IssueWorkflowIntegrationTest {
   @BeforeEach
   void setUp() {
     // Clean DB in FK-safe order
+    karmaTransactionRepository.deleteAll();
     issueActionRepository.deleteAll();
     issueRepository.deleteAll();
     mediaRepository.deleteAll();

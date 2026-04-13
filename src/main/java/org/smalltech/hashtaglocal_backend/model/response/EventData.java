@@ -23,7 +23,7 @@ public class EventData {
   private String organisation;
   private String imageUrl;
 
-  /** The portal this event was sourced from (e.g., "MYBHARATGOVIN", "IVOLUNTEER"). */
+  /** The portal this event was sourced from (e.g., "MYBHARATGOVIN", "IVOLUNTEERIN"). */
   private String portal;
 
   /** String name of the {@link org.smalltech.hashtaglocal_backend.model.EventTypeModel} enum. */

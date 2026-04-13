@@ -22,9 +22,17 @@ public enum EventPortalModel {
       "This should be an event where anybody can participate and do something related to cleaning,"
           + " plantation",
       ""),
-  IVOLUNTEER(null, null),
-  MYBHARATGOVIN(null, null),
-  TWITTER(null, null);
+  IVOLUNTEERIN(
+      "Any in-person volunteering activity: cleanliness drive, cleanup, tree plantation,  mural"
+          + " painting, food distribution, community engagement, elderly care, animal welfare,"
+          + " sanitation. Exclude: remote-only roles like content writing, video editing, social"
+          + " media management, UI/UX design, app development, proposal writing, digital marketing,"
+          + " and pure internships with no direct community interaction.",
+      "environment, education, civic engagement, community service, child welfare, health, hunger,"
+          + " disability, animal welfare, elderly care, sanitation"),
+  MYBHARATGOVIN("civic volunteering, cleanliness drive, tree plantation", "civic engagement"),
+  TWITTER(null, null),
+  INSTAGRAM(null, null);
 
   /** The event_filter sent in the FETCH_EVENTS POST body. {@code null} = portal not yet enabled. */
   private final String eventFilter;
@@ -42,7 +50,7 @@ public enum EventPortalModel {
    *
    * <ul>
    *   <li>"Team everest" → {@link #TEAMEVEREST}
-   *   <li>"ivolunteer" → {@link #IVOLUNTEER}
+   *   <li>"ivolunteer" / "ivolunteer.in" → {@link #IVOLUNTEERIN}
    *   <li>"mybharat.gov.in" → {@link #MYBHARATGOVIN}
    *   <li>"Twitter" → {@link #TWITTER}
    * </ul>
@@ -56,9 +64,10 @@ public enum EventPortalModel {
     String normalized = raw.toLowerCase().replaceAll("[\\s.\\-_]+", "");
     return switch (normalized) {
       case "teameverest" -> TEAMEVEREST;
-      case "ivolunteer" -> IVOLUNTEER;
+      case "ivolunteer", "ivolunteerin" -> IVOLUNTEERIN;
       case "mybharatgovin" -> MYBHARATGOVIN;
       case "twitter" -> TWITTER;
+      case "instagram" -> INSTAGRAM;
       default -> null;
     };
   }

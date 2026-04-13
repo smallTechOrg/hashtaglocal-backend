@@ -6,6 +6,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.smalltech.hashtaglocal_backend.mapper.IssueViewMapper;
+import org.smalltech.hashtaglocal_backend.model.IssueActionResult;
 import org.smalltech.hashtaglocal_backend.model.NewAPIResponse;
 import org.smalltech.hashtaglocal_backend.model.request.IssuePatchRequest;
 import org.smalltech.hashtaglocal_backend.model.request.IssueReportRequest;
@@ -13,11 +14,13 @@ import org.smalltech.hashtaglocal_backend.model.request.IssueVerifyRequest;
 import org.smalltech.hashtaglocal_backend.model.response.IssueActionResponseData;
 import org.smalltech.hashtaglocal_backend.model.response.IssueListResponseData;
 import org.smalltech.hashtaglocal_backend.model.response.IssueResponseData;
+import org.smalltech.hashtaglocal_backend.model.response.IssueStoriesResponseData;
 import org.smalltech.hashtaglocal_backend.service.IssueActionService;
 import org.smalltech.hashtaglocal_backend.service.IssueHomeService;
 import org.smalltech.hashtaglocal_backend.service.IssuePatchService;
 import org.smalltech.hashtaglocal_backend.service.IssueQueryService;
 import org.smalltech.hashtaglocal_backend.service.IssueReportService;
+import org.smalltech.hashtaglocal_backend.service.IssueStoryService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -41,6 +44,7 @@ public class IssueController {
   private final IssuePatchService issuePatchService;
   private final IssueQueryService issueQueryService;
   private final IssueReportService issueReportService;
+  private final IssueStoryService issueStoryService;
   private final IssueViewMapper issueViewMapper;
 
   @GetMapping("/issue/{issueId}")
@@ -82,11 +86,15 @@ public class IssueController {
       @PathVariable Long issueId,
       @AuthenticationPrincipal Long userId,
       @Valid @RequestBody IssueVerifyRequest request) {
-    Long updatedIssueId = issueActionService.handle(issueId, userId, request);
+    IssueActionResult result = issueActionService.handle(issueId, userId, request);
 
     NewAPIResponse<IssueActionResponseData> response =
         NewAPIResponse.<IssueActionResponseData>builder()
-            .data(IssueActionResponseData.builder().issueId(updatedIssueId).build())
+            .data(
+                IssueActionResponseData.builder()
+                    .issueId(result.getIssueId())
+                    .karmaAwarded(result.getKarmaAwarded())
+                    .build())
             .build();
 
     return ResponseEntity.ok(response);
@@ -103,16 +111,33 @@ public class IssueController {
     return issueHomeAssembler.getHome(localityHashtag, viewerUserId);
   }
 
+  @GetMapping("/issues/stories")
+  @Operation(
+      summary = "Get resolved issue stories",
+      description =
+          "Returns resolved issues with timeline data showing how they progressed from reported to resolved. Optionally filter by locality hashtag.")
+  public NewAPIResponse<IssueStoriesResponseData> getIssueStories(
+      @RequestParam(value = "locality", required = false) String localityHashtag) {
+    var stories = issueStoryService.getStories(localityHashtag);
+    return NewAPIResponse.<IssueStoriesResponseData>builder()
+        .data(IssueStoriesResponseData.builder().stories(stories).build())
+        .build();
+  }
+
   @PostMapping("/issue")
   @SecurityRequirement(name = "bearerAuth")
   @Operation(summary = "Create issue", description = "Creates a new issue with the given details.")
   public ResponseEntity<NewAPIResponse<IssueActionResponseData>> createIssue(
       @AuthenticationPrincipal Long userId, @Valid @RequestBody IssueReportRequest request) {
-    Long issueId = issueReportService.createIssue(userId, request);
+    IssueActionResult result = issueReportService.createIssue(userId, request);
 
     NewAPIResponse<IssueActionResponseData> response =
         NewAPIResponse.<IssueActionResponseData>builder()
-            .data(IssueActionResponseData.builder().issueId(issueId).build())
+            .data(
+                IssueActionResponseData.builder()
+                    .issueId(result.getIssueId())
+                    .karmaAwarded(result.getKarmaAwarded())
+                    .build())
             .build();
 
     return ResponseEntity.ok(response);

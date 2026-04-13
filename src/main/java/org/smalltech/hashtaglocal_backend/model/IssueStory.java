@@ -1,5 +1,6 @@
 package org.smalltech.hashtaglocal_backend.model;
 
+import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -9,9 +10,10 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class UserSummaryModel {
+public class IssueStory {
 
-  private IssueCountModel issueCount;
-  private int karmaEarned;
-  private int karmaPending;
+  private Issue issue;
+  private List<TimelineEvent> timeline;
+  private Integer resolutionDays;
+  private int daysSinceReported;
 }
