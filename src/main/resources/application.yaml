@@ -104,7 +104,6 @@ events:
 portalissue:
   enabled: ${PORTALISSUE_ENABLED:true}
   cron: ${PORTALISSUE_CRON:0 0 1 * * *}
-  stale-hours: ${PORTALISSUE_STALE_HOURS:24}
   scrape-url: ${PORTALISSUE_SCRAPE_URL:https://staging.api.smalltech.in/webscraperstaging/api/v1/scrape}
   report:
     scrape-url: ${PORTALISSUE_REPORT_SCRAPE_URL:https://staging.api.smalltech.in/webscraperstaging/api/v1/scrape}

@@ -1,6 +1,5 @@
 package org.smalltech.hashtaglocal_backend.repository;
 
-import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -18,8 +17,8 @@ public interface GovPortalRepository extends JpaRepository<GovPortalEntity, Long
   @Query("SELECT g FROM GovPortalEntity g WHERE g.issueEntity.id IN :issueIds")
   List<GovPortalEntity> findByIssueIds(@Param("issueIds") Collection<Long> issueIds);
 
-  Optional<GovPortalEntity> findFirstByUpdatedAtBeforeOrderByUpdatedAtAsc(LocalDateTime cutoff);
+  Optional<GovPortalEntity> findFirstByStatusOrderByUpdatedAtAsc(String status);
 
-  Optional<GovPortalEntity> findFirstByUpdatedAtBeforeAndIdNotInOrderByUpdatedAtAsc(
-      LocalDateTime cutoff, Collection<Long> excludedIds);
+  Optional<GovPortalEntity> findFirstByStatusAndIdNotInOrderByUpdatedAtAsc(
+      String status, Collection<Long> excludedIds);
 }
