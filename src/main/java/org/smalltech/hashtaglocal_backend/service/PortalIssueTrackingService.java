@@ -1,6 +1,5 @@
 package org.smalltech.hashtaglocal_backend.service;
 
-import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Map;
@@ -11,7 +10,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.smalltech.hashtaglocal_backend.dto.TrackIssueScrapeResponseDTO;
 import org.smalltech.hashtaglocal_backend.entity.GovPortalEntity;
 import org.smalltech.hashtaglocal_backend.repository.GovPortalRepository;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -19,20 +17,18 @@ import org.springframework.stereotype.Service;
 @Slf4j
 public class PortalIssueTrackingService {
 
+  private static final String TRACKABLE_STATUS = "OPEN";
+
   private final GovPortalRepository govPortalRepository;
   private final PortalIssueScrapeClient portalIssueScrapeClient;
 
-  @Value("${portalissue.stale-hours:24}")
-  private long staleHours;
-
   public void runCycle() {
-    LocalDateTime cutoff = LocalDateTime.now().minusHours(staleHours);
     Set<Long> attemptedIds = new HashSet<>();
     int processedCount = 0;
     int failedCount = 0;
 
     while (true) {
-      Optional<GovPortalEntity> nextIssue = findNextEligibleIssue(cutoff, attemptedIds);
+      Optional<GovPortalEntity> nextIssue = findNextEligibleIssue(attemptedIds);
       if (nextIssue.isEmpty()) {
         break;
       }
@@ -71,14 +67,13 @@ public class PortalIssueTrackingService {
         attemptedIds.size());
   }
 
-  private Optional<GovPortalEntity> findNextEligibleIssue(
-      LocalDateTime cutoff, Set<Long> attemptedIds) {
+  private Optional<GovPortalEntity> findNextEligibleIssue(Set<Long> attemptedIds) {
     if (attemptedIds.isEmpty()) {
-      return govPortalRepository.findFirstByUpdatedAtBeforeOrderByUpdatedAtAsc(cutoff);
+      return govPortalRepository.findFirstByStatusOrderByUpdatedAtAsc(TRACKABLE_STATUS);
     }
 
-    return govPortalRepository.findFirstByUpdatedAtBeforeAndIdNotInOrderByUpdatedAtAsc(
-        cutoff, attemptedIds);
+    return govPortalRepository.findFirstByStatusAndIdNotInOrderByUpdatedAtAsc(
+        TRACKABLE_STATUS, attemptedIds);
   }
 
   private void applySuccessUpdate(GovPortalEntity issue, TrackIssueScrapeResponseDTO response) {

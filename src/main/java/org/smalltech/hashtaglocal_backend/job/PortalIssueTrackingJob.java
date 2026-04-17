@@ -16,10 +16,10 @@ public class PortalIssueTrackingJob {
 
   private final PortalIssueTrackingService portalIssueTrackingService;
 
-  @Value("${portalissue.fixed-delay-ms:0 */30 * * * *}")
+  @Value("${portalissue.cron:0 */30 * * * *}")
   private String scheduleExpression;
 
-  @Scheduled(cron = "${portalissue.fixed-delay-ms:0 */30 * * * *}")
+  @Scheduled(cron = "${portalissue.cron:0 */30 * * * *}")
   public void run() {
     log.info("Portal issue tracking job started (cron={})", scheduleExpression);
     portalIssueTrackingService.runCycle();

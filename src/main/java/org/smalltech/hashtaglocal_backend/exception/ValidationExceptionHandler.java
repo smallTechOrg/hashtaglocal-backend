@@ -24,6 +24,18 @@ public class ValidationExceptionHandler {
                         .build())
             .collect(Collectors.toList());
 
+    List<ApiErrorResponse.ApiError> globalErrors =
+        ex.getBindingResult().getGlobalErrors().stream()
+            .map(
+                err ->
+                    ApiErrorResponse.ApiError.builder()
+                        .type("VALIDATION")
+                        .message(err.getDefaultMessage())
+                        .build())
+            .collect(Collectors.toList());
+
+    fieldErrors.addAll(globalErrors);
+
     ApiErrorResponse response =
         ApiErrorResponse.builder()
             .error(
@@ -34,5 +46,43 @@ public class ValidationExceptionHandler {
             .build();
 
     return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+  }
+
+  @ExceptionHandler(IllegalArgumentException.class)
+  public ResponseEntity<ApiErrorResponse> handleIllegalArgument(IllegalArgumentException ex) {
+    ApiErrorResponse response =
+        ApiErrorResponse.builder()
+            .error(
+                ApiErrorResponse.ErrorEnvelope.builder()
+                    .message(ex.getMessage())
+                    .errors(
+                        List.of(
+                            ApiErrorResponse.ApiError.builder()
+                                .type("VALIDATION")
+                                .message(ex.getMessage())
+                                .build()))
+                    .build())
+            .build();
+
+    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+  }
+
+  @ExceptionHandler(DownstreamServiceException.class)
+  public ResponseEntity<ApiErrorResponse> handleDownstreamFailure(DownstreamServiceException ex) {
+    ApiErrorResponse response =
+        ApiErrorResponse.builder()
+            .error(
+                ApiErrorResponse.ErrorEnvelope.builder()
+                    .message(ex.getMessage())
+                    .errors(
+                        List.of(
+                            ApiErrorResponse.ApiError.builder()
+                                .type(ex.getType())
+                                .message(ex.getMessage())
+                                .build()))
+                    .build())
+            .build();
+
+    return ResponseEntity.status(ex.getStatus()).body(response);
   }
 }
