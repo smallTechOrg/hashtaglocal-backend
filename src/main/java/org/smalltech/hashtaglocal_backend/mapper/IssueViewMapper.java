@@ -166,7 +166,7 @@ public class IssueViewMapper {
                   return Media.builder()
                       .location(mediaLocation)
                       .type(mediaEntity.getType().name().toLowerCase())
-                      .url(gcsService.generateSignedUrl(mediaEntity.getUrl()))
+                      .url(gcsService.generateOptimisedUrl(mediaEntity.getUrl()))
                       .urlThumbnail(gcsService.generateThumbnailUrl(mediaEntity.getUrl()))
                       .description(mediaEntity.getDescription())
                       .username(username)
