@@ -4,6 +4,8 @@ import com.google.cloud.storage.BlobInfo;
 import com.google.cloud.storage.HttpMethod;
 import com.google.cloud.storage.Storage;
 import java.net.URL;
+import java.time.Instant;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import org.smalltech.hashtaglocal_backend.config.CustomProperties;
 import org.springframework.stereotype.Service;
@@ -14,6 +16,15 @@ public class GCSService {
   private final Storage storage;
   private final String bucketName;
   private static final long SIGNED_URL_DURATION_MINUTES = 60;
+  private static final long CACHE_TTL_SECONDS = 55 * 60; // 5 min buffer before URL expiry
+
+  private record CachedUrl(String url, Instant expiresAt) {
+    boolean isValid() {
+      return Instant.now().isBefore(expiresAt);
+    }
+  }
+
+  private final ConcurrentHashMap<String, CachedUrl> urlCache = new ConcurrentHashMap<>();
 
   public GCSService(Storage storage, CustomProperties.Google googleProperties) {
     this.storage = storage;
@@ -28,9 +39,11 @@ public class GCSService {
    */
   public String generateSignedUrl(String gcsPath) {
     String objectPath = extractObjectPath(gcsPath);
+    String cacheKey = "main:" + objectPath;
+    CachedUrl cached = urlCache.get(cacheKey);
+    if (cached != null && cached.isValid()) return cached.url();
 
     BlobInfo blobInfo = BlobInfo.newBuilder(bucketName, objectPath).build();
-
     URL signedUrl =
         storage.signUrl(
             blobInfo,
@@ -39,7 +52,9 @@ public class GCSService {
             Storage.SignUrlOption.httpMethod(HttpMethod.GET),
             Storage.SignUrlOption.withV4Signature());
 
-    return signedUrl.toString();
+    String url = signedUrl.toString();
+    urlCache.put(cacheKey, new CachedUrl(url, Instant.now().plusSeconds(CACHE_TTL_SECONDS)));
+    return url;
   }
 
   /**
@@ -51,15 +66,16 @@ public class GCSService {
    */
   public String generateOptimisedUrl(String gcsPath) {
     String objectPath = extractObjectPath(gcsPath);
-
     String filename =
         objectPath.contains("/")
             ? objectPath.substring(objectPath.lastIndexOf('/') + 1)
             : objectPath;
     String optimisedPath = "optimised/" + filename;
+    String cacheKey = "optimised:" + optimisedPath;
+    CachedUrl cached = urlCache.get(cacheKey);
+    if (cached != null && cached.isValid()) return cached.url();
 
     BlobInfo blobInfo = BlobInfo.newBuilder(bucketName, optimisedPath).build();
-
     URL signedUrl =
         storage.signUrl(
             blobInfo,
@@ -68,7 +84,9 @@ public class GCSService {
             Storage.SignUrlOption.httpMethod(HttpMethod.GET),
             Storage.SignUrlOption.withV4Signature());
 
-    return signedUrl.toString();
+    String url = signedUrl.toString();
+    urlCache.put(cacheKey, new CachedUrl(url, Instant.now().plusSeconds(CACHE_TTL_SECONDS)));
+    return url;
   }
 
   /**
@@ -80,17 +98,16 @@ public class GCSService {
    */
   public String generateThumbnailUrl(String gcsPath) {
     String objectPath = extractObjectPath(gcsPath);
-
-    // Extract just the filename from the object path (e.g., "image/2024-01-01.jpg"
-    // -> "2024-01-01.jpg")
     String filename =
         objectPath.contains("/")
             ? objectPath.substring(objectPath.lastIndexOf('/') + 1)
             : objectPath;
     String thumbnailPath = "thumbnails/" + filename;
+    String cacheKey = "thumbnail:" + thumbnailPath;
+    CachedUrl cached = urlCache.get(cacheKey);
+    if (cached != null && cached.isValid()) return cached.url();
 
     BlobInfo blobInfo = BlobInfo.newBuilder(bucketName, thumbnailPath).build();
-
     URL signedUrl =
         storage.signUrl(
             blobInfo,
@@ -99,7 +116,9 @@ public class GCSService {
             Storage.SignUrlOption.httpMethod(HttpMethod.GET),
             Storage.SignUrlOption.withV4Signature());
 
-    return signedUrl.toString();
+    String url = signedUrl.toString();
+    urlCache.put(cacheKey, new CachedUrl(url, Instant.now().plusSeconds(CACHE_TTL_SECONDS)));
+    return url;
   }
 
   /**
