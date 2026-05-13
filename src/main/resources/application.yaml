@@ -51,6 +51,9 @@ google:
   storage:
     bucket-name: ${GOOGLE_STORAGE_BUCKET_NAME:}
 
+apple:
+  bundle-id: ${APPLE_BUNDLE_ID:com.smalltech.hashtaglocal}
+
 management:
   health:
     diskspace:
