@@ -1,14 +1,14 @@
-package org.smalltech.hashtaglocal_backend.service;
+package org.smalltech.hashtaglocal_backend.util;
 
 import org.smalltech.hashtaglocal_backend.repository.UserRepository;
-import org.springframework.stereotype.Service;
+import org.springframework.stereotype.Component;
 
-@Service
-public class UsernameService {
+@Component
+public class UsernameUtil {
 
   private final UserRepository userRepository;
 
-  public UsernameService(UserRepository userRepository) {
+  public UsernameUtil(UserRepository userRepository) {
     this.userRepository = userRepository;
   }
 

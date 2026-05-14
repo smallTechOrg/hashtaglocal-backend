@@ -1,4 +1,4 @@
-package org.smalltech.hashtaglocal_backend.service;
+package org.smalltech.hashtaglocal_backend.service.impl;
 
 import com.nimbusds.jose.JWSAlgorithm;
 import com.nimbusds.jose.jwk.source.JWKSource;
@@ -15,10 +15,14 @@ import org.smalltech.hashtaglocal_backend.entity.UserAuthProviderEntity;
 import org.smalltech.hashtaglocal_backend.entity.UserAuthSessionEntity;
 import org.smalltech.hashtaglocal_backend.entity.UserEntity;
 import org.smalltech.hashtaglocal_backend.model.TokenResponse;
+import org.smalltech.hashtaglocal_backend.model.request.OAuthRequest;
 import org.smalltech.hashtaglocal_backend.model.response.AuthTokenResponseData;
 import org.smalltech.hashtaglocal_backend.repository.UserAuthProviderRepository;
 import org.smalltech.hashtaglocal_backend.repository.UserAuthSessionRepository;
 import org.smalltech.hashtaglocal_backend.repository.UserRepository;
+import org.smalltech.hashtaglocal_backend.service.OAuthService;
+import org.smalltech.hashtaglocal_backend.service.TokenService;
+import org.smalltech.hashtaglocal_backend.util.UsernameUtil;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -26,6 +30,7 @@ import org.springframework.stereotype.Service;
 @Transactional
 public class AppleAuthService implements OAuthService {
 
+  private static final String PROVIDER_TYPE = "apple";
   private static final String APPLE_JWKS_URL = "https://appleid.apple.com/auth/keys";
   private static final String APPLE_ISSUER = "https://appleid.apple.com";
 
@@ -36,43 +41,38 @@ public class AppleAuthService implements OAuthService {
   private final UserAuthProviderRepository userAuthProviderRepository;
   private final UserAuthSessionRepository userAuthSessionRepository;
   private final TokenService tokenService;
-  private final UsernameService usernameService;
+  private final UsernameUtil usernameUtil;
 
   public AppleAuthService(
       UserRepository userRepository,
       UserAuthProviderRepository userAuthProviderRepository,
       UserAuthSessionRepository userAuthSessionRepository,
       TokenService tokenService,
-      UsernameService usernameService) {
+      UsernameUtil usernameUtil) {
     this.userRepository = userRepository;
     this.userAuthProviderRepository = userAuthProviderRepository;
     this.userAuthSessionRepository = userAuthSessionRepository;
     this.tokenService = tokenService;
-    this.usernameService = usernameService;
+    this.usernameUtil = usernameUtil;
   }
 
   @Override
   public String getProviderType() {
-    return "apple";
+    return PROVIDER_TYPE;
   }
 
-  /*
-   * =============================== ENTRY POINT
-   * ===============================
-   */
+  @Override
+  public AuthTokenResponseData authenticate(OAuthRequest request) {
+    return handleIdentityToken(request.getIdentityToken(), request.getFullName());
+  }
 
   public AuthTokenResponseData handleIdentityToken(String identityToken, String fullName) {
-    System.out.println("➡️ Verifying Apple identity token");
+    System.out.println("âž¡ï¸ Verifying Apple identity token");
     JWTClaimsSet claims = verifyIdentityToken(identityToken);
     String sub = claims.getSubject();
     String email = (String) claims.getClaim("email");
     return loginOrSignup(sub, email, fullName);
   }
-
-  /*
-   * =============================== TOKEN VERIFICATION
-   * ===============================
-   */
 
   private JWTClaimsSet verifyIdentityToken(String identityToken) {
     try {
@@ -90,7 +90,7 @@ public class AppleAuthService implements OAuthService {
             "Invalid Apple token audience: " + claims.getAudience() + ", expected: " + bundleId);
       }
 
-      System.out.println("✅ Apple identity token verified");
+      System.out.println("âœ… Apple identity token verified");
       return claims;
 
     } catch (RuntimeException e) {
@@ -100,59 +100,50 @@ public class AppleAuthService implements OAuthService {
     }
   }
 
-  /*
-   * =============================== LOGIN / SIGNUP
-   * ===============================
-   */
-
   private AuthTokenResponseData loginOrSignup(
       String providerUserId, String email, String fullName) {
 
-    System.out.println("👤 Apple userId: " + providerUserId);
+    System.out.println("ðŸ‘¤ Apple userId: " + providerUserId);
 
     Optional<UserAuthProviderEntity> existingProvider =
-        userAuthProviderRepository.findByProviderTypeAndProviderUserId("apple", providerUserId);
+        userAuthProviderRepository.findByProviderTypeAndProviderUserId(
+            PROVIDER_TYPE, providerUserId);
 
     UserEntity user;
     UserAuthProviderEntity provider;
 
     if (existingProvider.isPresent()) {
-      System.out.println("🔁 Existing Apple user found");
+      System.out.println("ðŸ” Existing Apple user found");
       provider = existingProvider.get();
       user = provider.getUser();
     } else {
-      System.out.println("🆕 Creating new Apple user");
+      System.out.println("ðŸ†• Creating new Apple user");
 
       String baseUsername =
-          usernameService.normalizeUsername(
+          usernameUtil.normalizeUsername(
               fullName != null ? fullName : (email != null ? email.split("@")[0] : "appleuser"));
 
-      String uniqueUsername = usernameService.generateUniqueUsername(baseUsername);
+      String uniqueUsername = usernameUtil.generateUniqueUsername(baseUsername);
 
       user =
           userRepository.save(UserEntity.builder().username(uniqueUsername).locale("en").build());
 
-      System.out.println("✅ User saved | ID: " + user.getId());
+      System.out.println("âœ… User saved | ID: " + user.getId());
 
       provider =
           userAuthProviderRepository.save(
               UserAuthProviderEntity.builder()
                   .user(user)
-                  .providerType("apple")
+                  .providerType(PROVIDER_TYPE)
                   .providerUserId(providerUserId)
                   .email(email)
                   .build());
 
-      System.out.println("✅ Provider saved | ID: " + provider.getId());
+      System.out.println("âœ… Provider saved | ID: " + provider.getId());
     }
 
     return createSession(user, provider);
   }
-
-  /*
-   * =============================== SESSION + TOKENS
-   * ===============================
-   */
 
   private AuthTokenResponseData createSession(UserEntity user, UserAuthProviderEntity provider) {
     String accessToken = tokenService.generateToken();
@@ -170,7 +161,7 @@ public class AppleAuthService implements OAuthService {
                 .isActive(true)
                 .build());
 
-    System.out.println("✅ Session created | ID: " + session.getId());
+    System.out.println("âœ… Session created | ID: " + session.getId());
 
     return AuthTokenResponseData.builder()
         .accessToken(
@@ -185,5 +176,4 @@ public class AppleAuthService implements OAuthService {
                 .build())
         .build();
   }
-
 }
