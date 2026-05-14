@@ -1,4 +1,4 @@
-package org.smalltech.hashtaglocal_backend.service;
+package org.smalltech.hashtaglocal_backend.service.impl;
 
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
@@ -13,10 +13,14 @@ import org.smalltech.hashtaglocal_backend.entity.UserAuthSessionEntity;
 import org.smalltech.hashtaglocal_backend.entity.UserEntity;
 import org.smalltech.hashtaglocal_backend.model.GoogleUserResponse;
 import org.smalltech.hashtaglocal_backend.model.TokenResponse;
+import org.smalltech.hashtaglocal_backend.model.request.OAuthRequest;
 import org.smalltech.hashtaglocal_backend.model.response.AuthTokenResponseData;
 import org.smalltech.hashtaglocal_backend.repository.UserAuthProviderRepository;
 import org.smalltech.hashtaglocal_backend.repository.UserAuthSessionRepository;
 import org.smalltech.hashtaglocal_backend.repository.UserRepository;
+import org.smalltech.hashtaglocal_backend.service.OAuthService;
+import org.smalltech.hashtaglocal_backend.service.TokenService;
+import org.smalltech.hashtaglocal_backend.util.UsernameUtil;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
@@ -25,7 +29,11 @@ import org.springframework.web.client.RestTemplate;
 
 @Service
 @Transactional
-public class GoogleAuthService {
+public class GoogleAuthService implements OAuthService {
+
+  private static final String PROVIDER_TYPE = "google";
+  private static final String TOKEN_URL = "https://oauth2.googleapis.com/token";
+  private static final String USERINFO_URL = "https://www.googleapis.com/oauth2/v2/userinfo";
 
   @Value("${google.oauth.client-id}")
   private String clientId;
@@ -36,38 +44,45 @@ public class GoogleAuthService {
   @Value("${google.oauth.redirect-uri}")
   private String redirectUri;
 
-  private static final String TOKEN_URL = "https://oauth2.googleapis.com/token";
-  private static final String USERINFO_URL = "https://www.googleapis.com/oauth2/v2/userinfo";
-
   private final UserRepository userRepository;
   private final UserAuthProviderRepository userAuthProviderRepository;
   private final UserAuthSessionRepository userAuthSessionRepository;
   private final TokenService tokenService;
+  private final UsernameUtil usernameUtil;
 
   public GoogleAuthService(
       UserRepository userRepository,
       UserAuthProviderRepository userAuthProviderRepository,
       UserAuthSessionRepository userAuthSessionRepository,
-      TokenService tokenService) {
+      TokenService tokenService,
+      UsernameUtil usernameUtil) {
 
     this.userRepository = userRepository;
     this.userAuthProviderRepository = userAuthProviderRepository;
     this.userAuthSessionRepository = userAuthSessionRepository;
     this.tokenService = tokenService;
+    this.usernameUtil = usernameUtil;
   }
 
-  /*
-   * =============================== AUTH CODE FLOW
-   * ===============================
-   */
+  @Override
+  public String getProviderType() {
+    return PROVIDER_TYPE;
+  }
+
+  @Override
+  public AuthTokenResponseData authenticate(OAuthRequest request) {
+    if (request.getAccessToken() != null && !request.getAccessToken().isBlank()) {
+      return handleAccessToken(request.getAccessToken());
+    }
+    return handleAuthorizationCode(
+        request.getCode(), request.getCodeVerifier(), request.getRedirectUri());
+  }
 
   public AuthTokenResponseData handleAuthorizationCode(
       String code, String codeVerifier, String clientRedirectUri) {
 
-    System.out.println("🔁 Exchanging auth code for Google tokens");
+    System.out.println("ðŸ” Exchanging auth code for Google tokens");
 
-    // Use caller-supplied redirect_uri (must match the one in the auth request),
-    // fall back to server-configured value.
     String effectiveRedirectUri =
         (clientRedirectUri != null && !clientRedirectUri.isEmpty())
             ? clientRedirectUri
@@ -91,7 +106,7 @@ public class GoogleAuthService {
 
     String idTokenString = tokenResponse.get("id_token").toString();
 
-    System.out.println("✅ Google ID Token received");
+    System.out.println("âœ… Google ID Token received");
 
     GoogleIdToken.Payload payload = verifyIdToken(idTokenString);
 
@@ -102,14 +117,9 @@ public class GoogleAuthService {
         (String) payload.get("name"));
   }
 
-  /*
-   * =============================== ACCESS TOKEN FLOW
-   * ===============================
-   */
-
   public AuthTokenResponseData handleAccessToken(String accessToken) {
 
-    System.out.println("🔁 Fetching Google user info");
+    System.out.println("ðŸ” Fetching Google user info");
 
     RestTemplate restTemplate = new RestTemplate();
 
@@ -121,34 +131,31 @@ public class GoogleAuthService {
         googleUser.getId(), googleUser.getEmail(), googleUser.getPicture(), googleUser.getName());
   }
 
-  /*
-   * =============================== LOGIN / SIGNUP
-   * ===============================
-   */
-
   private AuthTokenResponseData loginOrSignup(
       String providerUserId, String email, String picture, String name) {
 
-    System.out.println("👤 Google userId: " + providerUserId);
+    System.out.println("ðŸ‘¤ Google userId: " + providerUserId);
 
     Optional<UserAuthProviderEntity> existingProvider =
-        userAuthProviderRepository.findByProviderTypeAndProviderUserId("google", providerUserId);
+        userAuthProviderRepository.findByProviderTypeAndProviderUserId(
+            PROVIDER_TYPE, providerUserId);
 
     UserEntity user;
     UserAuthProviderEntity provider;
 
     if (existingProvider.isPresent()) {
-      System.out.println("🔁 Existing user found");
+      System.out.println("ðŸ” Existing user found");
 
       provider = existingProvider.get();
       user = provider.getUser();
     } else {
-      System.out.println("🆕 Creating new user");
+      System.out.println("ðŸ†• Creating new user");
 
       String baseUsername =
-          normalizeUsername(name != null ? name : (email != null ? email.split("@")[0] : "google"));
+          usernameUtil.normalizeUsername(
+              name != null ? name : (email != null ? email.split("@")[0] : "google"));
 
-      String uniqueUsername = generateUniqueUsername(baseUsername);
+      String uniqueUsername = usernameUtil.generateUniqueUsername(baseUsername);
 
       user =
           userRepository.save(
@@ -158,27 +165,22 @@ public class GoogleAuthService {
                   .profilePicture(picture)
                   .build());
 
-      System.out.println("✅ User saved | ID: " + user.getId());
+      System.out.println("âœ… User saved | ID: " + user.getId());
 
       provider =
           userAuthProviderRepository.save(
               UserAuthProviderEntity.builder()
                   .user(user)
-                  .providerType("google")
+                  .providerType(PROVIDER_TYPE)
                   .providerUserId(providerUserId)
                   .email(email)
                   .build());
 
-      System.out.println("✅ Provider saved | ID: " + provider.getId());
+      System.out.println("âœ… Provider saved | ID: " + provider.getId());
     }
 
     return createSession(user, provider);
   }
-
-  /*
-   * =============================== SESSION + TOKENS
-   * ===============================
-   */
 
   private AuthTokenResponseData createSession(UserEntity user, UserAuthProviderEntity provider) {
 
@@ -197,7 +199,7 @@ public class GoogleAuthService {
                 .isActive(true)
                 .build());
 
-    System.out.println("✅ Session created | ID: " + session.getId());
+    System.out.println("âœ… Session created | ID: " + session.getId());
 
     return AuthTokenResponseData.builder()
         .accessToken(
@@ -212,44 +214,6 @@ public class GoogleAuthService {
                 .build())
         .build();
   }
-
-  /*
-   * =============================== USERNAME HELPERS
-   * ===============================
-   */
-  private String normalizeUsername(String name) {
-
-    if (name == null || name.isBlank()) {
-      return "user";
-    }
-
-    return name.toLowerCase().replaceAll("\\s+", "").replaceAll("[^a-z0-9]", "");
-  }
-
-  private String generateUniqueUsername(String baseUsername) {
-
-    String username = baseUsername;
-    int attempt = 0;
-
-    while (userRepository.findByUsername(username).isPresent()) {
-
-      int random = 100 + (int) (Math.random() * 900);
-      username = baseUsername + random;
-      attempt++;
-
-      if (attempt > 3) {
-        username = baseUsername + (System.currentTimeMillis() % 100000);
-        break;
-      }
-    }
-
-    return username;
-  }
-
-  /*
-   * =============================== ID TOKEN VERIFICATION
-   * ===============================
-   */
 
   private GoogleIdToken.Payload verifyIdToken(String idTokenString) {
 
@@ -266,7 +230,7 @@ public class GoogleAuthService {
         throw new RuntimeException("Invalid ID token");
       }
 
-      System.out.println("✅ ID token verified");
+      System.out.println("âœ… ID token verified");
 
       return idToken.getPayload();
 
