@@ -24,7 +24,7 @@ import org.springframework.stereotype.Service;
 
 @Service
 @Transactional
-public class AppleAuthService {
+public class AppleAuthService implements OAuthService {
 
   private static final String APPLE_JWKS_URL = "https://appleid.apple.com/auth/keys";
   private static final String APPLE_ISSUER = "https://appleid.apple.com";
@@ -36,16 +36,24 @@ public class AppleAuthService {
   private final UserAuthProviderRepository userAuthProviderRepository;
   private final UserAuthSessionRepository userAuthSessionRepository;
   private final TokenService tokenService;
+  private final UsernameService usernameService;
 
   public AppleAuthService(
       UserRepository userRepository,
       UserAuthProviderRepository userAuthProviderRepository,
       UserAuthSessionRepository userAuthSessionRepository,
-      TokenService tokenService) {
+      TokenService tokenService,
+      UsernameService usernameService) {
     this.userRepository = userRepository;
     this.userAuthProviderRepository = userAuthProviderRepository;
     this.userAuthSessionRepository = userAuthSessionRepository;
     this.tokenService = tokenService;
+    this.usernameService = usernameService;
+  }
+
+  @Override
+  public String getProviderType() {
+    return "apple";
   }
 
   /*
@@ -116,10 +124,10 @@ public class AppleAuthService {
       System.out.println("🆕 Creating new Apple user");
 
       String baseUsername =
-          normalizeUsername(
+          usernameService.normalizeUsername(
               fullName != null ? fullName : (email != null ? email.split("@")[0] : "appleuser"));
 
-      String uniqueUsername = generateUniqueUsername(baseUsername);
+      String uniqueUsername = usernameService.generateUniqueUsername(baseUsername);
 
       user =
           userRepository.save(UserEntity.builder().username(uniqueUsername).locale("en").build());
@@ -178,30 +186,4 @@ public class AppleAuthService {
         .build();
   }
 
-  /*
-   * =============================== USERNAME HELPERS
-   * ===============================
-   */
-
-  private String normalizeUsername(String name) {
-    if (name == null || name.isBlank()) {
-      return "user";
-    }
-    return name.toLowerCase().replaceAll("\\s+", "").replaceAll("[^a-z0-9]", "");
-  }
-
-  private String generateUniqueUsername(String baseUsername) {
-    String username = baseUsername;
-    int attempt = 0;
-    while (userRepository.findByUsername(username).isPresent()) {
-      int random = 100 + (int) (Math.random() * 900);
-      username = baseUsername + random;
-      attempt++;
-      if (attempt > 3) {
-        username = baseUsername + (System.currentTimeMillis() % 100000);
-        break;
-      }
-    }
-    return username;
-  }
 }

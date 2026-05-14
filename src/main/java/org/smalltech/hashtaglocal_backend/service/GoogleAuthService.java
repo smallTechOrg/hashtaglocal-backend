@@ -25,7 +25,7 @@ import org.springframework.web.client.RestTemplate;
 
 @Service
 @Transactional
-public class GoogleAuthService {
+public class GoogleAuthService implements OAuthService {
 
   @Value("${google.oauth.client-id}")
   private String clientId;
@@ -43,17 +43,25 @@ public class GoogleAuthService {
   private final UserAuthProviderRepository userAuthProviderRepository;
   private final UserAuthSessionRepository userAuthSessionRepository;
   private final TokenService tokenService;
+  private final UsernameService usernameService;
 
   public GoogleAuthService(
       UserRepository userRepository,
       UserAuthProviderRepository userAuthProviderRepository,
       UserAuthSessionRepository userAuthSessionRepository,
-      TokenService tokenService) {
+      TokenService tokenService,
+      UsernameService usernameService) {
 
     this.userRepository = userRepository;
     this.userAuthProviderRepository = userAuthProviderRepository;
     this.userAuthSessionRepository = userAuthSessionRepository;
     this.tokenService = tokenService;
+    this.usernameService = usernameService;
+  }
+
+  @Override
+  public String getProviderType() {
+    return "google";
   }
 
   /*
@@ -146,9 +154,9 @@ public class GoogleAuthService {
       System.out.println("🆕 Creating new user");
 
       String baseUsername =
-          normalizeUsername(name != null ? name : (email != null ? email.split("@")[0] : "google"));
+          usernameService.normalizeUsername(name != null ? name : (email != null ? email.split("@")[0] : "google"));
 
-      String uniqueUsername = generateUniqueUsername(baseUsername);
+      String uniqueUsername = usernameService.generateUniqueUsername(baseUsername);
 
       user =
           userRepository.save(
@@ -211,39 +219,6 @@ public class GoogleAuthService {
                 .expiry(session.getRefreshTokenExpiryTs())
                 .build())
         .build();
-  }
-
-  /*
-   * =============================== USERNAME HELPERS
-   * ===============================
-   */
-  private String normalizeUsername(String name) {
-
-    if (name == null || name.isBlank()) {
-      return "user";
-    }
-
-    return name.toLowerCase().replaceAll("\\s+", "").replaceAll("[^a-z0-9]", "");
-  }
-
-  private String generateUniqueUsername(String baseUsername) {
-
-    String username = baseUsername;
-    int attempt = 0;
-
-    while (userRepository.findByUsername(username).isPresent()) {
-
-      int random = 100 + (int) (Math.random() * 900);
-      username = baseUsername + random;
-      attempt++;
-
-      if (attempt > 3) {
-        username = baseUsername + (System.currentTimeMillis() % 100000);
-        break;
-      }
-    }
-
-    return username;
   }
 
   /*
