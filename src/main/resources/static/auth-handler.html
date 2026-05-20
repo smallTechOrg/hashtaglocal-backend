@@ -59,7 +59,8 @@
                         `access_token=${encodeURIComponent(authData.access_token.value)}` +
                         `&refresh_token=${encodeURIComponent(authData.refresh_token.value)}` +
                         `&access_expiry=${authData.access_token.expiry}` +
-                        `&refresh_expiry=${authData.refresh_token.expiry}`;
+                        `&refresh_expiry=${authData.refresh_token.expiry}` +
+                        `&is_new_user=${authData.is_new_user}`;
                     
                     console.log(deepLink)
                     

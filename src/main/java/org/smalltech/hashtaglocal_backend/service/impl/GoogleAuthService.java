@@ -81,7 +81,7 @@ public class GoogleAuthService implements OAuthService {
   public AuthTokenResponseData handleAuthorizationCode(
       String code, String codeVerifier, String clientRedirectUri) {
 
-    System.out.println("ðŸ” Exchanging auth code for Google tokens");
+    System.out.println("Exchanging auth code for Google tokens");
 
     String effectiveRedirectUri =
         (clientRedirectUri != null && !clientRedirectUri.isEmpty())
@@ -106,7 +106,7 @@ public class GoogleAuthService implements OAuthService {
 
     String idTokenString = tokenResponse.get("id_token").toString();
 
-    System.out.println("âœ… Google ID Token received");
+    System.out.println("Google ID Token received");
 
     GoogleIdToken.Payload payload = verifyIdToken(idTokenString);
 
@@ -119,7 +119,7 @@ public class GoogleAuthService implements OAuthService {
 
   public AuthTokenResponseData handleAccessToken(String accessToken) {
 
-    System.out.println("ðŸ” Fetching Google user info");
+    System.out.println("Fetching Google user info");
 
     RestTemplate restTemplate = new RestTemplate();
 
@@ -134,7 +134,7 @@ public class GoogleAuthService implements OAuthService {
   private AuthTokenResponseData loginOrSignup(
       String providerUserId, String email, String picture, String name) {
 
-    System.out.println("ðŸ‘¤ Google userId: " + providerUserId);
+    System.out.println("Google userId: " + providerUserId);
 
     Optional<UserAuthProviderEntity> existingProvider =
         userAuthProviderRepository.findByProviderTypeAndProviderUserId(
@@ -142,14 +142,16 @@ public class GoogleAuthService implements OAuthService {
 
     UserEntity user;
     UserAuthProviderEntity provider;
+    boolean isNewUser;
 
     if (existingProvider.isPresent()) {
-      System.out.println("ðŸ” Existing user found");
+      System.out.println("Existing user found");
 
       provider = existingProvider.get();
       user = provider.getUser();
+      isNewUser = false;
     } else {
-      System.out.println("ðŸ†• Creating new user");
+      System.out.println("Creating new user");
 
       String baseUsername =
           usernameUtil.normalizeUsername(
@@ -165,7 +167,7 @@ public class GoogleAuthService implements OAuthService {
                   .profilePicture(picture)
                   .build());
 
-      System.out.println("âœ… User saved | ID: " + user.getId());
+      System.out.println("User saved | ID: " + user.getId());
 
       provider =
           userAuthProviderRepository.save(
@@ -176,13 +178,15 @@ public class GoogleAuthService implements OAuthService {
                   .email(email)
                   .build());
 
-      System.out.println("âœ… Provider saved | ID: " + provider.getId());
+      System.out.println("Provider saved | ID: " + provider.getId());
+      isNewUser = true;
     }
 
-    return createSession(user, provider);
+    return createSession(user, provider, isNewUser);
   }
 
-  private AuthTokenResponseData createSession(UserEntity user, UserAuthProviderEntity provider) {
+  private AuthTokenResponseData createSession(
+      UserEntity user, UserAuthProviderEntity provider, boolean isNewUser) {
 
     String accessToken = tokenService.generateToken();
     String refreshToken = tokenService.generateToken();
@@ -199,7 +203,7 @@ public class GoogleAuthService implements OAuthService {
                 .isActive(true)
                 .build());
 
-    System.out.println("âœ… Session created | ID: " + session.getId());
+    System.out.println("Session created | ID: " + session.getId());
 
     return AuthTokenResponseData.builder()
         .accessToken(
@@ -212,6 +216,7 @@ public class GoogleAuthService implements OAuthService {
                 .value(refreshToken)
                 .expiry(session.getRefreshTokenExpiryTs())
                 .build())
+        .isNewUser(isNewUser)
         .build();
   }
 
@@ -230,7 +235,7 @@ public class GoogleAuthService implements OAuthService {
         throw new RuntimeException("Invalid ID token");
       }
 
-      System.out.println("âœ… ID token verified");
+      System.out.println("ID token verified");
 
       return idToken.getPayload();
 
