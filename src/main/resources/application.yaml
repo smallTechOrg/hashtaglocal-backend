@@ -23,6 +23,20 @@ spring:
   sql:
     init:
       mode: always
+  # Added: SMTP settings for sending admin notification emails on account deletion requests
+  mail:
+    host: ${SPRING_MAIL_HOST:}
+    port: ${SPRING_MAIL_PORT:587}
+    username: ${SPRING_MAIL_USERNAME:}
+    password: ${SPRING_MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: ${SPRING_MAIL_SMTP_AUTH:true}
+          starttls:
+            enable: ${SPRING_MAIL_SMTP_STARTTLS_ENABLE:true}
+          from: ${SPRING_MAIL_SMTP_FROM:}
+          localhost: ${SPRING_MAIL_SMTP_LOCALHOST:}
 
 logging:
   level:
@@ -39,6 +53,13 @@ logging:
 app:
   geo:
     verify-radius-meters: 50
+
+# Added: account deletion workflow config — admin-email receives deletion notifications;
+# from-email is used as the SMTP sender address
+account:
+  deletion:
+    admin-email: ${ACCOUNT_DELETION_ADMIN_EMAIL:}
+    from-email: ${ACCOUNT_DELETION_FROM_EMAIL:}
 
 # Google Maps API configuration
 google:

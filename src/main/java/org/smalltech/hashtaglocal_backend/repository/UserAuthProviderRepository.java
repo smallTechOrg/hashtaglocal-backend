@@ -9,4 +9,7 @@ import org.springframework.stereotype.Repository;
 public interface UserAuthProviderRepository extends JpaRepository<UserAuthProviderEntity, Long> {
   Optional<UserAuthProviderEntity> findByProviderTypeAndProviderUserId(
       String providerType, String providerUserId);
+
+  /** Fetches the provider email to include in the internal deletion notification email. */
+  Optional<UserAuthProviderEntity> findFirstByUserIdOrderByIdAsc(Long userId);
 }
