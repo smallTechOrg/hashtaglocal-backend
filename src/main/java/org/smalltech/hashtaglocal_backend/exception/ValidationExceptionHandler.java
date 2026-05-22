@@ -67,7 +67,8 @@ public class ValidationExceptionHandler {
     return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
   }
 
-  // Added to map IllegalStateException (e.g., duplicate pending deletion request) to HTTP 409 Conflict
+  // Added to map IllegalStateException (e.g., duplicate pending deletion request) to HTTP 409
+  // Conflict
   @ExceptionHandler(IllegalStateException.class)
   public ResponseEntity<ApiErrorResponse> handleIllegalState(IllegalStateException ex) {
     ApiErrorResponse response =

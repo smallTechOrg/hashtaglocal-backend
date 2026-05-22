@@ -17,11 +17,10 @@ import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
 
 /**
- * Created to orchestrate the full account deletion request flow:
- * 1. Creates (or returns an existing) PENDING deletion request for the authenticated user.
- * 2. Immediately revokes all active login sessions so the user is logged out on every device.
- * 3. Sends a one-time admin notification email so the account can be manually removed
- *    within 24 hours
+ * Created to orchestrate the full account deletion request flow: 1. Creates (or returns an
+ * existing) PENDING deletion request for the authenticated user. 2. Immediately revokes all active
+ * login sessions so the user is logged out on every device. 3. Sends a one-time admin notification
+ * email so the account can be manually removed within 24 hours
  */
 @Service
 public class AccountDeletionRequestService {

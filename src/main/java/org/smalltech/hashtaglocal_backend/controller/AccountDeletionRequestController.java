@@ -9,9 +9,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/**
- * Created to expose an in-app account deletion endpoint
- */
+/** Created to expose an in-app account deletion endpoint */
 @RestController
 @RequestMapping("/account")
 public class AccountDeletionRequestController {

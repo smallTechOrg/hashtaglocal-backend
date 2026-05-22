@@ -10,8 +10,8 @@ import org.springframework.util.StringUtils;
 
 /**
  * Created to manually construct JavaMailSender instead of relying on Spring Boot's mail
- * autoconfiguration. Autoconfiguration fails when SMTP credentials are blank, which is the case
- * for Google Workspace IP-authenticated SMTP relay that does not require a username or password.
+ * autoconfiguration. Autoconfiguration fails when SMTP credentials are blank, which is the case for
+ * Google Workspace IP-authenticated SMTP relay that does not require a username or password.
  */
 @Configuration
 public class MailSenderConfig {

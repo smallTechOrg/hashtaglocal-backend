@@ -30,10 +30,10 @@ import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.test.util.ReflectionTestUtils;
 
 /**
- * Created to unit-test AccountDeletionRequestService in isolation (no Spring context).
- * Covers: new request creation with session revocation and admin email dispatch;
- * idempotent behaviour when a PENDING request already exists (no duplicate save or email);
- * and SMTP failure resilience (the deletion request is still saved if email sending fails).
+ * Created to unit-test AccountDeletionRequestService in isolation (no Spring context). Covers: new
+ * request creation with session revocation and admin email dispatch; idempotent behaviour when a
+ * PENDING request already exists (no duplicate save or email); and SMTP failure resilience (the
+ * deletion request is still saved if email sending fails).
  */
 @ExtendWith(MockitoExtension.class)
 class AccountDeletionRequestServiceTest {

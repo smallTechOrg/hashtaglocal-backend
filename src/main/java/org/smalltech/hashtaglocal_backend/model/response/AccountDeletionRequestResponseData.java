@@ -5,8 +5,8 @@ import lombok.Builder;
 import lombok.Data;
 
 /**
- * Created as the API response payload returned to the app after a user submits an account
- * deletion request, so the app can display the current status and the 24-hour deletion deadline.
+ * Created as the API response payload returned to the app after a user submits an account deletion
+ * request, so the app can display the current status and the 24-hour deletion deadline.
  */
 @Data
 @Builder

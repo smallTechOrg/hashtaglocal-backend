@@ -8,8 +8,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 /**
- * Created as the data access layer for account deletion requests. Supports idempotent
- * request submission (find-by-user-and-status) and admin lookup of pending requests.
+ * Created as the data access layer for account deletion requests. Supports idempotent request
+ * submission (find-by-user-and-status) and admin lookup of pending requests.
  */
 @Repository
 public interface AccountDeletionRequestRepository

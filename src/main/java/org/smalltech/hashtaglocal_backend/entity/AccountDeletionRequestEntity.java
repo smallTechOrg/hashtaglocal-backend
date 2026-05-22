@@ -21,9 +21,9 @@ import org.hibernate.annotations.UpdateTimestamp;
 import org.smalltech.hashtaglocal_backend.model.AccountDeletionRequestStatus;
 
 /**
- * Created to persist user-initiated account deletion requests in the
- * account_deletion_requests table. Requests start as PENDING and are resolved manually
- * by an admin within 24 hours of creation.
+ * Created to persist user-initiated account deletion requests in the account_deletion_requests
+ * table. Requests start as PENDING and are resolved manually by an admin within 24 hours of
+ * creation.
  */
 @Entity
 @Table(name = "account_deletion_requests")
