@@ -35,6 +35,18 @@ public class LocalityService {
     return localities.stream().map(this::convertToDTO).collect(Collectors.toList());
   }
 
+  /**
+   * Resolve the locality hashtag for a given coordinate. Tries exact containment first, then
+   * nearest-neighbor fallback.
+   */
+  @Transactional(readOnly = true)
+  public java.util.Optional<LocalityDTO> resolveByCoordinates(double latitude, double longitude) {
+    return localityRepository
+        .findContainingLocality(latitude, longitude)
+        .or(() -> localityRepository.findNearestLocality(latitude, longitude))
+        .map(l -> LocalityDTO.builder().id(l.getId()).hashtag(l.getHashtag()).name(l.getName()).build());
+  }
+
   /** Convert Locality entity to LocalityDTO with GeoJSON polygon. */
   private LocalityDTO convertToDTO(Locality locality) {
     return LocalityDTO.builder()
