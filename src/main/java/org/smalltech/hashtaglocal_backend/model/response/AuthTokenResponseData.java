@@ -9,4 +9,5 @@ import org.smalltech.hashtaglocal_backend.model.TokenResponse;
 public class AuthTokenResponseData {
   private TokenResponse accessToken;
   private TokenResponse refreshToken;
+  private boolean isNewUser;
 }
