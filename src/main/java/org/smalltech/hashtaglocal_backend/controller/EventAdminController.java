@@ -1,0 +1,260 @@
+package org.smalltech.hashtaglocal_backend.controller;
+
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.stream.Collectors;
+import lombok.RequiredArgsConstructor;
+import org.smalltech.hashtaglocal_backend.dto.AdminCreateEventRequest;
+import org.smalltech.hashtaglocal_backend.dto.EventApproveRequest;
+import org.smalltech.hashtaglocal_backend.entity.EventApprovalEntity;
+import org.smalltech.hashtaglocal_backend.entity.EventEntity;
+import org.smalltech.hashtaglocal_backend.model.EventApprovalStatus;
+import org.smalltech.hashtaglocal_backend.model.EventPortalModel;
+import org.smalltech.hashtaglocal_backend.model.EventTypeModel;
+import org.smalltech.hashtaglocal_backend.model.NewAPIResponse;
+import org.smalltech.hashtaglocal_backend.model.response.EventListResponseData;
+import org.smalltech.hashtaglocal_backend.repository.EventApprovalRepository;
+import org.smalltech.hashtaglocal_backend.service.EventGeocodingService;
+import org.smalltech.hashtaglocal_backend.service.EventService;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
+
+/**
+ * Admin endpoints for reviewing scraped events before they appear on the public site.
+ *
+ * <p>All routes require {@code ROLE_ADMIN} — enforced by the {@code /admin/**} rule in {@link
+ * org.smalltech.hashtaglocal_backend.config.SecurityConfig}.
+ *
+ * <p>Workflow:
+ *
+ * <ol>
+ *   <li>Events are ingested by the scraper and land in {@code event_approvals} with {@code PENDING}
+ *       status.
+ *   <li>Admin reviews pending events via {@code GET /admin/event/pending}.
+ *   <li>Admin approves (optionally setting a display name) or rejects each event.
+ *   <li>Only {@code APPROVED} events are returned by the public {@code GET /api/v1/events}.
+ * </ol>
+ */
+@RestController
+@RequestMapping("/admin")
+@Tag(
+    name = "Admin — Events",
+    description = "Admin APIs for approving and rejecting scraped events.")
+@SecurityRequirement(name = "bearerAuth")
+@RequiredArgsConstructor
+public class EventAdminController {
+
+  private final EventService eventService;
+  private final EventApprovalRepository eventApprovalRepository;
+  private final EventGeocodingService eventGeocodingService;
+
+  /**
+   * Creates an event manually (bypassing the scraper), auto-approves it, and triggers geocoding so
+   * it appears on the public site as soon as a location can be resolved.
+   */
+  @PostMapping("/event/manual")
+  @Operation(
+      summary = "Manually create an event",
+      description =
+          "Creates an event directly via the ops portal (portal=ADMIN), immediately approves it,"
+              + " and triggers geocoding. The event will appear in GET /api/v1/events once its"
+              + " address has been geocoded.")
+  public ResponseEntity<NewAPIResponse<Long>> createEventManually(
+      @RequestBody AdminCreateEventRequest request) {
+
+    if (request.getName() == null || request.getName().isBlank()) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "name is required");
+    }
+    if (request.getAddress() == null || request.getAddress().isBlank()) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "address is required");
+    }
+    if (request.getStartTime() == null) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "start_time is required");
+    }
+    if (request.getLink() == null || request.getLink().isBlank()) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "link is required");
+    }
+
+    EventTypeModel eventType;
+    try {
+      eventType =
+          request.getType() != null && !request.getType().isBlank()
+              ? EventTypeModel.valueOf(request.getType().trim().toUpperCase(Locale.ENGLISH))
+              : EventTypeModel.OTHER;
+    } catch (IllegalArgumentException e) {
+      eventType = EventTypeModel.OTHER;
+    }
+
+    EventEntity event =
+        EventEntity.builder()
+            .name(request.getName().strip())
+            .organisation(request.getOrganisation())
+            .portal(EventPortalModel.ADMIN)
+            .type(eventType)
+            .startTime(request.getStartTime())
+            .endTime(request.getEndTime())
+            .address(request.getAddress().strip())
+            .link(request.getLink().strip())
+            .build();
+
+    EventEntity saved = eventService.saveAll(List.of(event)).get(0);
+
+    // Auto-approve immediately — admin is explicitly creating this event
+    EventApprovalEntity approval =
+        EventApprovalEntity.builder()
+            .eventId(saved.getId())
+            .status(EventApprovalStatus.APPROVED)
+            .reviewedAt(LocalDateTime.now())
+            .build();
+    eventApprovalRepository.save(approval);
+
+    // Geocode all events without a location (includes the one just created)
+    eventGeocodingService.run();
+
+    return ResponseEntity.ok(NewAPIResponse.<Long>builder().data(saved.getId()).build());
+  }
+
+  /**
+   * Returns all pending events that have a geocoded location, oldest first. Events still awaiting
+   * geocoding are excluded — they cannot be shown on the map yet.
+   */
+  @GetMapping("/event/pending")
+  @Operation(
+      summary = "List pending events",
+      description =
+          "Returns all scraped events awaiting admin review that have a resolved location.")
+  public ResponseEntity<NewAPIResponse<EventListResponseData>> getPendingEvents() {
+    List<EventApprovalEntity> pendingApprovals =
+        eventApprovalRepository.findByStatus(EventApprovalStatus.PENDING);
+
+    Map<Long, EventApprovalEntity> approvalMap =
+        pendingApprovals.stream()
+            .collect(Collectors.toMap(EventApprovalEntity::getEventId, a -> a));
+
+    var events =
+        eventService.findByIds(approvalMap.keySet()).stream()
+            .filter(e -> e.getLocation() != null)
+            .map(e -> eventService.toAdminEventData(e, approvalMap.get(e.getId())))
+            .toList();
+
+    return ResponseEntity.ok(
+        NewAPIResponse.<EventListResponseData>builder()
+            .data(EventListResponseData.builder().events(events).build())
+            .build());
+  }
+
+  /**
+   * Approves a pending event and optionally sets a display name override.
+   *
+   * @param eventId ID of the event to approve (must have an existing approval row)
+   * @param request optional body containing a {@code displayName} override
+   */
+  @PutMapping("/event/{eventId}/approve")
+  @Operation(
+      summary = "Approve an event",
+      description =
+          "Marks the event as APPROVED so it appears on the public site. "
+              + "Optionally accepts a display_name to override the scraped event name.")
+  public ResponseEntity<NewAPIResponse<Long>> approveEvent(
+      @PathVariable Long eventId, @RequestBody(required = false) EventApproveRequest request) {
+
+    EventApprovalEntity approval =
+        eventApprovalRepository
+            .findById(eventId)
+            .orElseThrow(
+                () ->
+                    new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "No approval record found for event " + eventId));
+
+    approval.setStatus(EventApprovalStatus.APPROVED);
+    approval.setReviewedAt(LocalDateTime.now());
+
+    if (request != null
+        && request.getDisplayName() != null
+        && !request.getDisplayName().isBlank()) {
+      approval.setDisplayName(request.getDisplayName().strip());
+    }
+
+    eventApprovalRepository.save(approval);
+
+    return ResponseEntity.ok(NewAPIResponse.<Long>builder().data(eventId).build());
+  }
+
+  /**
+   * Rejects a pending event so it will not appear on the public site.
+   *
+   * @param eventId ID of the event to reject
+   */
+  @PutMapping("/event/{eventId}/reject")
+  @Operation(
+      summary = "Reject an event",
+      description = "Marks the event as REJECTED — it will not appear on the public site.")
+  public ResponseEntity<NewAPIResponse<Long>> rejectEvent(@PathVariable Long eventId) {
+
+    EventApprovalEntity approval =
+        eventApprovalRepository
+            .findById(eventId)
+            .orElseThrow(
+                () ->
+                    new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "No approval record found for event " + eventId));
+
+    approval.setStatus(EventApprovalStatus.REJECTED);
+    approval.setReviewedAt(LocalDateTime.now());
+    eventApprovalRepository.save(approval);
+
+    return ResponseEntity.ok(NewAPIResponse.<Long>builder().data(eventId).build());
+  }
+
+  /**
+   * Returns all events that have already been reviewed (approved or rejected), newest first. Useful
+   * for auditing decisions made in the ops portal.
+   */
+  @GetMapping("/event/history")
+  @Operation(
+      summary = "List reviewed events",
+      description =
+          "Returns all APPROVED and REJECTED events ordered by review time (newest first).")
+  public ResponseEntity<NewAPIResponse<EventListResponseData>> getEventHistory() {
+    List<EventApprovalEntity> reviewedApprovals =
+        eventApprovalRepository.findByStatusIn(
+            List.of(EventApprovalStatus.APPROVED, EventApprovalStatus.REJECTED));
+
+    Map<Long, EventApprovalEntity> approvalMap =
+        reviewedApprovals.stream()
+            .collect(Collectors.toMap(EventApprovalEntity::getEventId, a -> a));
+
+    var events =
+        eventService.findByIds(approvalMap.keySet()).stream()
+            .map(e -> eventService.toAdminEventData(e, approvalMap.get(e.getId())))
+            // Newest reviewed first
+            .sorted(
+                (a, b) -> {
+                  var aTime =
+                      approvalMap.get(a.getId()) != null
+                          ? approvalMap.get(a.getId()).getReviewedAt()
+                          : null;
+                  var bTime =
+                      approvalMap.get(b.getId()) != null
+                          ? approvalMap.get(b.getId()).getReviewedAt()
+                          : null;
+                  if (aTime == null && bTime == null) return 0;
+                  if (aTime == null) return 1;
+                  if (bTime == null) return -1;
+                  return bTime.compareTo(aTime);
+                })
+            .toList();
+
+    return ResponseEntity.ok(
+        NewAPIResponse.<EventListResponseData>builder()
+            .data(EventListResponseData.builder().events(events).build())
+            .build());
+  }
+}

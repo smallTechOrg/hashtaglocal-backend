@@ -6,12 +6,16 @@ import java.util.Locale;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.smalltech.hashtaglocal_backend.dto.ScrapeEventDTO;
+import org.smalltech.hashtaglocal_backend.entity.EventApprovalEntity;
 import org.smalltech.hashtaglocal_backend.entity.EventEntity;
 import org.smalltech.hashtaglocal_backend.entity.MediaEntity;
+import org.smalltech.hashtaglocal_backend.model.EventApprovalStatus;
 import org.smalltech.hashtaglocal_backend.model.EventPortalModel;
 import org.smalltech.hashtaglocal_backend.model.EventTypeModel;
+import org.smalltech.hashtaglocal_backend.repository.EventApprovalRepository;
 import org.smalltech.hashtaglocal_backend.repository.EventRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Handles importing events from the scrape service JSON response.
@@ -35,6 +39,7 @@ public class EventImportService {
   private final EventService eventService;
   private final EventRepository eventRepository;
   private final EventImageService eventImageService;
+  private final EventApprovalRepository eventApprovalRepository;
 
   /**
    * Processes a list of events from the scrape service, deduplicates against the database, and
@@ -43,6 +48,7 @@ public class EventImportService {
    * @param scrapeEvents raw event DTOs from the scrape service response
    * @return the number of events actually saved (duplicates excluded)
    */
+  @Transactional
   public int importFromScrapeResponse(List<ScrapeEventDTO> scrapeEvents) {
     if (scrapeEvents == null || scrapeEvents.isEmpty()) {
       return 0;
@@ -83,7 +89,21 @@ public class EventImportService {
       }
     }
 
-    eventService.saveAll(toSave);
+    List<EventEntity> saved = eventService.saveAll(toSave);
+
+    // Create a PENDING approval row for every newly imported event so it lands in the
+    // admin review queue before appearing on the public site.
+    List<EventApprovalEntity> approvals =
+        saved.stream()
+            .map(
+                e ->
+                    EventApprovalEntity.builder()
+                        .eventId(e.getId())
+                        .status(EventApprovalStatus.PENDING)
+                        .build())
+            .toList();
+    eventApprovalRepository.saveAll(approvals);
+
     log.info(
         "Imported {} new events ({} received, {} skipped)",
         toSave.size(),

@@ -28,6 +28,7 @@ import org.smalltech.hashtaglocal_backend.entity.MediaEntity;
 import org.smalltech.hashtaglocal_backend.model.EventPortalModel;
 import org.smalltech.hashtaglocal_backend.model.EventTypeModel;
 import org.smalltech.hashtaglocal_backend.model.MediaTypeModel;
+import org.smalltech.hashtaglocal_backend.repository.EventApprovalRepository;
 import org.smalltech.hashtaglocal_backend.repository.EventRepository;
 
 /**
@@ -43,6 +44,7 @@ class EventImportServiceTest {
   @Mock private EventService eventService;
   @Mock private EventRepository eventRepository;
   @Mock private EventImageService eventImageService;
+  @Mock private EventApprovalRepository eventApprovalRepository;
 
   @InjectMocks private EventImportService eventImportService;
 
