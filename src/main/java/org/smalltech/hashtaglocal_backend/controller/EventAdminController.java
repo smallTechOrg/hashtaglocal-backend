@@ -57,6 +57,7 @@ public class EventAdminController {
   private final EventApprovalRepository eventApprovalRepository;
   private final EventRepository eventRepository;
   private final EventGeocodingService eventGeocodingService;
+  private final org.smalltech.hashtaglocal_backend.service.EventImageService eventImageService;
 
   /**
    * Updates editable fields of an existing event. All fields are optional — only non-null values
@@ -177,6 +178,9 @@ public class EventAdminController {
     if (request.getLink() == null || request.getLink().isBlank()) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "link is required");
     }
+    if (request.getImageUrl() == null || request.getImageUrl().isBlank()) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "image_url is required");
+    }
 
     EventTypeModel eventType;
     try {
@@ -186,6 +190,14 @@ public class EventAdminController {
               : EventTypeModel.OTHER;
     } catch (IllegalArgumentException e) {
       eventType = EventTypeModel.OTHER;
+    }
+
+    org.smalltech.hashtaglocal_backend.entity.MediaEntity media =
+        eventImageService.downloadAndStore(request.getImageUrl().strip());
+    if (media == null) {
+      throw new ResponseStatusException(
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          "Image could not be downloaded or stored — check the URL and try again");
     }
 
     EventEntity event =
@@ -198,6 +210,7 @@ public class EventAdminController {
             .endTime(request.getEndTime())
             .address(request.getAddress().strip())
             .link(request.getLink().strip())
+            .media(media)
             .build();
 
     EventEntity saved = eventService.saveAll(List.of(event)).get(0);
