@@ -46,6 +46,10 @@ public class SecurityConfig {
             auth ->
                 auth.requestMatchers(HttpMethod.POST, "/api/v1/issue")
                     .authenticated()
+                    // account deletion endpoint must be authenticated so only the owning user can
+                    // initiate it
+                    .requestMatchers(HttpMethod.POST, "/account/delete-request")
+                    .authenticated()
                     .requestMatchers(HttpMethod.POST, "/api/v1/portal/**")
                     .hasRole("ADMIN")
                     .requestMatchers(HttpMethod.GET, "/api/v1/media/upload-url")
