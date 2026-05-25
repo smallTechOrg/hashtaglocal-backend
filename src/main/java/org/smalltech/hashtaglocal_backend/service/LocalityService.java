@@ -44,7 +44,13 @@ public class LocalityService {
     return localityRepository
         .findContainingLocality(latitude, longitude)
         .or(() -> localityRepository.findNearestLocality(latitude, longitude))
-        .map(l -> LocalityDTO.builder().id(l.getId()).hashtag(l.getHashtag()).name(l.getName()).build());
+        .map(
+            l ->
+                LocalityDTO.builder()
+                    .id(l.getId())
+                    .hashtag(l.getHashtag())
+                    .name(l.getName())
+                    .build());
   }
 
   /** Convert Locality entity to LocalityDTO with GeoJSON polygon. */
