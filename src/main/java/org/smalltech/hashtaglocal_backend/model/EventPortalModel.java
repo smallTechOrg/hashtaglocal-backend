@@ -32,7 +32,11 @@ public enum EventPortalModel {
           + " disability, animal welfare, elderly care, sanitation"),
   MYBHARATGOVIN("civic volunteering, cleanliness drive, tree plantation", "civic engagement"),
   TWITTER(null, null),
-  INSTAGRAM(null, null);
+  INSTAGRAM(null, null),
+  /**
+   * Events created directly by an admin via the ops portal (not scraped from any external source).
+   */
+  ADMIN(null, null);
 
   /** The event_filter sent in the FETCH_EVENTS POST body. {@code null} = portal not yet enabled. */
   private final String eventFilter;

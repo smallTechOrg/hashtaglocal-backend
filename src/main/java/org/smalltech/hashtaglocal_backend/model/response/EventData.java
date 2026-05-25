@@ -15,7 +15,7 @@ import lombok.Data;
  * consumers should fall back to the {@code address} field in that case.
  */
 @Data
-@Builder
+@Builder(toBuilder = true)
 public class EventData {
 
   private Long id;
@@ -48,6 +48,20 @@ public class EventData {
 
   /** Free-form extra fields that vary per organisation or portal (stored as JSONB). */
   private Map<String, Object> metaData;
+
+  // -------------------------------------------------------------------------
+  // Admin-only fields — null in the public /api/v1/events response
+  // -------------------------------------------------------------------------
+
+  /** Current approval status (PENDING / APPROVED / REJECTED). Null in public API. */
+  private String approvalStatus;
+
+  /**
+   * Admin-provided display name override. Null if no override has been set. When non-null the
+   * public {@code name} field already reflects this value. Exposed here so the ops portal can
+   * pre-fill the edit input.
+   */
+  private String displayName;
 
   @Data
   @Builder

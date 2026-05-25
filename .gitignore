@@ -1,6 +1,7 @@
 HELP.md
 .gradle
 build/
+src/main/resources/application-local.yaml
 !gradle/wrapper/gradle-wrapper.jar
 !**/src/main/**/build/
 !**/src/test/**/build/
@@ -50,3 +51,5 @@ logs/
 
 staging-urlmap-backup.yaml
 staging-urlmap-updated.yaml
+
+.env
