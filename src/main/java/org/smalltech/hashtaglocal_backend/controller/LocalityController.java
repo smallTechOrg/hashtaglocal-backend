@@ -39,9 +39,12 @@ public class LocalityController {
     log.info("Resolving hashtag for lat={} lng={}", lat, lng);
     return localityService
         .resolveByCoordinates(lat, lng)
-        .map(l -> ResponseEntity.ok(NewAPIResponse.<LocalityHashtagResponseData>builder()
-            .data(LocalityHashtagResponseData.builder().hashtag(l.getHashtag()).build())
-            .build()))
+        .map(
+            l ->
+                ResponseEntity.ok(
+                    NewAPIResponse.<LocalityHashtagResponseData>builder()
+                        .data(LocalityHashtagResponseData.builder().hashtag(l.getHashtag()).build())
+                        .build()))
         .orElse(ResponseEntity.notFound().build());
   }
 
