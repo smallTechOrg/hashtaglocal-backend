@@ -65,7 +65,10 @@ public class EventAdminController {
    * is re-triggered.
    */
   @PutMapping("/event/{eventId}")
-  @Operation(summary = "Edit an event", description = "Updates event fields. Null fields are ignored. Address changes clear the geocoded location and trigger re-geocoding.")
+  @Operation(
+      summary = "Edit an event",
+      description =
+          "Updates event fields. Null fields are ignored. Address changes clear the geocoded location and trigger re-geocoding.")
   public ResponseEntity<NewAPIResponse<Long>> updateEvent(
       @PathVariable Long eventId, @RequestBody AdminEditEventRequest request) {
 
@@ -105,8 +108,7 @@ public class EventAdminController {
     }
     if (request.getType() != null && !request.getType().isBlank()) {
       try {
-        event.setType(
-            EventTypeModel.valueOf(request.getType().trim().toUpperCase(Locale.ENGLISH)));
+        event.setType(EventTypeModel.valueOf(request.getType().trim().toUpperCase(Locale.ENGLISH)));
       } catch (IllegalArgumentException ignored) {
         // keep existing type
       }
@@ -121,9 +123,7 @@ public class EventAdminController {
           .ifPresent(
               approval -> {
                 approval.setDisplayName(
-                    request.getDisplayName().isBlank()
-                        ? null
-                        : request.getDisplayName().strip());
+                    request.getDisplayName().isBlank() ? null : request.getDisplayName().strip());
                 eventApprovalRepository.save(approval);
               });
     }
@@ -141,7 +141,9 @@ public class EventAdminController {
    * @param eventId ID of the event to delete
    */
   @DeleteMapping("/event/{eventId}")
-  @Operation(summary = "Delete an event", description = "Permanently removes the event and its approval record from the database.")
+  @Operation(
+      summary = "Delete an event",
+      description = "Permanently removes the event and its approval record from the database.")
   public ResponseEntity<Void> deleteEvent(@PathVariable Long eventId) {
     if (!eventRepository.existsById(eventId)) {
       throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Event not found: " + eventId);
