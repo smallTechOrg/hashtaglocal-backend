@@ -10,6 +10,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.smalltech.hashtaglocal_backend.dto.AdminCreateEventRequest;
+import org.smalltech.hashtaglocal_backend.dto.AdminEditEventRequest;
 import org.smalltech.hashtaglocal_backend.dto.EventApproveRequest;
 import org.smalltech.hashtaglocal_backend.entity.EventApprovalEntity;
 import org.smalltech.hashtaglocal_backend.entity.EventEntity;
@@ -19,6 +20,7 @@ import org.smalltech.hashtaglocal_backend.model.EventTypeModel;
 import org.smalltech.hashtaglocal_backend.model.NewAPIResponse;
 import org.smalltech.hashtaglocal_backend.model.response.EventListResponseData;
 import org.smalltech.hashtaglocal_backend.repository.EventApprovalRepository;
+import org.smalltech.hashtaglocal_backend.repository.EventRepository;
 import org.smalltech.hashtaglocal_backend.service.EventGeocodingService;
 import org.smalltech.hashtaglocal_backend.service.EventService;
 import org.springframework.http.HttpStatus;
@@ -53,7 +55,104 @@ public class EventAdminController {
 
   private final EventService eventService;
   private final EventApprovalRepository eventApprovalRepository;
+  private final EventRepository eventRepository;
   private final EventGeocodingService eventGeocodingService;
+  private final org.smalltech.hashtaglocal_backend.service.EventImageService eventImageService;
+
+  /**
+   * Updates editable fields of an existing event. All fields are optional — only non-null values
+   * are applied. If {@code address} changes the event's geocoded location is cleared and geocoding
+   * is re-triggered.
+   */
+  @PutMapping("/event/{eventId}")
+  @Operation(
+      summary = "Edit an event",
+      description =
+          "Updates event fields. Null fields are ignored. Address changes clear the geocoded location and trigger re-geocoding.")
+  public ResponseEntity<NewAPIResponse<Long>> updateEvent(
+      @PathVariable Long eventId, @RequestBody AdminEditEventRequest request) {
+
+    EventEntity event =
+        eventRepository
+            .findById(eventId)
+            .orElseThrow(
+                () ->
+                    new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "Event not found: " + eventId));
+
+    boolean addressChanged = false;
+
+    if (request.getName() != null && !request.getName().isBlank()) {
+      event.setName(request.getName().strip());
+    }
+    if (request.getOrganisation() != null) {
+      event.setOrganisation(
+          request.getOrganisation().isBlank() ? null : request.getOrganisation().strip());
+    }
+    if (request.getAddress() != null && !request.getAddress().isBlank()) {
+      String newAddress = request.getAddress().strip();
+      if (!newAddress.equals(event.getAddress())) {
+        event.setAddress(newAddress);
+        event.setLocation(null);
+        addressChanged = true;
+      }
+    }
+    if (request.getStartTime() != null) {
+      event.setStartTime(request.getStartTime());
+    }
+    if (request.getEndTime() != null) {
+      event.setEndTime(request.getEndTime());
+    }
+    if (request.getLink() != null && !request.getLink().isBlank()) {
+      event.setLink(request.getLink().strip());
+    }
+    if (request.getType() != null && !request.getType().isBlank()) {
+      try {
+        event.setType(EventTypeModel.valueOf(request.getType().trim().toUpperCase(Locale.ENGLISH)));
+      } catch (IllegalArgumentException ignored) {
+        // keep existing type
+      }
+    }
+
+    eventRepository.save(event);
+
+    // Update display name in the approval row if provided
+    if (request.getDisplayName() != null) {
+      eventApprovalRepository
+          .findById(eventId)
+          .ifPresent(
+              approval -> {
+                approval.setDisplayName(
+                    request.getDisplayName().isBlank() ? null : request.getDisplayName().strip());
+                eventApprovalRepository.save(approval);
+              });
+    }
+
+    if (addressChanged) {
+      eventGeocodingService.run();
+    }
+
+    return ResponseEntity.ok(NewAPIResponse.<Long>builder().data(eventId).build());
+  }
+
+  /**
+   * Permanently deletes an event and its approval record.
+   *
+   * @param eventId ID of the event to delete
+   */
+  @DeleteMapping("/event/{eventId}")
+  @Operation(
+      summary = "Delete an event",
+      description = "Permanently removes the event and its approval record from the database.")
+  public ResponseEntity<Void> deleteEvent(@PathVariable Long eventId) {
+    if (!eventRepository.existsById(eventId)) {
+      throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Event not found: " + eventId);
+    }
+    // Delete approval first to avoid FK violation
+    eventApprovalRepository.deleteById(eventId);
+    eventRepository.deleteById(eventId);
+    return ResponseEntity.noContent().build();
+  }
 
   /**
    * Creates an event manually (bypassing the scraper), auto-approves it, and triggers geocoding so
@@ -81,6 +180,9 @@ public class EventAdminController {
     if (request.getLink() == null || request.getLink().isBlank()) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "link is required");
     }
+    if (request.getImageUrl() == null || request.getImageUrl().isBlank()) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "image_url is required");
+    }
 
     EventTypeModel eventType;
     try {
@@ -90,6 +192,14 @@ public class EventAdminController {
               : EventTypeModel.OTHER;
     } catch (IllegalArgumentException e) {
       eventType = EventTypeModel.OTHER;
+    }
+
+    org.smalltech.hashtaglocal_backend.entity.MediaEntity media =
+        eventImageService.downloadAndStore(request.getImageUrl().strip());
+    if (media == null) {
+      throw new ResponseStatusException(
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          "Image could not be downloaded or stored — check the URL and try again");
     }
 
     EventEntity event =
@@ -102,6 +212,7 @@ public class EventAdminController {
             .endTime(request.getEndTime())
             .address(request.getAddress().strip())
             .link(request.getLink().strip())
+            .media(media)
             .build();
 
     EventEntity saved = eventService.saveAll(List.of(event)).get(0);

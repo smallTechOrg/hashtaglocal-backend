@@ -110,18 +110,21 @@ public class EventService {
    */
   public EventData toEventData(EventEntity entity) {
     Location loc = entity.getLocation();
-    Locality locality = loc.getLocality();
-    EventData.LocalityData localityData =
-        locality != null
-            ? EventData.LocalityData.builder().hashtags(List.of(locality.getHashtag())).build()
-            : null;
-    EventData.LocationData locationData =
-        EventData.LocationData.builder()
-            .lat(loc.getPoint().getY())
-            .lng(loc.getPoint().getX())
-            .name(loc.getName())
-            .locality(localityData)
-            .build();
+    EventData.LocationData locationData = null;
+    if (loc != null) {
+      Locality locality = loc.getLocality();
+      EventData.LocalityData localityData =
+          locality != null
+              ? EventData.LocalityData.builder().hashtags(List.of(locality.getHashtag())).build()
+              : null;
+      locationData =
+          EventData.LocationData.builder()
+              .lat(loc.getPoint().getY())
+              .lng(loc.getPoint().getX())
+              .name(loc.getName())
+              .locality(localityData)
+              .build();
+    }
 
     // Generate a fresh signed URL each time — GCS paths in DB never expire, but signed URLs do.
     MediaEntity media = entity.getMedia();

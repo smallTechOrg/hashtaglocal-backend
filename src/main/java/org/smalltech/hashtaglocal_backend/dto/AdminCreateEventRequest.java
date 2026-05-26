@@ -27,4 +27,11 @@ public class AdminCreateEventRequest {
    * to OTHER if omitted or unrecognised.
    */
   private String type;
+
+  /**
+   * Optional public URL of a banner image. If provided the image is downloaded and stored in GCS;
+   * the event will have a thumbnail on the public site.
+   */
+  @JsonProperty("image_url")
+  private String imageUrl;
 }
