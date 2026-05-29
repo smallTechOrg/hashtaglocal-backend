@@ -20,3 +20,12 @@ events:
 
 portalissue:
   enabled: false
+
+# Feed: keep the auto issue-ref and AI moderation out of unrelated issue/event tests.
+# Feed-specific tests enable these explicitly.
+feed:
+  auto-issue-ref:
+    enabled: false
+  moderation:
+    enabled: false
+    sweeper-delay-ms: 3600000

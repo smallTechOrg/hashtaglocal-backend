@@ -1,0 +1,71 @@
+package org.smalltech.hashtaglocal_backend.repository;
+
+import java.time.LocalDateTime;
+import java.util.List;
+import org.smalltech.hashtaglocal_backend.entity.FeedPostEntity;
+import org.smalltech.hashtaglocal_backend.model.FeedPostStatus;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+
+@Repository
+public interface FeedPostRepository extends JpaRepository<FeedPostEntity, Long> {
+
+  /**
+   * Keyset-paginated public timeline for a locality, newest first. Pass {@code cursorCreatedAt} /
+   * {@code cursorId} = null for the first page; for subsequent pages pass the last row of the
+   * previous page. Ordered by {@code (createdAt, id)} DESC and tuple-compared so rows sharing a
+   * timestamp are never skipped. Caller supplies a {@code Pageable} of size {@code limit}.
+   */
+  @Query(
+      "SELECT p FROM FeedPostEntity p "
+          + "WHERE p.locality.id = :localityId "
+          + "AND p.status = :status "
+          + "AND p.pinned = false "
+          + "AND (p.publishedAt IS NULL OR p.publishedAt <= :now) "
+          + "AND (:cursorCreatedAt IS NULL "
+          + "     OR p.createdAt < :cursorCreatedAt "
+          + "     OR (p.createdAt = :cursorCreatedAt AND p.id < :cursorId)) "
+          + "ORDER BY p.createdAt DESC, p.id DESC")
+  List<FeedPostEntity> findTimeline(
+      @Param("localityId") Long localityId,
+      @Param("status") FeedPostStatus status,
+      @Param("now") LocalDateTime now,
+      @Param("cursorCreatedAt") LocalDateTime cursorCreatedAt,
+      @Param("cursorId") Long cursorId,
+      Pageable pageable);
+
+  /** Pinned, published posts for a locality (returned on the first page only). */
+  @Query(
+      "SELECT p FROM FeedPostEntity p "
+          + "WHERE p.locality.id = :localityId "
+          + "AND p.status = :status "
+          + "AND p.pinned = true "
+          + "AND (p.publishedAt IS NULL OR p.publishedAt <= :now) "
+          + "ORDER BY p.createdAt DESC, p.id DESC")
+  List<FeedPostEntity> findPinned(
+      @Param("localityId") Long localityId,
+      @Param("status") FeedPostStatus status,
+      @Param("now") LocalDateTime now);
+
+  /**
+   * Admin moderation queue: posts in the given statuses (e.g. AI_BLOCKED, FLAGGED), newest first.
+   */
+  @Query(
+      "SELECT p FROM FeedPostEntity p "
+          + "WHERE p.status IN :statuses "
+          + "AND (:cursorCreatedAt IS NULL "
+          + "     OR p.createdAt < :cursorCreatedAt "
+          + "     OR (p.createdAt = :cursorCreatedAt AND p.id < :cursorId)) "
+          + "ORDER BY p.createdAt DESC, p.id DESC")
+  List<FeedPostEntity> findModerationQueue(
+      @Param("statuses") List<FeedPostStatus> statuses,
+      @Param("cursorCreatedAt") LocalDateTime cursorCreatedAt,
+      @Param("cursorId") Long cursorId,
+      Pageable pageable);
+
+  /** Posts stuck awaiting moderation — picked up by the retry sweeper. */
+  List<FeedPostEntity> findByStatus(FeedPostStatus status, Pageable pageable);
+}

@@ -83,8 +83,9 @@ whatever its kind. `feed_post_content` carries:
   user vote", unique constraints) — these can't live in a per-post JSONB without
   rewriting the row on every vote and racing concurrent writers. `feed_moderation`
   stays relational too because the admin queue queries it directly.
-- A multi-image gallery uses a `feed_post_media (feed_post_id, media_id, position)`
-  join (ordered); single cover image is just `feed_post_content.media_id`.
+- Media is referenced by FK from `feed_post_content.media_id` → existing
+  `MediaEntity` (single media item per post in v1; no join table). A multi-image
+  gallery is deferred — if needed later, add it without touching the spine.
 
 ---
 
@@ -96,7 +97,7 @@ All content lives in the single `feed_post_content` row; `kind` tells the client
 | kind        | uses on `feed_post_content`                                  | who creates                |
 |-------------|--------------------------------------------------------------|----------------------------|
 | `TEXT`      | `text`                                                       | any user                   |
-| `MEDIA`     | `media_id` (or `feed_post_media` gallery) + optional `text`  | any user                   |
+| `MEDIA`     | `media_id` FK + optional `text`                              | any user                   |
 | `LINK`      | `url`, `title`, `text`, `image_media_id`, `embed_html`, `scrape_status` | any user        |
 | `ISSUE_REF` | `issue_id` FK                                                | **system, auto on new issue** + user share |
 | `EVENT_REF` | `event_id` FK                                                | user share only (deferred — §1.2) |
@@ -166,8 +167,8 @@ data           jsonb (Map<String,Object>) -- poll options, quiz Qs, OG extras
 - **QUIZ**: `data.questions = [{id, prompt, media_id?, options:[{id,label,correct}]}]`.
   The `correct` flag is **stripped in the unanswered DTO** so answers aren't
   leaked; correctness is computed server-side on submit.
-- Multi-image gallery: `feed_post_media (feed_post_id, media_id, position)` join;
-  media URLs are freshly signed GCS URLs at read time (reuse `GcsMediaService`).
+- Media: a single FK `media_id` → existing `MediaEntity` (no join table in v1);
+  the URL is a freshly signed GCS URL at read time (reuse `GcsMediaService`).
 
 ### 4.3 `FeedVoteEntity` → `feed_votes` (relational — must COUNT + dedupe)
 ```
@@ -399,7 +400,7 @@ followed hashtags (and only here consider SSE/push if product needs realtime).
 
 ```
 entity/        FeedPostEntity, FeedPostContentEntity, FeedModerationEntity,
-               LinkCache (+ FeedPostMedia join)   [+ Phase 2: FeedVoteEntity, FeedQuizAnswerEntity]
+               LinkCache   [+ Phase 2: FeedVoteEntity, FeedQuizAnswerEntity]
 model/         FeedPostKind, FeedPostStatus, LinkEmbedType, LinkScrapeStatus,
                AiVerdict, AiCategory, AdminModerationAction
 repository/    FeedPostRepository (keyset + moderation-queue queries),
