@@ -99,11 +99,15 @@ public class FeedService {
   }
 
   private Locality resolveLocality(UserEntity author, CreateFeedPostRequest req, boolean isAdmin) {
-    if (isAdmin) {
-      // ADMIN: post to the open hashtag directly — no location, any hashtag.
-      if (req.getHashtag() == null || req.getHashtag().isBlank()) {
+    boolean hasHashtag = req.getHashtag() != null && !req.getHashtag().isBlank();
+
+    // Posting to an explicit hashtag (without being there) is an admin-only broadcast.
+    if (hasHashtag) {
+      if (!isAdmin) {
         throw new DownstreamServiceException(
-            HttpStatus.BAD_REQUEST, "VALIDATION", "hashtag is required for admin posts");
+            HttpStatus.FORBIDDEN,
+            "PERMISSION",
+            "Only admins may post to a hashtag directly; regular posts use your location.");
       }
       return localityRepository
           .findByHashtagFlexible(req.getHashtag())
@@ -113,7 +117,8 @@ public class FeedService {
                       HttpStatus.NOT_FOUND, "NOT_FOUND", "Unknown hashtag: " + req.getHashtag()));
     }
 
-    // USER: location required; resolve strictly via point-in-polygon (no nearest fallback).
+    // Otherwise (any role) resolve the locality from coordinates via point-in-polygon. This lets an
+    // admin posting through the regular composer behave like a normal located post.
     if (req.getLat() == null || req.getLng() == null) {
       throw new DownstreamServiceException(
           HttpStatus.UNPROCESSABLE_ENTITY,

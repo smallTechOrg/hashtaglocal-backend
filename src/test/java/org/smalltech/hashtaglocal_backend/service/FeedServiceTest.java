@@ -130,7 +130,7 @@ class FeedServiceTest {
   }
 
   @Test
-  void adminPostWithoutHashtagIsRejected400() {
+  void adminPostWithoutHashtagOrLocationIsRejected422() {
     when(userRepository.findById(2L)).thenReturn(Optional.of(admin));
     CreateFeedPostRequest req = new CreateFeedPostRequest();
     req.setKind(FeedPostKind.TEXT);
@@ -138,7 +138,39 @@ class FeedServiceTest {
 
     DownstreamServiceException ex =
         assertThrows(DownstreamServiceException.class, () -> feedService.create(2L, req));
-    assertEquals(HttpStatus.BAD_REQUEST, ex.getStatus());
+    assertEquals(HttpStatus.UNPROCESSABLE_ENTITY, ex.getStatus());
+    assertEquals("GEO", ex.getType());
+  }
+
+  @Test
+  void adminPostWithLocationButNoHashtagResolvesByLocationAndPublishes() {
+    when(userRepository.findById(2L)).thenReturn(Optional.of(admin));
+    when(localityRepository.findContainingLocality(13.0, 77.6)).thenReturn(Optional.of(locality));
+    CreateFeedPostRequest req = new CreateFeedPostRequest();
+    req.setKind(FeedPostKind.TEXT);
+    req.setText("admin posting via the regular composer");
+    req.setLat(13.0);
+    req.setLng(77.6);
+
+    FeedPostEntity post = feedService.create(2L, req);
+
+    assertEquals(locality, post.getLocality());
+    // Admin is trusted → published directly even on the located path.
+    assertEquals(FeedPostStatus.PUBLISHED, post.getStatus());
+    verifyNoInteractions(eventPublisher);
+  }
+
+  @Test
+  void nonAdminPostingByHashtagIsForbidden() {
+    when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+    CreateFeedPostRequest req = new CreateFeedPostRequest();
+    req.setKind(FeedPostKind.TEXT);
+    req.setText("trying to broadcast");
+    req.setHashtag("tnagar");
+
+    DownstreamServiceException ex =
+        assertThrows(DownstreamServiceException.class, () -> feedService.create(1L, req));
+    assertEquals(HttpStatus.FORBIDDEN, ex.getStatus());
   }
 
   @Test

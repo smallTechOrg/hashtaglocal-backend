@@ -34,9 +34,14 @@ public class FeedAdminService {
   @Transactional(readOnly = true)
   public ModerationQueueData queue(String verdict, String cursorToken, Integer limit) {
     List<FeedPostStatus> statuses =
-        switch (verdict == null ? "ALL" : verdict.toUpperCase()) {
+        switch (verdict == null ? "REVIEW" : verdict.toUpperCase()) {
           case "BLOCKED" -> List.of(FeedPostStatus.AI_BLOCKED);
           case "FLAGGED" -> List.of(FeedPostStatus.FLAGGED);
+          case "PUBLISHED" -> List.of(FeedPostStatus.PUBLISHED);
+          case "HIDDEN" -> List.of(FeedPostStatus.ADMIN_HIDDEN);
+          // ALL = the full archive/history across every status.
+          case "ALL" -> List.of(FeedPostStatus.values());
+          // REVIEW (default) = the items needing a decision.
           default -> List.of(FeedPostStatus.AI_BLOCKED, FeedPostStatus.FLAGGED);
         };
 
