@@ -23,6 +23,14 @@ public class FeedPostData {
   private String status;
 
   private String hashtag;
+
+  /**
+   * Centroid of the post's locality, for the map marker in the aggregated home feed. May be null.
+   */
+  private Double localityLat;
+
+  private Double localityLng;
+
   private boolean pinned;
 
   private AuthorData author;

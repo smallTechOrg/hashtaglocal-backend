@@ -32,7 +32,7 @@ public class FeedQueryService {
 
   @Transactional(readOnly = true)
   public FeedListResponseData getTimeline(
-      String hashtag, String cursorToken, Integer limit, Long viewerUserId) {
+      String hashtag, String cursorToken, Integer limit, boolean aggregate, Long viewerUserId) {
 
     Locality locality =
         localityRepository
@@ -45,20 +45,26 @@ public class FeedQueryService {
     int pageSize = clampLimit(limit);
     FeedCursor cursor = FeedCursor.decode(cursorToken);
     LocalDateTime now = LocalDateTime.now();
+    Long id = locality.getId();
 
     // Fetch one extra row to know whether a further page exists, without a spurious empty page.
+    // When aggregate=true (a parent/root hashtag like #india), include all child localities' posts.
     PageRequest page = PageRequest.of(0, pageSize + 1);
-    List<FeedPostEntity> rows =
-        cursor == null
-            ? feedPostRepository.findTimelineFirstPage(
-                locality.getId(), FeedPostStatus.PUBLISHED, now, page)
-            : feedPostRepository.findTimelineAfter(
-                locality.getId(),
-                FeedPostStatus.PUBLISHED,
-                now,
-                cursor.createdAt(),
-                cursor.id(),
-                page);
+    List<FeedPostEntity> rows;
+    if (cursor == null) {
+      rows =
+          aggregate
+              ? feedPostRepository.findAggregatedTimelineFirstPage(
+                  id, FeedPostStatus.PUBLISHED, now, page)
+              : feedPostRepository.findTimelineFirstPage(id, FeedPostStatus.PUBLISHED, now, page);
+    } else {
+      rows =
+          aggregate
+              ? feedPostRepository.findAggregatedTimelineAfter(
+                  id, FeedPostStatus.PUBLISHED, now, cursor.createdAt(), cursor.id(), page)
+              : feedPostRepository.findTimelineAfter(
+                  id, FeedPostStatus.PUBLISHED, now, cursor.createdAt(), cursor.id(), page);
+    }
 
     boolean hasMore = rows.size() > pageSize;
     List<FeedPostEntity> pageRows = hasMore ? rows.subList(0, pageSize) : rows;
@@ -74,13 +80,12 @@ public class FeedQueryService {
 
     // Pinned posts are returned on the first page only.
     List<FeedPostData> pinned =
-        cursor == null
-            ? feedPostRepository
-                .findPinned(locality.getId(), FeedPostStatus.PUBLISHED, now)
-                .stream()
-                .map(p -> feedPostMapper.toData(p, viewerUserId))
-                .toList()
-            : List.of();
+        cursor != null
+            ? List.of()
+            : (aggregate
+                    ? feedPostRepository.findAggregatedPinned(id, FeedPostStatus.PUBLISHED, now)
+                    : feedPostRepository.findPinned(id, FeedPostStatus.PUBLISHED, now))
+                .stream().map(p -> feedPostMapper.toData(p, viewerUserId)).toList();
 
     return FeedListResponseData.builder()
         .pinned(pinned)

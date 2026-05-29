@@ -39,9 +39,10 @@ public class FeedController {
       @RequestParam String hashtag,
       @RequestParam(required = false) String cursor,
       @RequestParam(required = false) Integer limit,
+      @RequestParam(required = false, defaultValue = "false") boolean aggregate,
       @AuthenticationPrincipal Long viewerUserId) {
     return NewAPIResponse.<FeedListResponseData>builder()
-        .data(feedQueryService.getTimeline(hashtag, cursor, limit, viewerUserId))
+        .data(feedQueryService.getTimeline(hashtag, cursor, limit, aggregate, viewerUserId))
         .build();
   }
 

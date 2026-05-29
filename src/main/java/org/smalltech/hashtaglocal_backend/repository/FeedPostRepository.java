@@ -51,6 +51,57 @@ public interface FeedPostRepository extends JpaRepository<FeedPostEntity, Long> 
       @Param("cursorId") Long cursorId,
       Pageable pageable);
 
+  // -------------------------------------------------------------------------
+  // Aggregated timeline for a parent (root) locality: the parent's own posts
+  // (e.g. #india admin national posts) PLUS every child locality's posts. Each
+  // post keeps its own locality, so the client can show a per-post marker.
+  // -------------------------------------------------------------------------
+
+  /** First page of the aggregated timeline for {@code rootId} (self + children). */
+  @Query(
+      "SELECT p FROM FeedPostEntity p "
+          + "WHERE (p.locality.id = :rootId OR p.locality.parent.id = :rootId) "
+          + "AND p.status = :status "
+          + "AND p.pinned = false "
+          + "AND (p.publishedAt IS NULL OR p.publishedAt <= :now) "
+          + "ORDER BY p.createdAt DESC, p.id DESC")
+  List<FeedPostEntity> findAggregatedTimelineFirstPage(
+      @Param("rootId") Long rootId,
+      @Param("status") FeedPostStatus status,
+      @Param("now") LocalDateTime now,
+      Pageable pageable);
+
+  /** Subsequent aggregated page: older than the cursor. */
+  @Query(
+      "SELECT p FROM FeedPostEntity p "
+          + "WHERE (p.locality.id = :rootId OR p.locality.parent.id = :rootId) "
+          + "AND p.status = :status "
+          + "AND p.pinned = false "
+          + "AND (p.publishedAt IS NULL OR p.publishedAt <= :now) "
+          + "AND (p.createdAt < :cursorCreatedAt "
+          + "     OR (p.createdAt = :cursorCreatedAt AND p.id < :cursorId)) "
+          + "ORDER BY p.createdAt DESC, p.id DESC")
+  List<FeedPostEntity> findAggregatedTimelineAfter(
+      @Param("rootId") Long rootId,
+      @Param("status") FeedPostStatus status,
+      @Param("now") LocalDateTime now,
+      @Param("cursorCreatedAt") LocalDateTime cursorCreatedAt,
+      @Param("cursorId") Long cursorId,
+      Pageable pageable);
+
+  /** Pinned aggregated posts (self + children) — first page only. */
+  @Query(
+      "SELECT p FROM FeedPostEntity p "
+          + "WHERE (p.locality.id = :rootId OR p.locality.parent.id = :rootId) "
+          + "AND p.status = :status "
+          + "AND p.pinned = true "
+          + "AND (p.publishedAt IS NULL OR p.publishedAt <= :now) "
+          + "ORDER BY p.createdAt DESC, p.id DESC")
+  List<FeedPostEntity> findAggregatedPinned(
+      @Param("rootId") Long rootId,
+      @Param("status") FeedPostStatus status,
+      @Param("now") LocalDateTime now);
+
   /** Pinned, published posts for a locality (returned on the first page only). */
   @Query(
       "SELECT p FROM FeedPostEntity p "

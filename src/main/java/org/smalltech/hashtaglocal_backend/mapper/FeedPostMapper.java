@@ -32,6 +32,14 @@ public class FeedPostMapper {
             .author(toAuthor(post.getAuthor()))
             .createdAt(post.getCreatedAt());
 
+    // Locality centroid → map marker in the aggregated home feed (null for boundary-less roots).
+    if (post.getLocality() != null && post.getLocality().getGeoBoundary() != null) {
+      org.locationtech.jts.geom.Point c = post.getLocality().getGeoBoundary().getCentroid();
+      if (c != null && !c.isEmpty()) {
+        b.localityLat(c.getY()).localityLng(c.getX());
+      }
+    }
+
     if (content != null) {
       b.text(content.getText())
           .title(content.getTitle())

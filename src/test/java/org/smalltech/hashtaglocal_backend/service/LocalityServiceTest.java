@@ -139,21 +139,20 @@ class LocalityServiceTest {
   }
 
   @Test
-  @DisplayName("Should handle locality with null polygon gracefully")
-  void testGetAllLocalitiesWithPolygons_NullPolygon() {
-    // Arrange
+  @DisplayName("Should exclude boundary-less localities (e.g. #india root) from the polygons list")
+  void testGetAllLocalitiesWithPolygons_NullPolygonExcluded() {
+    // Arrange — a boundary-less root locality is not drawable on the map.
     Locality locality =
-        Locality.builder().id(1L).hashtag("test").name("Test Locality").geoBoundary(null).build();
+        Locality.builder().id(1L).hashtag("#india").name("India").geoBoundary(null).build();
 
     when(localityRepository.findAll()).thenReturn(Collections.singletonList(locality));
 
     // Act
     List<LocalityDTO> result = localityService.getAllLocalitiesWithPolygons();
 
-    // Assert
+    // Assert — excluded from the polygons endpoint.
     assertNotNull(result);
-    assertEquals(1, result.size());
-    assertNull(result.get(0).getGeoBoundary());
+    assertEquals(0, result.size());
   }
 
   /** Helper method to create a test polygon. */
