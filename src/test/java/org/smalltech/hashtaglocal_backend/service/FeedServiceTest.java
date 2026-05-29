@@ -115,7 +115,7 @@ class FeedServiceTest {
   @Test
   void adminPostPublishesDirectlyByHashtagWithoutLocationOrModeration() {
     when(userRepository.findById(2L)).thenReturn(Optional.of(admin));
-    when(localityRepository.findByHashtag("tnagar")).thenReturn(Optional.of(locality));
+    when(localityRepository.findByHashtagFlexible("tnagar")).thenReturn(Optional.of(locality));
     CreateFeedPostRequest req = new CreateFeedPostRequest();
     req.setKind(FeedPostKind.TEXT);
     req.setText("official notice");

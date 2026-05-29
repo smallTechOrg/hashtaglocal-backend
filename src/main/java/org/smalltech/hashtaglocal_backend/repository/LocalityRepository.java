@@ -11,6 +11,15 @@ import org.springframework.stereotype.Repository;
 public interface LocalityRepository extends JpaRepository<Locality, Long> {
   Optional<Locality> findByHashtag(String hashtag);
 
+  /**
+   * Resolve a hashtag tolerant of the leading '#'. Hashtags are stored with the '#' prefix (e.g.
+   * "#gangtok") but URLs/clients commonly send the bare word ("gangtok"). Matches either form.
+   */
+  @Query(
+      "SELECT l FROM Locality l WHERE l.hashtag = :tag OR l.hashtag = CONCAT('#', :tag) "
+          + "OR CONCAT('#', l.hashtag) = :tag")
+  Optional<Locality> findByHashtagFlexible(@Param("tag") String tag);
+
   @Query(
       value =
           "SELECT * FROM localities l WHERE ST_Contains(l.geo_boundary, ST_SetSRID(ST_MakePoint(:lng, :lat), ST_SRID(l.geo_boundary))) ORDER BY ST_Area(l.geo_boundary) ASC LIMIT 1",

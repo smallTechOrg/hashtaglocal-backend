@@ -106,7 +106,7 @@ public class FeedService {
             HttpStatus.BAD_REQUEST, "VALIDATION", "hashtag is required for admin posts");
       }
       return localityRepository
-          .findByHashtag(req.getHashtag())
+          .findByHashtagFlexible(req.getHashtag())
           .orElseThrow(
               () ->
                   new DownstreamServiceException(

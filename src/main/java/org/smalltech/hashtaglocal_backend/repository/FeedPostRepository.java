@@ -14,10 +14,8 @@ import org.springframework.stereotype.Repository;
 public interface FeedPostRepository extends JpaRepository<FeedPostEntity, Long> {
 
   /**
-   * Keyset-paginated public timeline for a locality, newest first. Pass {@code cursorCreatedAt} /
-   * {@code cursorId} = null for the first page; for subsequent pages pass the last row of the
-   * previous page. Ordered by {@code (createdAt, id)} DESC and tuple-compared so rows sharing a
-   * timestamp are never skipped. Caller supplies a {@code Pageable} of size {@code limit}.
+   * First page of the public timeline for a locality, newest first. Ordered by {@code (createdAt,
+   * id)} DESC. Caller supplies a {@code Pageable} of size {@code limit}.
    */
   @Query(
       "SELECT p FROM FeedPostEntity p "
@@ -25,11 +23,27 @@ public interface FeedPostRepository extends JpaRepository<FeedPostEntity, Long> 
           + "AND p.status = :status "
           + "AND p.pinned = false "
           + "AND (p.publishedAt IS NULL OR p.publishedAt <= :now) "
-          + "AND (:cursorCreatedAt IS NULL "
-          + "     OR p.createdAt < :cursorCreatedAt "
+          + "ORDER BY p.createdAt DESC, p.id DESC")
+  List<FeedPostEntity> findTimelineFirstPage(
+      @Param("localityId") Long localityId,
+      @Param("status") FeedPostStatus status,
+      @Param("now") LocalDateTime now,
+      Pageable pageable);
+
+  /**
+   * Subsequent timeline page: rows strictly older than the cursor {@code (createdAt, id)}.
+   * Tuple-compared so rows sharing a timestamp are never skipped.
+   */
+  @Query(
+      "SELECT p FROM FeedPostEntity p "
+          + "WHERE p.locality.id = :localityId "
+          + "AND p.status = :status "
+          + "AND p.pinned = false "
+          + "AND (p.publishedAt IS NULL OR p.publishedAt <= :now) "
+          + "AND (p.createdAt < :cursorCreatedAt "
           + "     OR (p.createdAt = :cursorCreatedAt AND p.id < :cursorId)) "
           + "ORDER BY p.createdAt DESC, p.id DESC")
-  List<FeedPostEntity> findTimeline(
+  List<FeedPostEntity> findTimelineAfter(
       @Param("localityId") Long localityId,
       @Param("status") FeedPostStatus status,
       @Param("now") LocalDateTime now,
@@ -56,11 +70,18 @@ public interface FeedPostRepository extends JpaRepository<FeedPostEntity, Long> 
   @Query(
       "SELECT p FROM FeedPostEntity p "
           + "WHERE p.status IN :statuses "
-          + "AND (:cursorCreatedAt IS NULL "
-          + "     OR p.createdAt < :cursorCreatedAt "
+          + "ORDER BY p.createdAt DESC, p.id DESC")
+  List<FeedPostEntity> findModerationQueueFirstPage(
+      @Param("statuses") List<FeedPostStatus> statuses, Pageable pageable);
+
+  /** Admin moderation queue, subsequent page: older than the cursor. */
+  @Query(
+      "SELECT p FROM FeedPostEntity p "
+          + "WHERE p.status IN :statuses "
+          + "AND (p.createdAt < :cursorCreatedAt "
           + "     OR (p.createdAt = :cursorCreatedAt AND p.id < :cursorId)) "
           + "ORDER BY p.createdAt DESC, p.id DESC")
-  List<FeedPostEntity> findModerationQueue(
+  List<FeedPostEntity> findModerationQueueAfter(
       @Param("statuses") List<FeedPostStatus> statuses,
       @Param("cursorCreatedAt") LocalDateTime cursorCreatedAt,
       @Param("cursorId") Long cursorId,

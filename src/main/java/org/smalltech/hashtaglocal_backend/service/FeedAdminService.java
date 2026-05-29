@@ -42,17 +42,19 @@ public class FeedAdminService {
 
     int pageSize = clampLimit(limit);
     FeedCursor cursor = FeedCursor.decode(cursorToken);
+    PageRequest page = PageRequest.of(0, pageSize + 1);
     List<FeedPostEntity> rows =
-        feedPostRepository.findModerationQueue(
-            statuses,
-            cursor == null ? null : cursor.createdAt(),
-            cursor == null ? null : cursor.id(),
-            PageRequest.of(0, pageSize));
+        cursor == null
+            ? feedPostRepository.findModerationQueueFirstPage(statuses, page)
+            : feedPostRepository.findModerationQueueAfter(
+                statuses, cursor.createdAt(), cursor.id(), page);
 
-    List<ModerationQueueData.Item> items = rows.stream().map(this::toItem).toList();
+    boolean hasMore = rows.size() > pageSize;
+    List<FeedPostEntity> pageRows = hasMore ? rows.subList(0, pageSize) : rows;
+    List<ModerationQueueData.Item> items = pageRows.stream().map(this::toItem).toList();
     String nextCursor = null;
-    if (rows.size() == pageSize) {
-      FeedPostEntity last = rows.get(rows.size() - 1);
+    if (hasMore) {
+      FeedPostEntity last = pageRows.get(pageRows.size() - 1);
       nextCursor = new FeedCursor(last.getCreatedAt(), last.getId()).encode();
     }
     return ModerationQueueData.builder().items(items).nextCursor(nextCursor).build();

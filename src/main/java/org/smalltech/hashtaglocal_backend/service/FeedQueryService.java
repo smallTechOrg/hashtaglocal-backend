@@ -36,7 +36,7 @@ public class FeedQueryService {
 
     Locality locality =
         localityRepository
-            .findByHashtag(hashtag)
+            .findByHashtagFlexible(hashtag)
             .orElseThrow(
                 () ->
                     new DownstreamServiceException(
@@ -47,14 +47,18 @@ public class FeedQueryService {
     LocalDateTime now = LocalDateTime.now();
 
     // Fetch one extra row to know whether a further page exists, without a spurious empty page.
+    PageRequest page = PageRequest.of(0, pageSize + 1);
     List<FeedPostEntity> rows =
-        feedPostRepository.findTimeline(
-            locality.getId(),
-            FeedPostStatus.PUBLISHED,
-            now,
-            cursor == null ? null : cursor.createdAt(),
-            cursor == null ? null : cursor.id(),
-            PageRequest.of(0, pageSize + 1));
+        cursor == null
+            ? feedPostRepository.findTimelineFirstPage(
+                locality.getId(), FeedPostStatus.PUBLISHED, now, page)
+            : feedPostRepository.findTimelineAfter(
+                locality.getId(),
+                FeedPostStatus.PUBLISHED,
+                now,
+                cursor.createdAt(),
+                cursor.id(),
+                page);
 
     boolean hasMore = rows.size() > pageSize;
     List<FeedPostEntity> pageRows = hasMore ? rows.subList(0, pageSize) : rows;
