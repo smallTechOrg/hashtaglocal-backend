@@ -240,17 +240,19 @@ POST /api/v1/feed/{postId}/react         { type }    (later phase)
 POST /api/v1/feed/{postId}/report        flag for moderation
 ```
 
-### Admin / system  (UserRole.ADMIN, like `IssueAdminController`)
+### Admin / system  (`/admin/**` is already `hasRole("ADMIN")` in SecurityConfig;
+matches `IssueAdminController`'s `@RequestMapping("/admin")` prefix)
 ```
-GET   /api/v1/admin/feed/moderation?verdict=BLOCKED|FLAGGED|ALL&cursor=&limit=
+GET   /admin/feed/moderation?verdict=BLOCKED|FLAGGED|ALL&cursor=&limit=
         → review queue: posts the AI blocked/flagged, with the AI reason &
           category, newest first. This is the data behind the admin moderation page.
-POST  /api/v1/admin/feed/{postId}/approve   { note? }
+POST  /admin/feed/{postId}/approve   { note? }
         → admin overrides AI: AI-BLOCKED post becomes PUBLISHED.
-POST  /api/v1/admin/feed/{postId}/hide      { reason }
+POST  /admin/feed/{postId}/hide      { reason }
         → admin overrides AI: AI-APPROVED (or live) post becomes ADMIN_HIDDEN.
-PATCH /api/v1/admin/feed/{postId}           { pinned }   pin/unpin
-POST  /api/v1/admin/feed/bulletin           create BULLETIN (Phase 2)
+PATCH /admin/feed/{postId}           { pinned }   pin/unpin
+POST  /admin/feed                    admin creates a post on any open hashtag (§5.1)
+POST  /admin/feed/bulletin           create BULLETIN (Phase 2)
 ```
 Every admin override is recorded on `FeedModerationEntity` (who/when/why) so the
 AI verdict and the human decision are both auditable.
@@ -446,4 +448,35 @@ application.yaml: feed.moderation.{enabled,gemini-api-key,model,endpoint},
 - Should an author be able to **edit & resubmit** an AI-blocked post, or is a block
   terminal (must repost)? (Affects whether posts are mutable.)
 - Image moderation timing — v1 text/link only; when do images need it?
+
+---
+
+## 12. Execution plan (agreed workflow)
+
+1. **Backend** — implement Phase 1, write tests, self-review (`/code-review`),
+   fix. Branch: `feature/feed-channel`.
+2. **Web UI** — build the feed UI on the **website only** (`hashtaglocal-frontend-web`,
+   Next.js 15 / React 19 / Tailwind / shadcn). **No mobile app changes in v1.**
+3. **Local test** — run backend + web against localhost; user manually verifies.
+4. **Staging** — once localhost passes, deploy to staging and test there.
+
+Backend build order: entities + repos → `FeedService` (role-based create) →
+public read API → link scrape → AI moderation → admin endpoints → tests.
+
+## 13. Integration points verified in the existing codebase
+
+- **Security** (`SecurityConfig`): default is `permitAll`, with an allowlist of
+  authenticated/admin routes. So feed **GETs are public automatically**; add
+  `POST /api/v1/feed` → `authenticated()`, and feed admin lives under the existing
+  `/admin/**` → `hasRole("ADMIN")` rule (no new matcher needed for admin).
+- **Principal**: `AccessTokenAuthFilter` sets the principal to the **user id
+  (`Long`)** with authority `ROLE_USER` / `ROLE_ADMIN`. Controllers use
+  `@AuthenticationPrincipal Long viewerUserId` (nullable for anonymous).
+- **Locality resolution**: reuse the existing PostGIS containment approach used
+  for issues/events geocoding (`Locality.geoBoundary`, hibernate-spatial).
+- **Media**: reuse `GcsMediaService` + `MediaEntity`; upload-url flow already
+  exists (`/api/v1/media/upload-url`), so the client uploads media then sends
+  `media_ids` — feed doesn't reinvent upload.
+- **Web client**: `src/app/constants/api.ts` (`API_PATHS`) + snake_case models
+  (e.g. `models/event.ts`) are the pattern to extend with feed paths/models.
 ```
