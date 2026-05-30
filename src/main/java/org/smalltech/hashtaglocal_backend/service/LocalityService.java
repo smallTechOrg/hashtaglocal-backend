@@ -32,7 +32,12 @@ public class LocalityService {
     List<Locality> localities = localityRepository.findAll();
     log.info("Found {} localities", localities.size());
 
-    return localities.stream().map(this::convertToDTO).collect(Collectors.toList());
+    // Only localities with an actual polygon are drawable on the map; skip boundary-less roots
+    // such as #india (which exist only as feed-aggregation parents).
+    return localities.stream()
+        .filter(l -> l.getGeoBoundary() != null)
+        .map(this::convertToDTO)
+        .collect(Collectors.toList());
   }
 
   /**

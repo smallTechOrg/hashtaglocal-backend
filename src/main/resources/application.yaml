@@ -125,6 +125,26 @@ events:
     # Cron expression for the ingestion job. Use '-' to disable. Override via EVENTS_SCRAPE_CRON env var.
     cron: ${EVENTS_SCRAPE_CRON:0 */5 * * * *}
 
+# Per-hashtag feed / broadcast channel (see FEED_DESIGN.md)
+feed:
+  moderation:
+    # When false (e.g. local dev without a key), user posts are FLAGGED for human review
+    # instead of being auto-published. Never auto-publishes without AI.
+    enabled: ${FEED_MODERATION_ENABLED:true}
+    gemini-api-key: ${GEMINI_API_KEY:}
+    model: ${FEED_MODERATION_MODEL:gemini-2.0-flash}
+    endpoint: ${FEED_MODERATION_ENDPOINT:https://generativelanguage.googleapis.com/v1beta/models}
+    # Retry sweeper interval for posts stuck in PENDING_AI
+    sweeper-delay-ms: ${FEED_MODERATION_SWEEPER_DELAY_MS:60000}
+  scrape:
+    timeout-ms: ${FEED_SCRAPE_TIMEOUT_MS:8000}
+    max-body-bytes: ${FEED_SCRAPE_MAX_BODY_BYTES:2097152}
+    # Cap on the Open Graph image we re-host to GCS (5 MB default).
+    max-image-bytes: ${FEED_SCRAPE_MAX_IMAGE_BYTES:5242880}
+  auto-issue-ref:
+    # Auto-post an ISSUE_REF to the feed when a new issue is created (FEED_DESIGN.md §1.2)
+    enabled: ${FEED_AUTO_ISSUE_REF_ENABLED:true}
+
 portalissue:
   enabled: ${PORTALISSUE_ENABLED:true}
   cron: ${PORTALISSUE_CRON:0 0 1 * * *}

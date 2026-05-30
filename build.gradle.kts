@@ -33,6 +33,8 @@ dependencies {
     implementation("com.google.cloud:google-cloud-storage:2.55.0")
     implementation("org.locationtech.jts:jts-core:1.19.0")
     implementation("com.vladmihalcea:hibernate-types-60:2.21.1")
+    // Feed link-preview scraping (Open Graph / oEmbed parsing)
+    implementation("org.jsoup:jsoup:1.18.1")
 	testImplementation("org.springframework.boot:spring-boot-starter-test")
 	testImplementation("org.springframework.boot:spring-boot-starter-webflux")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")

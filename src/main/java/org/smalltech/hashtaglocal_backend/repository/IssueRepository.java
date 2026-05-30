@@ -16,6 +16,22 @@ public interface IssueRepository extends JpaRepository<IssueEntity, Long> {
   @EntityGraph(attributePaths = {"userEntity", "location", "location.locality"})
   Optional<IssueEntity> findById(Long id);
 
+  /**
+   * Issues that have a resolved locality but no ISSUE_REF feed post yet — the backlog for the feed
+   * backfill. Oldest first so backfilled posts keep chronological order. Idempotent: rerunning
+   * skips issues already referenced.
+   */
+  @EntityGraph(attributePaths = {"userEntity", "location", "location.locality"})
+  @Query(
+      "SELECT i FROM IssueEntity i "
+          + "WHERE i.location IS NOT NULL AND i.location.locality IS NOT NULL "
+          + "AND NOT EXISTS ("
+          + "  SELECT 1 FROM FeedPostContentEntity c "
+          + "  WHERE c.issue = i AND c.post.kind = org.smalltech.hashtaglocal_backend.model.FeedPostKind.ISSUE_REF"
+          + ") "
+          + "ORDER BY i.createdAt ASC")
+  List<IssueEntity> findIssuesWithoutFeedRef(org.springframework.data.domain.Pageable pageable);
+
   @EntityGraph(attributePaths = {"userEntity", "location", "location.locality"})
   List<IssueEntity> findAll();
 

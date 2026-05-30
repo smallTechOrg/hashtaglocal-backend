@@ -46,6 +46,10 @@ public class SecurityConfig {
             auth ->
                 auth.requestMatchers(HttpMethod.POST, "/api/v1/issue")
                     .authenticated()
+                    // Feed: reads are public (default permitAll); creating a post requires auth.
+                    // Admin feed routes are covered by the /admin/** rule below.
+                    .requestMatchers(HttpMethod.POST, "/api/v1/feed")
+                    .authenticated()
                     // account deletion endpoint must be authenticated so only the owning user can
                     // initiate it
                     .requestMatchers(HttpMethod.POST, "/account/delete-request")
