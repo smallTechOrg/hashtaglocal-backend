@@ -3,7 +3,6 @@ package org.smalltech.hashtaglocal_backend.service.impl;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.smalltech.hashtaglocal_backend.entity.LinkCache;
-import org.smalltech.hashtaglocal_backend.entity.MediaEntity;
 import org.smalltech.hashtaglocal_backend.model.LinkEmbedType;
 import org.smalltech.hashtaglocal_backend.repository.LinkCacheRepository;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -30,12 +29,13 @@ public class LinkCacheWriter {
       String description,
       String siteName,
       String faviconUrl,
-      LinkEmbedType embedType,
-      MediaEntity imageMedia) {
+      LinkEmbedType embedType) {
     if (canonicalUrl == null || linkCacheRepository.findByCanonicalUrl(canonicalUrl).isPresent()) {
       return;
     }
     try {
+      // Text metadata only — no image_media FK. The re-hosted image belongs to the caller's
+      // (still-open) transaction, which this separate transaction can't reference yet.
       linkCacheRepository.save(
           LinkCache.builder()
               .canonicalUrl(canonicalUrl)
@@ -43,7 +43,6 @@ public class LinkCacheWriter {
               .description(description)
               .siteName(siteName)
               .faviconUrl(faviconUrl)
-              .imageMedia(imageMedia)
               .embedType(embedType != null ? embedType : LinkEmbedType.LINK)
               .build());
     } catch (DataIntegrityViolationException dup) {

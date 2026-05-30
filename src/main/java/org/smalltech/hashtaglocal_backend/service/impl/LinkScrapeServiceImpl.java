@@ -135,21 +135,39 @@ public class LinkScrapeServiceImpl implements LinkScrapeService {
       content.setScrapeStatus(LinkScrapeStatus.OK);
       feedPostRepository.save(post);
 
-      // Populate the shared cache for reuse, in a separate transaction so a concurrent duplicate
-      // insert can't roll back this post's scrape result. Reuse the same re-hosted image.
+      // Cache the text metadata for reuse (best-effort, in its own transaction). Deliberately
+      // OUTSIDE the try below and image-free: the re-hosted MediaEntity belongs to THIS still-open
+      // transaction, so a separate-tx cache row can't FK-reference it yet — and a cache failure
+      // must never flip this post's successful scrape to FAILED.
+      cacheTextMetadata(canonical, title, description, siteName, faviconUrl, embedType);
+    } catch (Exception e) {
+      log.warn(
+          "Link scrape failed for post {} ({}): {}", feedPostId, content.getUrl(), e.toString());
+      content.setScrapeStatus(LinkScrapeStatus.FAILED);
+      feedPostRepository.save(post);
+    }
+  }
+
+  /**
+   * Best-effort text-metadata cache write; never propagates (its failure must not fail a scrape).
+   */
+  private void cacheTextMetadata(
+      String canonical,
+      String title,
+      String description,
+      String siteName,
+      String faviconUrl,
+      LinkEmbedType embedType) {
+    try {
       linkCacheWriter.saveIfAbsent(
           canonical,
           truncate(title, 500),
           truncate(description, 2000),
           truncate(siteName, 300),
           faviconUrl,
-          embedType,
-          image);
+          embedType);
     } catch (Exception e) {
-      log.warn(
-          "Link scrape failed for post {} ({}): {}", feedPostId, content.getUrl(), e.toString());
-      content.setScrapeStatus(LinkScrapeStatus.FAILED);
-      feedPostRepository.save(post);
+      log.debug("link_cache write skipped for {}: {}", canonical, e.toString());
     }
   }
 
