@@ -91,6 +91,18 @@ public class FeedAdminService {
     feedPostRepository.save(post);
   }
 
+  /**
+   * Permanently delete a feed post. Its {@code feed_post_content} and {@code feed_moderation} rows
+   * are removed via cascade/orphan-removal on the post; the referenced issue/event/media (which
+   * live in their own tables) are untouched. Use {@link #hide} for a reversible takedown; this is
+   * the hard delete for when a post should be gone entirely.
+   */
+  @Transactional
+  public void deletePost(Long postId) {
+    FeedPostEntity post = requirePost(postId);
+    feedPostRepository.delete(post);
+  }
+
   private void recordAdminAction(
       FeedPostEntity post, Long adminUserId, AdminModerationAction action, String note) {
     UserEntity admin =

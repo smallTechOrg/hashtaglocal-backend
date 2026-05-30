@@ -79,6 +79,17 @@ public class FeedAdminController {
         .build();
   }
 
+  @DeleteMapping("/{postId}")
+  @Operation(
+      summary = "Permanently delete a feed post",
+      description =
+          "Hard delete (removes the post + its content/moderation rows). Use hide for a"
+              + " reversible takedown.")
+  public NewAPIResponse<Map<String, Object>> delete(@PathVariable Long postId) {
+    feedAdminService.deletePost(postId);
+    return NewAPIResponse.<Map<String, Object>>builder().data(Map.of("deleted", true)).build();
+  }
+
   @PostMapping
   @Operation(
       summary = "Admin: create a post on any hashtag",
