@@ -89,7 +89,11 @@ public class FeedPostEntity {
   @PrePersist
   protected void onCreate() {
     LocalDateTime now = LocalDateTime.now();
-    createdAt = now;
+    // Preserve an explicitly-set createdAt (e.g. backfilled historical issue-refs); otherwise stamp
+    // it now. Mirrors MediaEntity's import-friendly behaviour.
+    if (createdAt == null) {
+      createdAt = now;
+    }
     updatedAt = now;
   }
 

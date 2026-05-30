@@ -98,6 +98,31 @@ public class FeedService {
     return feedPostRepository.save(post);
   }
 
+  /**
+   * Create a backfilled system post whose {@code createdAt}/{@code publishedAt} are set to {@code
+   * when} (the original event time) rather than now, so historical posts sort correctly in the
+   * timeline. Used by the feed backfill for issues reported before the feed existed.
+   */
+  @Transactional
+  public FeedPostEntity createBackfilledSystemPost(
+      Locality locality,
+      FeedPostKind kind,
+      FeedPostContentEntity content,
+      java.time.LocalDateTime when) {
+    FeedPostEntity post =
+        FeedPostEntity.builder()
+            .locality(locality)
+            .author(null)
+            .kind(kind)
+            .status(FeedPostStatus.PUBLISHED)
+            .createdAt(when) // preserved by @PrePersist when non-null
+            .publishedAt(when)
+            .build();
+    content.setPost(post);
+    post.setContent(content);
+    return feedPostRepository.save(post);
+  }
+
   private Locality resolveLocality(UserEntity author, CreateFeedPostRequest req, boolean isAdmin) {
     boolean hasHashtag = req.getHashtag() != null && !req.getHashtag().isBlank();
 

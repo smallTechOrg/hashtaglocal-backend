@@ -14,6 +14,7 @@ import org.smalltech.hashtaglocal_backend.model.request.CreateFeedPostRequest;
 import org.smalltech.hashtaglocal_backend.model.response.FeedPostData;
 import org.smalltech.hashtaglocal_backend.model.response.ModerationQueueData;
 import org.smalltech.hashtaglocal_backend.service.FeedAdminService;
+import org.smalltech.hashtaglocal_backend.service.FeedBackfillService;
 import org.smalltech.hashtaglocal_backend.service.FeedService;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -30,6 +31,7 @@ public class FeedAdminController {
 
   private final FeedAdminService feedAdminService;
   private final FeedService feedService;
+  private final FeedBackfillService feedBackfillService;
   private final FeedPostMapper feedPostMapper;
 
   @GetMapping("/moderation")
@@ -87,6 +89,25 @@ public class FeedAdminController {
     FeedPostEntity post = feedService.create(adminUserId, request);
     return NewAPIResponse.<FeedPostData>builder()
         .data(feedPostMapper.toData(post, adminUserId))
+        .build();
+  }
+
+  @PostMapping("/backfill-issue-refs")
+  @Operation(
+      summary = "Backfill ISSUE_REF posts for previously-reported issues",
+      description =
+          "Creates an ISSUE_REF feed post (backdated to the issue's time) for every issue with a"
+              + " locality that doesn't already have one. Idempotent — safe to re-run after"
+              + " deployment. Optional `max` caps how many to process (0 = all).")
+  public NewAPIResponse<Map<String, Object>> backfillIssueRefs(
+      @RequestParam(required = false, defaultValue = "0") int max) {
+    FeedBackfillService.BackfillResult result = feedBackfillService.backfillIssueRefs(max);
+    return NewAPIResponse.<Map<String, Object>>builder()
+        .data(
+            Map.of(
+                "created", result.created(),
+                "skipped", result.skipped(),
+                "batches", result.batches()))
         .build();
   }
 }
