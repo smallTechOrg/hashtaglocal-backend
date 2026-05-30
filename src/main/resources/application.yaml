@@ -139,6 +139,8 @@ feed:
   scrape:
     timeout-ms: ${FEED_SCRAPE_TIMEOUT_MS:8000}
     max-body-bytes: ${FEED_SCRAPE_MAX_BODY_BYTES:2097152}
+    # Cap on the Open Graph image we re-host to GCS (5 MB default).
+    max-image-bytes: ${FEED_SCRAPE_MAX_IMAGE_BYTES:5242880}
   auto-issue-ref:
     # Auto-post an ISSUE_REF to the feed when a new issue is created (FEED_DESIGN.md §1.2)
     enabled: ${FEED_AUTO_ISSUE_REF_ENABLED:true}

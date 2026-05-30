@@ -1,11 +1,7 @@
 package org.smalltech.hashtaglocal_backend.service.impl;
 
-import java.net.IDN;
-import java.net.InetAddress;
 import java.net.URI;
-import java.net.UnknownHostException;
 import java.util.HashMap;
-import java.util.Locale;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -14,21 +10,24 @@ import org.jsoup.nodes.Document;
 import org.smalltech.hashtaglocal_backend.entity.FeedPostContentEntity;
 import org.smalltech.hashtaglocal_backend.entity.FeedPostEntity;
 import org.smalltech.hashtaglocal_backend.entity.LinkCache;
+import org.smalltech.hashtaglocal_backend.entity.MediaEntity;
 import org.smalltech.hashtaglocal_backend.model.LinkEmbedType;
 import org.smalltech.hashtaglocal_backend.model.LinkScrapeStatus;
 import org.smalltech.hashtaglocal_backend.repository.FeedPostRepository;
 import org.smalltech.hashtaglocal_backend.repository.LinkCacheRepository;
+import org.smalltech.hashtaglocal_backend.service.LinkImageService;
 import org.smalltech.hashtaglocal_backend.service.LinkScrapeService;
+import org.smalltech.hashtaglocal_backend.util.Ssrf;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Scrapes Open Graph metadata for LINK posts and caches it by canonical URL. SSRF-guarded: only
- * http/https, public hosts, capped size/redirects/timeout. See FEED_DESIGN.md §6.
- *
- * <p>v1 stores the OG image as a URL (in {@code content.data.image_url}); re-hosting it to GCS is
- * deferred — see FEED_DESIGN.md §6/§9.
+ * Builds a rich, self-contained link card for LINK posts: scrapes Open Graph / Twitter Card
+ * metadata (title, description, site name, author, favicon, video), re-hosts the preview image to
+ * GCS via {@link LinkImageService} so the card never depends on an expiring source CDN URL, and
+ * caches the result by canonical URL. SSRF-guarded: only http/https public hosts, capped
+ * size/redirects/timeout. See FEED_DESIGN.md §6.
  */
 @Service
 @RequiredArgsConstructor
@@ -40,6 +39,7 @@ public class LinkScrapeServiceImpl implements LinkScrapeService {
   private final FeedPostRepository feedPostRepository;
   private final LinkCacheRepository linkCacheRepository;
   private final LinkCacheWriter linkCacheWriter;
+  private final LinkImageService linkImageService;
 
   @Value("${feed.scrape.timeout-ms:8000}")
   private int timeoutMs;
@@ -74,38 +74,77 @@ public class LinkScrapeServiceImpl implements LinkScrapeService {
 
     try {
       Document doc = fetchWithSafeRedirects(content.getUrl());
+      String baseUrl =
+          doc.baseUri() != null && !doc.baseUri().isBlank() ? doc.baseUri() : content.getUrl();
 
-      String title = meta(doc, "og:title");
-      if (title == null) {
-        title = doc.title();
-      }
-      String description = meta(doc, "og:description");
-      String imageUrl = meta(doc, "og:image");
-      String siteName = meta(doc, "og:site_name");
+      // Title: og:title → twitter:title → <title>.
+      String title = firstNonBlank(meta(doc, "og:title"), meta(doc, "twitter:title"), doc.title());
+      // Description: og:description → twitter:description → <meta name=description>.
+      String description =
+          firstNonBlank(
+              meta(doc, "og:description"),
+              meta(doc, "twitter:description"),
+              meta(doc, "description"));
+      // Image: og:image(:secure_url) → twitter:image → twitter:image:src.
+      String imageUrl =
+          firstNonBlank(
+              meta(doc, "og:image:secure_url"),
+              meta(doc, "og:image"),
+              meta(doc, "twitter:image"),
+              meta(doc, "twitter:image:src"));
+      imageUrl = absolutize(imageUrl, baseUrl);
+      String siteName = firstNonBlank(meta(doc, "og:site_name"), meta(doc, "application-name"));
+      String author =
+          firstNonBlank(
+              meta(doc, "article:author"), meta(doc, "author"), meta(doc, "twitter:creator"));
+      String ogType = meta(doc, "og:type");
+      String faviconUrl = absolutize(faviconHref(doc), baseUrl);
+      String videoUrl =
+          absolutize(firstNonBlank(meta(doc, "og:video:url"), meta(doc, "og:video")), baseUrl);
+
+      // A video card if the page advertises a video; otherwise a standard link card.
+      LinkEmbedType embedType =
+          (videoUrl != null || (ogType != null && ogType.toLowerCase().contains("video")))
+              ? LinkEmbedType.VIDEO
+              : LinkEmbedType.LINK;
 
       content.setTitle(truncate(title, 500));
       if (content.getText() == null || content.getText().isBlank()) {
         content.setText(truncate(description, 4000));
       }
-      content.setEmbedType(LinkEmbedType.LINK);
-      content.setScrapeStatus(LinkScrapeStatus.OK);
+      content.setEmbedType(embedType);
 
+      // Re-host the preview image in GCS so the card is self-contained (source CDN URLs expire).
+      MediaEntity image = imageUrl == null ? null : linkImageService.rehost(imageUrl);
+      if (image != null) {
+        content.setImageMedia(image);
+      }
+
+      // Rich, structured tail — everything a modern social-media share card needs.
       Map<String, Object> data =
           content.getData() == null ? new HashMap<>() : new HashMap<>(content.getData());
-      if (imageUrl != null) {
-        data.put("image_url", imageUrl);
-      }
-      if (siteName != null) {
-        data.put("site_name", siteName);
-      }
+      putIfPresent(data, "site_name", siteName);
+      putIfPresent(data, "author", author);
+      putIfPresent(data, "favicon_url", faviconUrl);
+      putIfPresent(data, "og_type", ogType);
+      putIfPresent(data, "video_url", videoUrl);
+      // Keep the original (non-rehosted) image URL as a fallback for the client.
+      putIfPresent(data, "image_url", imageUrl);
       content.setData(data);
 
+      content.setScrapeStatus(LinkScrapeStatus.OK);
       feedPostRepository.save(post);
 
       // Populate the shared cache for reuse, in a separate transaction so a concurrent duplicate
-      // insert can't roll back this post's scrape result.
+      // insert can't roll back this post's scrape result. Reuse the same re-hosted image.
       linkCacheWriter.saveIfAbsent(
-          canonical, truncate(title, 500), truncate(description, 2000), truncate(siteName, 300));
+          canonical,
+          truncate(title, 500),
+          truncate(description, 2000),
+          truncate(siteName, 300),
+          faviconUrl,
+          embedType,
+          image);
     } catch (Exception e) {
       log.warn(
           "Link scrape failed for post {} ({}): {}", feedPostId, content.getUrl(), e.toString());
@@ -122,7 +161,7 @@ public class LinkScrapeServiceImpl implements LinkScrapeService {
   private Document fetchWithSafeRedirects(String startUrl) throws java.io.IOException {
     String url = startUrl;
     for (int hop = 0; hop < MAX_REDIRECTS; hop++) {
-      assertSafeUrl(url);
+      Ssrf.assertSafeUrl(url);
       org.jsoup.Connection.Response resp =
           Jsoup.connect(url)
               .userAgent("HashtagLocalBot/1.0 (+https://local.smalltech.in)")
@@ -154,6 +193,14 @@ public class LinkScrapeServiceImpl implements LinkScrapeService {
     }
     content.setEmbedHtml(cached.getEmbedHtml());
     content.setEmbedType(cached.getEmbedType());
+    if (cached.getImageMedia() != null) {
+      content.setImageMedia(cached.getImageMedia());
+    }
+    Map<String, Object> data =
+        content.getData() == null ? new HashMap<>() : new HashMap<>(content.getData());
+    putIfPresent(data, "site_name", cached.getSiteName());
+    putIfPresent(data, "favicon_url", cached.getFaviconUrl());
+    content.setData(data);
   }
 
   private static String meta(Document doc, String property) {
@@ -165,37 +212,47 @@ public class LinkScrapeServiceImpl implements LinkScrapeService {
     return (v == null || v.isBlank()) ? null : v;
   }
 
+  /** First `<link rel="icon">`/`apple-touch-icon` href, if any. */
+  private static String faviconHref(Document doc) {
+    var el = doc.selectFirst("link[rel~=(?i)icon]");
+    if (el == null) {
+      el = doc.selectFirst("link[rel=apple-touch-icon]");
+    }
+    String href = el != null ? el.attr("href") : null;
+    return (href == null || href.isBlank()) ? null : href;
+  }
+
+  /** Resolve a possibly-relative URL against the page base. Returns null if unusable. */
+  private static String absolutize(String maybeRelative, String baseUrl) {
+    if (maybeRelative == null || maybeRelative.isBlank()) {
+      return null;
+    }
+    try {
+      return URI.create(baseUrl).resolve(maybeRelative.trim()).toString();
+    } catch (RuntimeException e) {
+      return maybeRelative;
+    }
+  }
+
+  private static String firstNonBlank(String... values) {
+    for (String v : values) {
+      if (v != null && !v.isBlank()) {
+        return v;
+      }
+    }
+    return null;
+  }
+
+  private static void putIfPresent(Map<String, Object> data, String key, String value) {
+    if (value != null && !value.isBlank()) {
+      data.put(key, value);
+    }
+  }
+
   private static String truncate(String s, int max) {
     if (s == null) {
       return null;
     }
     return s.length() <= max ? s : s.substring(0, max);
-  }
-
-  /** SSRF guard: only http/https to a public host. */
-  private static void assertSafeUrl(String url) throws UnknownHostException {
-    URI uri = URI.create(url.trim());
-    String scheme = uri.getScheme();
-    if (scheme == null || !(scheme.equalsIgnoreCase("http") || scheme.equalsIgnoreCase("https"))) {
-      throw new IllegalArgumentException("Only http/https URLs may be scraped: " + url);
-    }
-    String host = uri.getHost();
-    if (host == null || host.isBlank()) {
-      throw new IllegalArgumentException("URL has no host: " + url);
-    }
-    String ascii = IDN.toASCII(host).toLowerCase(Locale.ROOT);
-    if (ascii.equals("localhost") || ascii.endsWith(".localhost") || ascii.endsWith(".internal")) {
-      throw new IllegalArgumentException("Refusing to scrape internal host: " + host);
-    }
-    for (InetAddress addr : InetAddress.getAllByName(host)) {
-      if (addr.isAnyLocalAddress()
-          || addr.isLoopbackAddress()
-          || addr.isLinkLocalAddress()
-          || addr.isSiteLocalAddress()
-          || addr.isMulticastAddress()) {
-        throw new IllegalArgumentException(
-            "Refusing to scrape private/link-local address: " + host);
-      }
-    }
   }
 }

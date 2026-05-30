@@ -3,6 +3,7 @@ package org.smalltech.hashtaglocal_backend.service.impl;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.smalltech.hashtaglocal_backend.entity.LinkCache;
+import org.smalltech.hashtaglocal_backend.entity.MediaEntity;
 import org.smalltech.hashtaglocal_backend.model.LinkEmbedType;
 import org.smalltech.hashtaglocal_backend.repository.LinkCacheRepository;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -23,7 +24,14 @@ public class LinkCacheWriter {
   private final LinkCacheRepository linkCacheRepository;
 
   @Transactional(propagation = Propagation.REQUIRES_NEW)
-  public void saveIfAbsent(String canonicalUrl, String title, String description, String siteName) {
+  public void saveIfAbsent(
+      String canonicalUrl,
+      String title,
+      String description,
+      String siteName,
+      String faviconUrl,
+      LinkEmbedType embedType,
+      MediaEntity imageMedia) {
     if (canonicalUrl == null || linkCacheRepository.findByCanonicalUrl(canonicalUrl).isPresent()) {
       return;
     }
@@ -34,7 +42,9 @@ public class LinkCacheWriter {
               .title(title)
               .description(description)
               .siteName(siteName)
-              .embedType(LinkEmbedType.LINK)
+              .faviconUrl(faviconUrl)
+              .imageMedia(imageMedia)
+              .embedType(embedType != null ? embedType : LinkEmbedType.LINK)
               .build());
     } catch (DataIntegrityViolationException dup) {
       // Another scrape inserted the same canonical URL first — fine.
