@@ -6,6 +6,7 @@ import org.smalltech.hashtaglocal_backend.entity.EventEntity;
 import org.smalltech.hashtaglocal_backend.model.EventPortalModel;
 import org.smalltech.hashtaglocal_backend.model.EventTypeModel;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 /**
@@ -39,4 +40,16 @@ public interface EventRepository extends JpaRepository<EventEntity, Long> {
    * imported from a previous scrape of the same portal.
    */
   boolean existsByNameAndStartTime(String name, LocalDateTime startTime);
+
+  /**
+   * Returns events that have NO approval row at all. Such events are invisible to both the public
+   * API (which needs APPROVED) and the ops review queue (which queries by approval status), so they
+   * must be surfaced as implicitly-pending in ops to avoid silently lost events. (Normally every
+   * imported event gets an approval row; orphans arise from events imported before that logic, or a
+   * failed import.)
+   */
+  @Query(
+      "SELECT e FROM EventEntity e "
+          + "WHERE NOT EXISTS (SELECT 1 FROM EventApprovalEntity a WHERE a.eventId = e.id)")
+  List<EventEntity> findWithoutApprovalRow();
 }
