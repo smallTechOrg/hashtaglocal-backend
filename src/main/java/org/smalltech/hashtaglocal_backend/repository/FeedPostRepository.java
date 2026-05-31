@@ -20,7 +20,8 @@ public interface FeedPostRepository extends JpaRepository<FeedPostEntity, Long> 
   @Query(
       "SELECT p FROM FeedPostEntity p "
           + "WHERE p.locality.id = :localityId "
-          + "AND p.status = :status "
+          + "AND (p.status = :status "
+          + "     OR (:viewerUserId IS NOT NULL AND p.author.id = :viewerUserId)) "
           + "AND p.pinned = false "
           + "AND (p.publishedAt IS NULL OR p.publishedAt <= :now) "
           + "ORDER BY p.createdAt DESC, p.id DESC")
@@ -28,6 +29,7 @@ public interface FeedPostRepository extends JpaRepository<FeedPostEntity, Long> 
       @Param("localityId") Long localityId,
       @Param("status") FeedPostStatus status,
       @Param("now") LocalDateTime now,
+      @Param("viewerUserId") Long viewerUserId,
       Pageable pageable);
 
   /**
@@ -37,7 +39,8 @@ public interface FeedPostRepository extends JpaRepository<FeedPostEntity, Long> 
   @Query(
       "SELECT p FROM FeedPostEntity p "
           + "WHERE p.locality.id = :localityId "
-          + "AND p.status = :status "
+          + "AND (p.status = :status "
+          + "     OR (:viewerUserId IS NOT NULL AND p.author.id = :viewerUserId)) "
           + "AND p.pinned = false "
           + "AND (p.publishedAt IS NULL OR p.publishedAt <= :now) "
           + "AND (p.createdAt < :cursorCreatedAt "
@@ -47,6 +50,7 @@ public interface FeedPostRepository extends JpaRepository<FeedPostEntity, Long> 
       @Param("localityId") Long localityId,
       @Param("status") FeedPostStatus status,
       @Param("now") LocalDateTime now,
+      @Param("viewerUserId") Long viewerUserId,
       @Param("cursorCreatedAt") LocalDateTime cursorCreatedAt,
       @Param("cursorId") Long cursorId,
       Pageable pageable);
@@ -61,7 +65,8 @@ public interface FeedPostRepository extends JpaRepository<FeedPostEntity, Long> 
   @Query(
       "SELECT p FROM FeedPostEntity p "
           + "WHERE (p.locality.id = :rootId OR p.locality.parent.id = :rootId) "
-          + "AND p.status = :status "
+          + "AND (p.status = :status "
+          + "     OR (:viewerUserId IS NOT NULL AND p.author.id = :viewerUserId)) "
           + "AND p.pinned = false "
           + "AND (p.publishedAt IS NULL OR p.publishedAt <= :now) "
           + "ORDER BY p.createdAt DESC, p.id DESC")
@@ -69,13 +74,15 @@ public interface FeedPostRepository extends JpaRepository<FeedPostEntity, Long> 
       @Param("rootId") Long rootId,
       @Param("status") FeedPostStatus status,
       @Param("now") LocalDateTime now,
+      @Param("viewerUserId") Long viewerUserId,
       Pageable pageable);
 
   /** Subsequent aggregated page: older than the cursor. */
   @Query(
       "SELECT p FROM FeedPostEntity p "
           + "WHERE (p.locality.id = :rootId OR p.locality.parent.id = :rootId) "
-          + "AND p.status = :status "
+          + "AND (p.status = :status "
+          + "     OR (:viewerUserId IS NOT NULL AND p.author.id = :viewerUserId)) "
           + "AND p.pinned = false "
           + "AND (p.publishedAt IS NULL OR p.publishedAt <= :now) "
           + "AND (p.createdAt < :cursorCreatedAt "
@@ -85,6 +92,7 @@ public interface FeedPostRepository extends JpaRepository<FeedPostEntity, Long> 
       @Param("rootId") Long rootId,
       @Param("status") FeedPostStatus status,
       @Param("now") LocalDateTime now,
+      @Param("viewerUserId") Long viewerUserId,
       @Param("cursorCreatedAt") LocalDateTime cursorCreatedAt,
       @Param("cursorId") Long cursorId,
       Pageable pageable);
