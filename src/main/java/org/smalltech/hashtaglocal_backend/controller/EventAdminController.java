@@ -249,11 +249,20 @@ public class EventAdminController {
         pendingApprovals.stream()
             .collect(Collectors.toMap(EventApprovalEntity::getEventId, a -> a));
 
-    var events =
+    var pendingEvents =
         eventService.findByIds(approvalMap.keySet()).stream()
             .filter(e -> e.getLocation() != null)
-            .map(e -> eventService.toAdminEventData(e, approvalMap.get(e.getId())))
-            .toList();
+            .map(e -> eventService.toAdminEventData(e, approvalMap.get(e.getId())));
+
+    // Also surface events that have NO approval row at all — otherwise they are invisible
+    // everywhere (not public, not pending, not history) and silently lost. Treat them as
+    // implicitly pending (toAdminEventData maps a null approval to PENDING).
+    var orphanEvents =
+        eventRepository.findWithoutApprovalRow().stream()
+            .filter(e -> e.getLocation() != null)
+            .map(e -> eventService.toAdminEventData(e, null));
+
+    var events = java.util.stream.Stream.concat(pendingEvents, orphanEvents).toList();
 
     return ResponseEntity.ok(
         NewAPIResponse.<EventListResponseData>builder()
@@ -276,13 +285,12 @@ public class EventAdminController {
   public ResponseEntity<NewAPIResponse<Long>> approveEvent(
       @PathVariable Long eventId, @RequestBody(required = false) EventApproveRequest request) {
 
+    // Upsert: orphan events (imported before approval rows existed) have no row yet, but still
+    // show in the pending queue — approving one must create the row rather than 404.
     EventApprovalEntity approval =
         eventApprovalRepository
             .findById(eventId)
-            .orElseThrow(
-                () ->
-                    new ResponseStatusException(
-                        HttpStatus.NOT_FOUND, "No approval record found for event " + eventId));
+            .orElseGet(() -> requireEventApprovalShell(eventId));
 
     approval.setStatus(EventApprovalStatus.APPROVED);
     approval.setReviewedAt(LocalDateTime.now());
@@ -309,13 +317,11 @@ public class EventAdminController {
       description = "Marks the event as REJECTED — it will not appear on the public site.")
   public ResponseEntity<NewAPIResponse<Long>> rejectEvent(@PathVariable Long eventId) {
 
+    // Upsert: orphan events have no approval row yet — rejecting one must create it, not 404.
     EventApprovalEntity approval =
         eventApprovalRepository
             .findById(eventId)
-            .orElseThrow(
-                () ->
-                    new ResponseStatusException(
-                        HttpStatus.NOT_FOUND, "No approval record found for event " + eventId));
+            .orElseGet(() -> requireEventApprovalShell(eventId));
 
     approval.setStatus(EventApprovalStatus.REJECTED);
     approval.setReviewedAt(LocalDateTime.now());
@@ -328,6 +334,17 @@ public class EventAdminController {
    * Returns all events that have already been reviewed (approved or rejected), newest first. Useful
    * for auditing decisions made in the ops portal.
    */
+  /**
+   * Builds a fresh approval-row shell for an event that has none yet (an orphan surfaced in the
+   * pending queue). Verifies the event itself exists so we never create a dangling approval row.
+   */
+  private EventApprovalEntity requireEventApprovalShell(Long eventId) {
+    if (!eventRepository.existsById(eventId)) {
+      throw new ResponseStatusException(HttpStatus.NOT_FOUND, "No event found for id " + eventId);
+    }
+    return EventApprovalEntity.builder().eventId(eventId).build();
+  }
+
   @GetMapping("/event/history")
   @Operation(
       summary = "List reviewed events",
