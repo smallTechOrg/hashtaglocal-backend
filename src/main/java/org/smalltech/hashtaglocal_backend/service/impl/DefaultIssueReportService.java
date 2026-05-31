@@ -7,7 +7,6 @@ import org.smalltech.hashtaglocal_backend.entity.IssueEntity;
 import org.smalltech.hashtaglocal_backend.entity.Location;
 import org.smalltech.hashtaglocal_backend.entity.MediaEntity;
 import org.smalltech.hashtaglocal_backend.entity.UserEntity;
-import org.smalltech.hashtaglocal_backend.event.IssueCreatedEvent;
 import org.smalltech.hashtaglocal_backend.model.IssueActionApprovalStatus;
 import org.smalltech.hashtaglocal_backend.model.IssueActionModel;
 import org.smalltech.hashtaglocal_backend.model.IssueActionResult;
@@ -24,7 +23,6 @@ import org.smalltech.hashtaglocal_backend.repository.UserRepository;
 import org.smalltech.hashtaglocal_backend.service.IssueReportService;
 import org.smalltech.hashtaglocal_backend.service.KarmaService;
 import org.smalltech.hashtaglocal_backend.service.LocationService;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -39,7 +37,6 @@ public class DefaultIssueReportService implements IssueReportService {
   private final LocationService locationService;
   private final IssueActionRepository issueActionRepository;
   private final KarmaService karmaService;
-  private final ApplicationEventPublisher eventPublisher;
 
   @Override
   public IssueActionResult createIssue(Long userId, IssueReportRequest request) {
@@ -129,8 +126,8 @@ public class DefaultIssueReportService implements IssueReportService {
           karmaService.awardPendingKarma(user, KarmaTransactionType.REPORT, firstPendingAction);
     }
 
-    // Notify the feed module to auto-post an ISSUE_REF (fired after commit by the listener).
-    eventPublisher.publishEvent(new IssueCreatedEvent(issue.getId()));
+    // No feed post at creation — a new issue is ONHOLD awaiting approval. The feed module posts
+    // an ISSUE_REF only when the issue becomes OPEN (approved) via IssueStatusChangedEvent.
 
     return IssueActionResult.builder().issueId(issue.getId()).karmaAwarded(karmaAwarded).build();
   }

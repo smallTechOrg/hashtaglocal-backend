@@ -140,4 +140,28 @@ public interface FeedPostRepository extends JpaRepository<FeedPostEntity, Long> 
 
   /** Posts stuck awaiting moderation — picked up by the retry sweeper. */
   List<FeedPostEntity> findByStatus(FeedPostStatus status, Pageable pageable);
+
+  /**
+   * How many ISSUE_REF posts already exist for an issue, regardless of status. Used by the issue
+   * lifecycle listener to avoid duplicating the approval ({@code OPEN}) post.
+   */
+  @Query(
+      "SELECT COUNT(p) FROM FeedPostEntity p "
+          + "WHERE p.kind = org.smalltech.hashtaglocal_backend.model.FeedPostKind.ISSUE_REF "
+          + "AND p.content.issue.id = :issueId")
+  long countIssueRefPosts(@Param("issueId") Long issueId);
+
+  /**
+   * Hide every ISSUE_REF post for an issue (set to {@code ADMIN_HIDDEN}) when the issue leaves the
+   * publicly-visible OPEN/RESOLVED states (rejected or put back on hold). The public timeline shows
+   * {@code PUBLISHED} only, so hidden posts drop out immediately.
+   */
+  @org.springframework.data.jpa.repository.Modifying
+  @Query(
+      "UPDATE FeedPostEntity p SET p.status = org.smalltech.hashtaglocal_backend.model.FeedPostStatus.ADMIN_HIDDEN "
+          + "WHERE p.kind = org.smalltech.hashtaglocal_backend.model.FeedPostKind.ISSUE_REF "
+          + "AND p.status <> org.smalltech.hashtaglocal_backend.model.FeedPostStatus.ADMIN_HIDDEN "
+          + "AND p.id IN ("
+          + "  SELECT c.post.id FROM FeedPostContentEntity c WHERE c.issue.id = :issueId)")
+  int hideIssueRefPosts(@Param("issueId") Long issueId);
 }

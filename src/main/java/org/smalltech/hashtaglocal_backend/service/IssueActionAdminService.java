@@ -5,12 +5,14 @@ import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.smalltech.hashtaglocal_backend.entity.IssueActionEntity;
 import org.smalltech.hashtaglocal_backend.entity.UserEntity;
+import org.smalltech.hashtaglocal_backend.event.IssueStatusChangedEvent;
 import org.smalltech.hashtaglocal_backend.model.IssueActionApprovalStatus;
 import org.smalltech.hashtaglocal_backend.model.IssueActionModel;
 import org.smalltech.hashtaglocal_backend.model.IssueStatusModel;
 import org.smalltech.hashtaglocal_backend.repository.IssueActionRepository;
 import org.smalltech.hashtaglocal_backend.repository.IssueRepository;
 import org.smalltech.hashtaglocal_backend.repository.UserRepository;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,6 +42,7 @@ public class IssueActionAdminService {
   private final IssueRepository issueRepository;
   private final UserRepository userRepository;
   private final KarmaService karmaService;
+  private final ApplicationEventPublisher eventPublisher;
 
   /**
    * Approves or rejects a pending issue action.
@@ -103,6 +106,9 @@ public class IssueActionAdminService {
       }
       issueEntity.setUpdatedAt(LocalDateTime.now());
       issueRepository.save(issueEntity);
+      // Feed: post on approval (OPEN), hide on rejection. Fired after commit by the listener.
+      eventPublisher.publishEvent(
+          new IssueStatusChangedEvent(issueEntity.getId(), issueEntity.getStatus()));
 
     } else if (actionType == IssueActionModel.VERIFY) {
       // VERIFY approval/rejection only affects the action record.
@@ -117,6 +123,9 @@ public class IssueActionAdminService {
       }
       issueEntity.setUpdatedAt(LocalDateTime.now());
       issueRepository.save(issueEntity);
+      // Feed: RESOLVED → post again (announce resolution); revert to OPEN → no-op (post stays).
+      eventPublisher.publishEvent(
+          new IssueStatusChangedEvent(issueEntity.getId(), issueEntity.getStatus()));
 
     } else {
       throw new ResponseStatusException(
