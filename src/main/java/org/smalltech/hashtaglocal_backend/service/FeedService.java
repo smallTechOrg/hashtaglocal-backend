@@ -150,8 +150,13 @@ public class FeedService {
           "GEO",
           "Location is required to post. Enable location and try again.");
     }
+    // Point-in-polygon first, then fall back to the nearest locality — same resolution the profile,
+    // issue-report and locality endpoints use. (Without the nearest fallback, a user whose GPS sits
+    // just outside every boundary polygon — e.g. a #sikar resident near the edge — was wrongly told
+    // their location isn't supported, even though their profile resolves to #sikar fine.)
     return localityRepository
         .findContainingLocality(req.getLat(), req.getLng())
+        .or(() -> localityRepository.findNearestLocality(req.getLat(), req.getLng()))
         .orElseThrow(
             () ->
                 new DownstreamServiceException(
