@@ -17,14 +17,19 @@ public interface IssueRepository extends JpaRepository<IssueEntity, Long> {
   Optional<IssueEntity> findById(Long id);
 
   /**
-   * Issues that have a resolved locality but no ISSUE_REF feed post yet — the backlog for the feed
-   * backfill. Oldest first so backfilled posts keep chronological order. Idempotent: rerunning
-   * skips issues already referenced.
+   * Publicly-visible issues ({@code OPEN} or {@code RESOLVED}) that have a resolved locality but no
+   * ISSUE_REF feed post yet — the backlog for the feed backfill. ONHOLD/REJECTED/PENDING issues are
+   * excluded so the feed never shows unapproved issues. Oldest first so backfilled posts keep
+   * chronological order. Idempotent: rerunning skips issues already referenced.
    */
   @EntityGraph(attributePaths = {"userEntity", "location", "location.locality"})
   @Query(
       "SELECT i FROM IssueEntity i "
           + "WHERE i.location IS NOT NULL AND i.location.locality IS NOT NULL "
+          // Only publicly-visible issues belong in the feed — never ONHOLD/REJECTED/PENDING.
+          + "AND i.status IN ("
+          + "  org.smalltech.hashtaglocal_backend.model.IssueStatusModel.OPEN, "
+          + "  org.smalltech.hashtaglocal_backend.model.IssueStatusModel.RESOLVED) "
           + "AND NOT EXISTS ("
           + "  SELECT 1 FROM FeedPostContentEntity c "
           + "  WHERE c.issue = i AND c.post.kind = org.smalltech.hashtaglocal_backend.model.FeedPostKind.ISSUE_REF"
