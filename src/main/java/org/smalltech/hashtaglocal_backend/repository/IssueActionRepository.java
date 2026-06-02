@@ -2,9 +2,11 @@ package org.smalltech.hashtaglocal_backend.repository;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import org.smalltech.hashtaglocal_backend.entity.IssueActionEntity;
 import org.smalltech.hashtaglocal_backend.entity.IssueEntity;
+import org.smalltech.hashtaglocal_backend.entity.UserEntity;
 import org.smalltech.hashtaglocal_backend.model.IssueActionApprovalStatus;
 import org.smalltech.hashtaglocal_backend.model.IssueActionModel;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -79,6 +81,12 @@ public interface IssueActionRepository extends JpaRepository<IssueActionEntity, 
 
   List<IssueActionEntity> findByIssueEntityAndActionAndApprovalStatus(
       IssueEntity issueEntity, IssueActionModel action, IssueActionApprovalStatus approvalStatus);
+
+  /** Returns the user who filed the REPORT action for the given issue. */
+  @Query(
+      "SELECT a.userEntity FROM IssueActionEntity a "
+          + "WHERE a.issueEntity.id = :issueId AND a.action = 'REPORT'")
+  Optional<UserEntity> findReporterByIssueId(@Param("issueId") Long issueId);
 
   /** Bulk: returns the subset of issueIds that have at least one approved VERIFY action. */
   @Query(
