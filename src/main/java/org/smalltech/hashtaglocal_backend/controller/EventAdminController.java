@@ -136,21 +136,26 @@ public class EventAdminController {
   }
 
   /**
-   * Permanently deletes an event and its approval record.
+   * Soft-deletes an event by setting {@code is_active = false}. The row and its approval record are
+   * retained in the database but excluded from all public and admin views.
    *
-   * @param eventId ID of the event to delete
+   * @param eventId ID of the event to soft-delete
    */
   @DeleteMapping("/event/{eventId}")
   @Operation(
       summary = "Delete an event",
-      description = "Permanently removes the event and its approval record from the database.")
+      description =
+          "Soft-deletes the event (is_active = false). The row is retained in the database but hidden from all views.")
   public ResponseEntity<Void> deleteEvent(@PathVariable Long eventId) {
-    if (!eventRepository.existsById(eventId)) {
-      throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Event not found: " + eventId);
-    }
-    // Delete approval first to avoid FK violation
-    eventApprovalRepository.deleteById(eventId);
-    eventRepository.deleteById(eventId);
+    EventEntity event =
+        eventRepository
+            .findById(eventId)
+            .orElseThrow(
+                () ->
+                    new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "Event not found: " + eventId));
+    event.setActive(false);
+    eventRepository.save(event);
     return ResponseEntity.noContent().build();
   }
 
@@ -213,6 +218,7 @@ public class EventAdminController {
             .address(request.getAddress().strip())
             .link(request.getLink().strip())
             .media(media)
+            .active(true)
             .build();
 
     EventEntity saved = eventService.saveAll(List.of(event)).get(0);
@@ -302,6 +308,15 @@ public class EventAdminController {
     }
 
     eventApprovalRepository.save(approval);
+
+    // Mark the event itself as active so it appears on the public site
+    eventRepository
+        .findById(eventId)
+        .ifPresent(
+            event -> {
+              event.setActive(true);
+              eventRepository.save(event);
+            });
 
     return ResponseEntity.ok(NewAPIResponse.<Long>builder().data(eventId).build());
   }

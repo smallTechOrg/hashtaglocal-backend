@@ -76,7 +76,7 @@ public class EventService {
         approvals.stream().collect(Collectors.toMap(EventApprovalEntity::getEventId, a -> a));
 
     return eventRepository.findAllById(approvalMap.keySet()).stream()
-        .filter(e -> e.getLocation() != null)
+        .filter(e -> e.isActive() && e.getLocation() != null)
         .map(
             e -> {
               EventApprovalEntity approval = approvalMap.get(e.getId());
