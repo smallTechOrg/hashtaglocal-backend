@@ -2,7 +2,7 @@ package org.smalltech.hashtaglocal_backend.service;
 
 import java.time.LocalDateTime;
 import java.util.List;
-
+import lombok.RequiredArgsConstructor;
 import org.smalltech.hashtaglocal_backend.entity.FeedPostEntity;
 import org.smalltech.hashtaglocal_backend.entity.Locality;
 import org.smalltech.hashtaglocal_backend.exception.DownstreamServiceException;
@@ -17,8 +17,6 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import lombok.RequiredArgsConstructor;
 
 /** Read side of the feed: the public, keyset-paginated timeline. See FEED_DESIGN.md §5. */
 @Service
@@ -67,7 +65,12 @@ public class FeedQueryService {
       rows =
           aggregate
               ? feedPostRepository.findAggregatedTimelineAfter(
-                  id, FeedPostStatus.PUBLISHED, now, viewerUserId, cursor.createdAt(), cursor.id(),
+                  id,
+                  FeedPostStatus.PUBLISHED,
+                  now,
+                  viewerUserId,
+                  cursor.createdAt(),
+                  cursor.id(),
                   page)
               : feedPostRepository.findTimelineAfter(
                   id,
