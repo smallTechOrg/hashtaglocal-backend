@@ -102,6 +102,10 @@ springdoc:
   default-consumes-media-type: application/json
   default-produces-media-type: application/json
 
+firebase:
+  credentials:
+    path: ${FIREBASE_CREDENTIALS_PATH:firebase-key.json}
+
 # Google Cloud Storage Configuration
 gcs:
   credentials:

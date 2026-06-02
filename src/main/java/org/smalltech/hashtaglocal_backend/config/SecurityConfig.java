@@ -54,6 +54,10 @@ public class SecurityConfig {
                     // initiate it
                     .requestMatchers(HttpMethod.POST, "/account/delete-request")
                     .authenticated()
+                    .requestMatchers(HttpMethod.POST, "/account/device-token")
+                    .authenticated()
+                    .requestMatchers(HttpMethod.DELETE, "/account/device-token")
+                    .authenticated()
                     .requestMatchers(HttpMethod.POST, "/api/v1/portal/**")
                     .hasRole("ADMIN")
                     .requestMatchers(HttpMethod.GET, "/api/v1/media/upload-url")

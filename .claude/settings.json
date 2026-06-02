@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem -Path . -Directory)",
+      "Bash(Select-Object Name)",
+      "Bash(xargs head -50)",
+      "Bash(Get-ChildItem -Recurse \"e:\\\\smalltech\\\\#local\\\\src\\\\main\\\\java\\\\org\\\\smalltech\\\\hashtaglocal_backend\\\\infra\\\\notification\\\\\" | Select-Object FullName)",
+      "PowerShell(Get-ChildItem -Recurse \"e:\\\\smalltech\\\\#local\\\\src\\\\main\\\\resources\\\\\" | Where-Object { $_.Name -match \"\\\\.sql$\" -or $_.Name -match \"migration\" } | Select-Object FullName)",
+      "PowerShell(Select-String -Path \"e:\\\\smalltech\\\\#local\\\\src\\\\main\\\\resources\\\\application.yaml\" -Pattern \"ddl|flyway|liquibase|schema|jpa|hibernate\" -CaseSensitive:$false)",
+      "PowerShell(Select-String -Path \"e:\\\\smalltech\\\\#local\\\\build.gradle.kts\" -Pattern \"flyway|liquibase\" -CaseSensitive:$false)"
+    ]
+  }
+}
