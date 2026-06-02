@@ -85,8 +85,10 @@ Content-Type: application/json
 **Request**
 ```json
 {
-  "token": "fcm-token-string",
-  "platform": "android"
+  "data": {
+    "token": "fcm-token-string",
+    "platform": "android"
+    }
 }
 ```
 
@@ -109,7 +111,9 @@ Content-Type: application/json
 **Request**
 ```json
 {
-  "platform": "android"
+  "data": {
+    "platform": "android"
+    }
 }
 ```
 
