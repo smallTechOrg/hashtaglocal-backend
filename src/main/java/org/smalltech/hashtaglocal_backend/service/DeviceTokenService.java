@@ -37,7 +37,11 @@ public class DeviceTokenService {
             existing -> existing.setUser(user),
             () ->
                 deviceTokenRepository.save(
-                    DeviceTokenEntity.builder().user(user).token(token).platform(platform).build()));
+                    DeviceTokenEntity.builder()
+                        .user(user)
+                        .token(token)
+                        .platform(platform)
+                        .build()));
   }
 
   /** Deletes all device tokens for the authenticated user on the given platform. */

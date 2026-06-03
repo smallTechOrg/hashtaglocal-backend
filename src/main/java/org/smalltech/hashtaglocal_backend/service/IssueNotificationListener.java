@@ -58,7 +58,8 @@ public class IssueNotificationListener {
             "event", "STATUS_CHANGE");
 
     List<String> stale =
-        fcmSender.sendMulticast(tokens, "Issue is live", "Your report has been approved and is now open.", data);
+        fcmSender.sendMulticast(
+            tokens, "Issue is live", "Your report has been approved and is now open.", data);
 
     stale.forEach(deviceTokenRepository::deleteByToken);
   }

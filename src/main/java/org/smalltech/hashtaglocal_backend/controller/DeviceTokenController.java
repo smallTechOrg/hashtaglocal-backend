@@ -26,13 +26,15 @@ public class DeviceTokenController {
   public ResponseEntity<NewAPIResponse<RegisterDeviceTokenRequest>> register(
       @AuthenticationPrincipal Long userId, @RequestBody RegisterDeviceTokenRequest request) {
     deviceTokenService.register(userId, request.getToken(), request.getPlatform());
-    return ResponseEntity.ok(NewAPIResponse.<RegisterDeviceTokenRequest>builder().data(request).build());
+    return ResponseEntity.ok(
+        NewAPIResponse.<RegisterDeviceTokenRequest>builder().data(request).build());
   }
 
   @DeleteMapping
   public ResponseEntity<NewAPIResponse<RemoveDeviceTokenRequest>> remove(
       @AuthenticationPrincipal Long userId, @RequestBody RemoveDeviceTokenRequest request) {
     deviceTokenService.remove(userId, request.getPlatform());
-    return ResponseEntity.ok(NewAPIResponse.<RemoveDeviceTokenRequest>builder().data(request).build());
+    return ResponseEntity.ok(
+        NewAPIResponse.<RemoveDeviceTokenRequest>builder().data(request).build());
   }
 }
