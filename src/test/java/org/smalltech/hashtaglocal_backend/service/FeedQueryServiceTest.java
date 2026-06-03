@@ -49,7 +49,8 @@ class FeedQueryServiceTest {
     verify(feedPostRepository)
         .findAggregatedTimelineFirstPage(eq(1L), eq(FeedPostStatus.PUBLISHED), any(), any(), any());
     verify(feedPostRepository).findAggregatedPinned(eq(1L), eq(FeedPostStatus.PUBLISHED), any());
-    verify(feedPostRepository, never()).findTimelineFirstPage(anyLong(), any(), any(), any(), any());
+    verify(feedPostRepository, never())
+        .findTimelineFirstPage(anyLong(), any(), any(), any(), any());
   }
 
   @Test

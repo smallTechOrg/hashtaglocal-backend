@@ -65,10 +65,20 @@ public class FeedQueryService {
       rows =
           aggregate
               ? feedPostRepository.findAggregatedTimelineAfter(
-                  id, FeedPostStatus.PUBLISHED, now, viewerUserId, cursor.createdAt(), cursor.id(),
+                  id,
+                  FeedPostStatus.PUBLISHED,
+                  now,
+                  viewerUserId,
+                  cursor.createdAt(),
+                  cursor.id(),
                   page)
               : feedPostRepository.findTimelineAfter(
-                  id, FeedPostStatus.PUBLISHED, now, viewerUserId, cursor.createdAt(), cursor.id(),
+                  id,
+                  FeedPostStatus.PUBLISHED,
+                  now,
+                  viewerUserId,
+                  cursor.createdAt(),
+                  cursor.id(),
                   page);
     }
 
