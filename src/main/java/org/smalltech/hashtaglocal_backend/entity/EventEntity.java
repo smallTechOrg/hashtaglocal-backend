@@ -95,6 +95,14 @@ public class EventEntity {
   @Column(columnDefinition = "jsonb")
   private Map<String, Object> metaData;
 
+  /**
+   * True only after an admin approves the event. False for pending, rejected, and soft-deleted
+   * events.
+   */
+  @Builder.Default
+  @Column(name = "is_active", nullable = false)
+  private boolean active = false;
+
   /** Timestamp when this record was first created. Set automatically, never updated. */
   @Column(nullable = false, updatable = false)
   private LocalDateTime createdAt;

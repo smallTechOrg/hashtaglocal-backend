@@ -53,3 +53,6 @@ staging-urlmap-backup.yaml
 staging-urlmap-updated.yaml
 
 .env
+
+### Claude Code ###
+.claude/

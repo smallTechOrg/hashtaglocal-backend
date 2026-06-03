@@ -39,7 +39,7 @@ class FeedQueryServiceTest {
   @Test
   void aggregateTrueUsesAggregatedQueries() {
     when(feedPostRepository.findAggregatedTimelineFirstPage(
-            eq(1L), eq(FeedPostStatus.PUBLISHED), any(), any(Pageable.class)))
+            eq(1L), eq(FeedPostStatus.PUBLISHED), any(), any(), any(Pageable.class)))
         .thenReturn(List.of());
     when(feedPostRepository.findAggregatedPinned(eq(1L), eq(FeedPostStatus.PUBLISHED), any()))
         .thenReturn(List.of());
@@ -47,15 +47,16 @@ class FeedQueryServiceTest {
     feedQueryService.getTimeline("india", null, 30, true, null);
 
     verify(feedPostRepository)
-        .findAggregatedTimelineFirstPage(eq(1L), eq(FeedPostStatus.PUBLISHED), any(), any());
+        .findAggregatedTimelineFirstPage(eq(1L), eq(FeedPostStatus.PUBLISHED), any(), any(), any());
     verify(feedPostRepository).findAggregatedPinned(eq(1L), eq(FeedPostStatus.PUBLISHED), any());
-    verify(feedPostRepository, never()).findTimelineFirstPage(anyLong(), any(), any(), any());
+    verify(feedPostRepository, never())
+        .findTimelineFirstPage(anyLong(), any(), any(), any(), any());
   }
 
   @Test
   void aggregateFalseUsesSingleLocalityQueries() {
     when(feedPostRepository.findTimelineFirstPage(
-            eq(1L), eq(FeedPostStatus.PUBLISHED), any(), any(Pageable.class)))
+            eq(1L), eq(FeedPostStatus.PUBLISHED), any(), any(), any(Pageable.class)))
         .thenReturn(List.of());
     when(feedPostRepository.findPinned(eq(1L), eq(FeedPostStatus.PUBLISHED), any()))
         .thenReturn(List.of());
@@ -63,8 +64,23 @@ class FeedQueryServiceTest {
     feedQueryService.getTimeline("india", null, 30, false, null);
 
     verify(feedPostRepository)
-        .findTimelineFirstPage(eq(1L), eq(FeedPostStatus.PUBLISHED), any(), any());
+        .findTimelineFirstPage(eq(1L), eq(FeedPostStatus.PUBLISHED), any(), any(), any());
     verify(feedPostRepository, never())
-        .findAggregatedTimelineFirstPage(anyLong(), any(), any(), any());
+        .findAggregatedTimelineFirstPage(anyLong(), any(), any(), any(), any());
+  }
+
+  @Test
+  void viewerUserIdIsPassedToTimelineQuery() {
+    when(feedPostRepository.findTimelineFirstPage(
+            eq(1L), eq(FeedPostStatus.PUBLISHED), any(), eq(42L), any(Pageable.class)))
+        .thenReturn(List.of());
+    when(feedPostRepository.findPinned(eq(1L), eq(FeedPostStatus.PUBLISHED), any()))
+        .thenReturn(List.of());
+
+    feedQueryService.getTimeline("india", null, 30, false, 42L);
+
+    // The viewer's id flows into the query so their own under-review posts are included.
+    verify(feedPostRepository)
+        .findTimelineFirstPage(eq(1L), eq(FeedPostStatus.PUBLISHED), any(), eq(42L), any());
   }
 }

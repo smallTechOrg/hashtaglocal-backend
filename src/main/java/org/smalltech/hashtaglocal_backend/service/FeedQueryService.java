@@ -51,19 +51,35 @@ public class FeedQueryService {
     // When aggregate=true (a parent/root hashtag like #india), include all child localities' posts.
     PageRequest page = PageRequest.of(0, pageSize + 1);
     List<FeedPostEntity> rows;
+    // The viewer additionally sees their OWN not-yet-published posts (PENDING_AI/FLAGGED/
+    // AI_BLOCKED) inline in the timeline — so a user always sees what they just sent, marked
+    // "under review" on the client. Everyone else sees PUBLISHED only.
     if (cursor == null) {
       rows =
           aggregate
               ? feedPostRepository.findAggregatedTimelineFirstPage(
-                  id, FeedPostStatus.PUBLISHED, now, page)
-              : feedPostRepository.findTimelineFirstPage(id, FeedPostStatus.PUBLISHED, now, page);
+                  id, FeedPostStatus.PUBLISHED, now, viewerUserId, page)
+              : feedPostRepository.findTimelineFirstPage(
+                  id, FeedPostStatus.PUBLISHED, now, viewerUserId, page);
     } else {
       rows =
           aggregate
               ? feedPostRepository.findAggregatedTimelineAfter(
-                  id, FeedPostStatus.PUBLISHED, now, cursor.createdAt(), cursor.id(), page)
+                  id,
+                  FeedPostStatus.PUBLISHED,
+                  now,
+                  viewerUserId,
+                  cursor.createdAt(),
+                  cursor.id(),
+                  page)
               : feedPostRepository.findTimelineAfter(
-                  id, FeedPostStatus.PUBLISHED, now, cursor.createdAt(), cursor.id(), page);
+                  id,
+                  FeedPostStatus.PUBLISHED,
+                  now,
+                  viewerUserId,
+                  cursor.createdAt(),
+                  cursor.id(),
+                  page);
     }
 
     boolean hasMore = rows.size() > pageSize;

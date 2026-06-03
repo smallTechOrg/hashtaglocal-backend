@@ -24,7 +24,8 @@ import org.springframework.transaction.event.TransactionalEventListener;
  * <ul>
  *   <li>{@code OPEN} — issue approved → post an ISSUE_REF (once; skips if one already exists).
  *   <li>{@code RESOLVED} — issue resolved → post again to announce the resolution.
- *   <li>{@code REJECTED} / {@code ONHOLD} — issue left the public states → hide its ISSUE_REF posts.
+ *   <li>{@code REJECTED} / {@code ONHOLD} — issue left the public states → hide its ISSUE_REF
+ *       posts.
  * </ul>
  */
 @Component
@@ -74,7 +75,8 @@ public class FeedIssueRefListener {
 
     // On approval (OPEN) post once; if a post already exists (e.g. re-approval), don't duplicate.
     // On RESOLVED we always post again to announce the resolution.
-    if (status == IssueStatusModel.OPEN && feedPostRepository.countIssueRefPosts(issue.getId()) > 0) {
+    if (status == IssueStatusModel.OPEN
+        && feedPostRepository.countIssueRefPosts(issue.getId()) > 0) {
       return;
     }
 
