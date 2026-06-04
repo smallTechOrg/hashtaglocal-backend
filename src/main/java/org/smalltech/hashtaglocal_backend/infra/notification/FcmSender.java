@@ -13,6 +13,8 @@ import java.util.List;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -22,12 +24,17 @@ public class FcmSender {
 
   private final FirebaseMessaging firebaseMessaging;
 
-  public FcmSender(FirebaseMessaging firebaseMessaging) {
+  @Autowired
+  public FcmSender(@Nullable FirebaseMessaging firebaseMessaging) {
     this.firebaseMessaging = firebaseMessaging;
   }
 
   /** Sends to a single device. Silently drops send-level errors (token already logged). */
   public void send(String token, String title, String body, Map<String, String> data) {
+    if (firebaseMessaging == null) {
+      log.debug("FCM not configured; skipping notification to token {}", token);
+      return;
+    }
     Message.Builder builder =
         Message.builder()
             .setToken(token)
@@ -61,6 +68,10 @@ public class FcmSender {
 
     data.forEach(builder::putData);
 
+    if (firebaseMessaging == null) {
+      log.debug("FCM not configured; skipping multicast to {} tokens", tokens.size());
+      return List.of();
+    }
     List<String> staleTokens = new ArrayList<>();
     try {
       var response = firebaseMessaging.sendEachForMulticast(builder.build());

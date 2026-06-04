@@ -1,5 +1,6 @@
 package org.smalltech.hashtaglocal_backend.controller;
 
+import java.util.Map;
 import org.smalltech.hashtaglocal_backend.dto.RegisterDeviceTokenRequest;
 import org.smalltech.hashtaglocal_backend.dto.RemoveDeviceTokenRequest;
 import org.smalltech.hashtaglocal_backend.model.NewAPIResponse;
@@ -24,7 +25,9 @@ public class DeviceTokenController {
 
   @PostMapping
   public ResponseEntity<NewAPIResponse<RegisterDeviceTokenRequest>> register(
-      @AuthenticationPrincipal Long userId, @RequestBody RegisterDeviceTokenRequest request) {
+      @AuthenticationPrincipal Long userId,
+      @RequestBody Map<String, RegisterDeviceTokenRequest> body) {
+    RegisterDeviceTokenRequest request = body.get("data");
     deviceTokenService.register(userId, request.getToken(), request.getPlatform());
     return ResponseEntity.ok(
         NewAPIResponse.<RegisterDeviceTokenRequest>builder().data(request).build());
@@ -32,7 +35,9 @@ public class DeviceTokenController {
 
   @DeleteMapping
   public ResponseEntity<NewAPIResponse<RemoveDeviceTokenRequest>> remove(
-      @AuthenticationPrincipal Long userId, @RequestBody RemoveDeviceTokenRequest request) {
+      @AuthenticationPrincipal Long userId,
+      @RequestBody Map<String, RemoveDeviceTokenRequest> body) {
+    RemoveDeviceTokenRequest request = body.get("data");
     deviceTokenService.remove(userId, request.getPlatform());
     return ResponseEntity.ok(
         NewAPIResponse.<RemoveDeviceTokenRequest>builder().data(request).build());

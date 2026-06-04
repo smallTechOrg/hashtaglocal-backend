@@ -20,15 +20,21 @@ Firebase Cloud Messaging (FCM) is used to send push notifications to Android (an
 3. Rename it `firebase-key.json` and place it in the project root (next to `gcs-key.json`)
 4. Add it to `.gitignore` — **never commit this file**
 
-On the VM, set the path via environment variable instead of relying on the default filename:
+### Uploading the key to the VM
 
-```
-FIREBASE_CREDENTIALS_PATH=/home/deploy/secrets/firebase-key.json
+`scp` cannot write directly to `/opt/` (root-owned). Copy to `/tmp/` first, then move with `sudo`:
+
+```powershell
+# From local PowerShell
+gcloud compute scp .\firebase-key.json staging-instance:/tmp/firebase-key.json --zone=us-central1-f
+gcloud compute ssh staging-instance --zone=us-central1-f --command="sudo mv /tmp/firebase-key.json /opt/hashtaglocal-backend/firebase-key.json && sudo chmod 600 /opt/hashtaglocal-backend/firebase-key.json"
 ```
 
-Add to `/etc/systemd/system/hashtaglocal-backend.service` under `[Service]`:
+The app defaults to looking for `firebase-key.json` in the working directory (`/opt/hashtaglocal-backend/`), so no extra config is needed once the file is in place. To use a custom path, set the property via environment variable:
+
 ```ini
-Environment="FIREBASE_CREDENTIALS_PATH=/home/deploy/secrets/firebase-key.json"
+# /etc/systemd/system/hashtaglocal-backend.service — under [Service]
+Environment="FIREBASE_CREDENTIALS_PATH=/opt/hashtaglocal-backend/firebase-key.json"
 ```
 
 Then reload:
@@ -36,6 +42,8 @@ Then reload:
 sudo systemctl daemon-reload
 sudo systemctl restart hashtaglocal-backend
 ```
+
+> **Note:** If `firebase-key.json` is absent, the app still starts — FCM is disabled and push notifications are silently skipped (a warning is logged). This prevents deploy failures when the key hasn't been placed yet.
 
 ---
 
@@ -111,6 +119,37 @@ CREATE INDEX idx_device_tokens_user_id ON device_tokens(user_id);
 ```
 
 Stale tokens returned by `sendMulticast()` should be deleted immediately to keep the table clean.
+
+### API
+
+**Register token** — call after login whenever the FCM token may have changed:
+```
+POST /account/device-token
+Authorization: Bearer <access_token>
+Content-Type: application/json
+
+{
+  "data": {
+    "token": "<fcm_token>",
+    "platform": "android"
+  }
+}
+```
+
+**Remove token** — call on logout:
+```
+DELETE /account/device-token
+Authorization: Bearer <access_token>
+Content-Type: application/json
+
+{
+  "data": {
+    "platform": "android"
+  }
+}
+```
+
+Both endpoints return `2xx` with `{ "data": { ... } }` on success.
 
 ---
 

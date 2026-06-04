@@ -16,6 +16,23 @@ Push notifications are delivered via Firebase Cloud Messaging (FCM).
 
 ---
 
+## Implementation Status
+
+| Feature | Status |
+|---|---|
+| Device token register / remove | ✅ Done |
+| `ISSUE_UPDATE` — `STATUS_CHANGE` → `OPEN` (reporter only) | ✅ Done |
+| `ISSUE_UPDATE` — other status changes (`ONHOLD`, `RESOLVED`, `REJECTED`) | ⬜ Planned |
+| `ISSUE_UPDATE` — `VERIFIED` / `RESOLVED_BY_USER` events | ⬜ Planned |
+| Notify verifiers (not just reporter) | ⬜ Planned |
+| `NEARBY_ISSUE` | ⬜ Planned |
+| `PORTAL_ISSUE_CLOSED` | ⬜ Planned |
+| `ACTIVITY_REMINDER` | ⬜ Planned |
+| Don't-notify-actor / dedup rules | ⬜ Planned |
+| iOS APNs support | ⬜ Planned |
+
+---
+
 ## 1. Architecture Overview
 
 ```
@@ -131,14 +148,16 @@ All FCM `data` values must be **strings** (no numbers or booleans). `notificatio
 
 ### 4.1 `ISSUE_UPDATE`
 
+> **Status:** Partially implemented. Only `STATUS_CHANGE → OPEN` is live, and only the reporter is notified. Other events and verifier notifications are planned.
+
 **When:** anything significant happens to an issue the user is involved with:
-- Status changes: `PENDING` → `OPEN`, `OPEN` → `RESOLVED` / `ONHOLD` / `REJECTED`
-- Another user's `VERIFY` action is approved for this issue
-- Another user's `RESOLVE` action is approved for this issue
+- Status changes: `PENDING` → `OPEN` ✅ · `OPEN` → `RESOLVED` / `ONHOLD` / `REJECTED` ⬜
+- Another user's `VERIFY` action is approved for this issue ⬜
+- Another user's `RESOLVE` action is approved for this issue ⬜
 
 **Recipients:**
-- The user who submitted the original `REPORT` action (`issue_actions.action = 'REPORT'`)
-- All users who submitted a `VERIFY` action on the same `issue_id` (regardless of their approval status — they cared enough to verify)
+- The user who submitted the original `REPORT` action (`issue_actions.action = 'REPORT'`) ✅
+- All users who submitted a `VERIFY` action on the same `issue_id` (regardless of their approval status — they cared enough to verify) ⬜
 
 **Payload**
 ```json
@@ -170,7 +189,7 @@ All FCM `data` values must be **strings** (no numbers or booleans). `notificatio
 
 ---
 
-### 4.2 `NEARBY_ISSUE`
+### 4.2 `NEARBY_ISSUE` ⬜ Planned
 
 **When:** a new issue is created and its status moves to `OPEN` (approved by ops).
 
@@ -205,7 +224,7 @@ notifications:
 
 ---
 
-### 4.3 `PORTAL_ISSUE_CLOSED`
+### 4.3 `PORTAL_ISSUE_CLOSED` ⬜ Planned
 
 **When:** the `PortalIssueTrackingJob` cron detects that a `GovPortalEntity` status has changed from `OPEN` to closed/resolved on the government portal.
 
@@ -238,7 +257,7 @@ notifications:
 
 ---
 
-### 4.4 `ACTIVITY_REMINDER`
+### 4.4 `ACTIVITY_REMINDER` ⬜ Planned
 
 **When:** a scheduled job runs and finds issues where the reporter has had no activity for N days — a nudge to go back out and see if anything has changed.
 
@@ -291,12 +310,12 @@ notifications:
 
 ## 6. Delivery Rules
 
-- **Don't notify the actor.** If the reporter is also the one triggering the action (e.g. they verify their own issue), suppress the notification to them.
-- **One notification per event per user.** If a user is both reporter and verifier, send one message — not two.
-- **`ACTIVITY_REMINDER` — once per N-day window.** Track last reminder sent per user+issue to avoid repeat spam. A simple `last_reminded_at` column on `issue_actions` or a separate `notification_log` table works.
-- **`NEARBY_ISSUE` — only for OPEN issues.** Do not fire for issues still in `PENDING` (awaiting ops approval).
-- **Android priority:** all messages use `AndroidConfig.Priority.HIGH`.
-- **iOS (when ready):** add `ApnsConfig` with `content-available: 1` and upload the APNs `.p8` key to Firebase Console.
+- **Don't notify the actor.** ⬜ If the reporter is also the one triggering the action (e.g. they verify their own issue), suppress the notification to them.
+- **One notification per event per user.** ⬜ If a user is both reporter and verifier, send one message — not two.
+- **`ACTIVITY_REMINDER` — once per N-day window.** ⬜ Track last reminder sent per user+issue to avoid repeat spam. A simple `last_reminded_at` column on `issue_actions` or a separate `notification_log` table works.
+- **`NEARBY_ISSUE` — only for OPEN issues.** ⬜ Do not fire for issues still in `PENDING` (awaiting ops approval).
+- **Android priority:** ✅ All messages use `AndroidConfig.Priority.HIGH`.
+- **iOS (when ready):** ⬜ Add `ApnsConfig` with `content-available: 1` and upload the APNs `.p8` key to Firebase Console.
 
 ---
 
