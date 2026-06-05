@@ -52,7 +52,7 @@ logging:
 # Application-specific custom configuration
 app:
   geo:
-    verify-radius-meters: 50
+    verify-radius-meters: 100
 
 # Added: account deletion workflow config — admin-email receives deletion notifications;
 # from-email is used as the SMTP sender address
