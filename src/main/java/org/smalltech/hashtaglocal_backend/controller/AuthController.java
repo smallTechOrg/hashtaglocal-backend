@@ -4,6 +4,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.smalltech.hashtaglocal_backend.model.NewAPIResponse;
+import org.smalltech.hashtaglocal_backend.model.Platform;
 import org.smalltech.hashtaglocal_backend.model.request.AppleAuthRequest;
 import org.smalltech.hashtaglocal_backend.model.request.AuthRefreshRequest;
 import org.smalltech.hashtaglocal_backend.model.request.OAuthRequest;
@@ -41,7 +42,9 @@ public class AuthController {
   public ResponseEntity<NewAPIResponse<AuthTokenResponseData>> googleCallback(
       @RequestParam("code") String code,
       @RequestParam(value = "code_verifier", required = false) String codeVerifier,
-      @RequestParam(value = "redirect_uri", required = false) String redirectUri) {
+      @RequestParam(value = "redirect_uri", required = false) String redirectUri,
+      @RequestParam(value = "platform", required = false) Platform platform,
+      @RequestParam(value = "device_id", required = false) String deviceId) {
 
     System.out.println("/auth/google/callback hit");
     System.out.println("Auth Code: " + code);
@@ -51,6 +54,8 @@ public class AuthController {
             .code(code)
             .codeVerifier(codeVerifier)
             .redirectUri(redirectUri)
+            .platform(platform)
+            .deviceId(deviceId)
             .build();
 
     var tokenData = resolveAuthService(GOOGLE_PROVIDER).authenticate(request);
@@ -62,12 +67,19 @@ public class AuthController {
   @GetMapping("/google/token")
   @Operation(summary = "Authenticate using Google access token")
   public ResponseEntity<NewAPIResponse<AuthTokenResponseData>> authenticateWithAccessToken(
-      @RequestParam("access_token") String accessToken) {
+      @RequestParam("access_token") String accessToken,
+      @RequestParam(value = "platform", required = false) Platform platform,
+      @RequestParam(value = "device_id", required = false) String deviceId) {
 
     System.out.println("/auth/google/token hit");
     System.out.println("Google Access Token: " + accessToken);
 
-    OAuthRequest request = OAuthRequest.builder().accessToken(accessToken).build();
+    OAuthRequest request =
+        OAuthRequest.builder()
+            .accessToken(accessToken)
+            .platform(platform)
+            .deviceId(deviceId)
+            .build();
 
     var tokenData = resolveAuthService(GOOGLE_PROVIDER).authenticate(request);
 
@@ -88,6 +100,7 @@ public class AuthController {
             .fullName(request.getFullName())
             .notificationToken(request.getNotificationToken())
             .platform(request.getPlatform())
+            .deviceId(request.getDeviceId())
             .build();
 
     var tokenData = resolveAuthService(APPLE_PROVIDER).authenticate(oAuthRequest);

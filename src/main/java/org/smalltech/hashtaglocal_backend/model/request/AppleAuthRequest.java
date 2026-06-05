@@ -24,4 +24,7 @@ public class AppleAuthRequest {
   private String notificationToken;
 
   private Platform platform;
+
+  @JsonProperty("device_id")
+  private String deviceId;
 }

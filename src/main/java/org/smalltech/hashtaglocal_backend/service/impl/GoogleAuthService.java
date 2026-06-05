@@ -74,14 +74,18 @@ public class GoogleAuthService implements OAuthService {
   public AuthTokenResponseData authenticate(OAuthRequest request) {
     if (request.getAccessToken() != null && !request.getAccessToken().isBlank()) {
       return handleAccessToken(
-          request.getAccessToken(), request.getNotificationToken(), request.getPlatform());
+          request.getAccessToken(),
+          request.getNotificationToken(),
+          request.getPlatform(),
+          request.getDeviceId());
     }
     return handleAuthorizationCode(
         request.getCode(),
         request.getCodeVerifier(),
         request.getRedirectUri(),
         request.getNotificationToken(),
-        request.getPlatform());
+        request.getPlatform(),
+        request.getDeviceId());
   }
 
   public AuthTokenResponseData handleAuthorizationCode(
@@ -89,7 +93,8 @@ public class GoogleAuthService implements OAuthService {
       String codeVerifier,
       String clientRedirectUri,
       String notificationToken,
-      Platform platform) {
+      Platform platform,
+      String deviceId) {
 
     System.out.println("Exchanging auth code for Google tokens");
 
@@ -126,11 +131,12 @@ public class GoogleAuthService implements OAuthService {
         (String) payload.get("picture"),
         (String) payload.get("name"),
         notificationToken,
-        platform);
+        platform,
+        deviceId);
   }
 
   public AuthTokenResponseData handleAccessToken(
-      String accessToken, String notificationToken, Platform platform) {
+      String accessToken, String notificationToken, Platform platform, String deviceId) {
 
     System.out.println("Fetching Google user info");
 
@@ -146,7 +152,8 @@ public class GoogleAuthService implements OAuthService {
         googleUser.getPicture(),
         googleUser.getName(),
         notificationToken,
-        platform);
+        platform,
+        deviceId);
   }
 
   private AuthTokenResponseData loginOrSignup(
@@ -155,7 +162,8 @@ public class GoogleAuthService implements OAuthService {
       String picture,
       String name,
       String notificationToken,
-      Platform platform) {
+      Platform platform,
+      String deviceId) {
 
     System.out.println("Google userId: " + providerUserId);
 
@@ -205,7 +213,7 @@ public class GoogleAuthService implements OAuthService {
       isNewUser = true;
     }
 
-    return createSession(user, provider, isNewUser, notificationToken, platform);
+    return createSession(user, provider, isNewUser, notificationToken, platform, deviceId);
   }
 
   private AuthTokenResponseData createSession(
@@ -213,7 +221,8 @@ public class GoogleAuthService implements OAuthService {
       UserAuthProviderEntity provider,
       boolean isNewUser,
       String notificationToken,
-      Platform platform) {
+      Platform platform,
+      String deviceId) {
 
     String accessToken = tokenService.generateToken();
     String refreshToken = tokenService.generateToken();
@@ -229,6 +238,7 @@ public class GoogleAuthService implements OAuthService {
                 .refreshTokenExpiryTs(tokenService.refreshExpiryEpochSeconds())
                 .notificationToken(notificationToken)
                 .platform(platform)
+                .deviceId(deviceId)
                 .isActive(true)
                 .build());
 

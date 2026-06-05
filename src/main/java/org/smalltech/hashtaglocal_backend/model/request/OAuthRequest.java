@@ -20,4 +20,5 @@ public class OAuthRequest {
   private String fullName;
   private String notificationToken;
   private Platform platform;
+  private String deviceId;
 }

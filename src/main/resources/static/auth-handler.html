@@ -22,22 +22,27 @@
             const fragmentParams = new URLSearchParams(fragment);
             const accessToken = fragmentParams.get('access_token');
             
-            // Extract redirect_url from query params (?)
+            // Extract query params
             const queryParams = new URLSearchParams(window.location.search);
             const redirectUrl = queryParams.get('redirect_url');
-            
+            const platform = queryParams.get('platform');
+            const deviceId = queryParams.get('device_id');
+
             const statusEl = document.getElementById('status');
-            
+
             if (!accessToken) {
                 statusEl.className = 'error';
                 statusEl.textContent = 'Error: No access token found. Please try authenticating again.';
                 return;
             }
-            
+
             // Build backend URL
             let backendUrl = 'auth/google/token?access_token=' + encodeURIComponent(accessToken);
-            if (redirectUrl) {
-                backendUrl += '&redirect_url=' + encodeURIComponent(redirectUrl);
+            if (platform) {
+                backendUrl += '&platform=' + encodeURIComponent(platform);
+            }
+            if (deviceId) {
+                backendUrl += '&device_id=' + encodeURIComponent(deviceId);
             }
             
             // Call backend to authenticate

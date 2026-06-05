@@ -68,16 +68,21 @@ public class AppleAuthService implements OAuthService {
         request.getIdentityToken(),
         request.getFullName(),
         request.getNotificationToken(),
-        request.getPlatform());
+        request.getPlatform(),
+        request.getDeviceId());
   }
 
   public AuthTokenResponseData handleIdentityToken(
-      String identityToken, String fullName, String notificationToken, Platform platform) {
+      String identityToken,
+      String fullName,
+      String notificationToken,
+      Platform platform,
+      String deviceId) {
     System.out.println("âž¡ï¸ Verifying Apple identity token");
     JWTClaimsSet claims = verifyIdentityToken(identityToken);
     String sub = claims.getSubject();
     String email = (String) claims.getClaim("email");
-    return loginOrSignup(sub, email, fullName, notificationToken, platform);
+    return loginOrSignup(sub, email, fullName, notificationToken, platform, deviceId);
   }
 
   private JWTClaimsSet verifyIdentityToken(String identityToken) {
@@ -111,7 +116,8 @@ public class AppleAuthService implements OAuthService {
       String email,
       String fullName,
       String notificationToken,
-      Platform platform) {
+      Platform platform,
+      String deviceId) {
 
     System.out.println("ðŸ‘¤ Apple userId: " + providerUserId);
 
@@ -152,14 +158,15 @@ public class AppleAuthService implements OAuthService {
       System.out.println("âœ… Provider saved | ID: " + provider.getId());
     }
 
-    return createSession(user, provider, notificationToken, platform);
+    return createSession(user, provider, notificationToken, platform, deviceId);
   }
 
   private AuthTokenResponseData createSession(
       UserEntity user,
       UserAuthProviderEntity provider,
       String notificationToken,
-      Platform platform) {
+      Platform platform,
+      String deviceId) {
     String accessToken = tokenService.generateToken();
     String refreshToken = tokenService.generateToken();
 
@@ -174,6 +181,7 @@ public class AppleAuthService implements OAuthService {
                 .refreshTokenExpiryTs(tokenService.refreshExpiryEpochSeconds())
                 .notificationToken(notificationToken)
                 .platform(platform)
+                .deviceId(deviceId)
                 .isActive(true)
                 .build());
 
