@@ -86,6 +86,8 @@ public class AuthController {
         OAuthRequest.builder()
             .identityToken(request.getIdentityToken())
             .fullName(request.getFullName())
+            .notificationToken(request.getNotificationToken())
+            .platform(request.getPlatform())
             .build();
 
     var tokenData = resolveAuthService(APPLE_PROVIDER).authenticate(oAuthRequest);

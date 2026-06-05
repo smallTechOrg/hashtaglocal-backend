@@ -4,13 +4,12 @@ import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.smalltech.hashtaglocal_backend.entity.DeviceTokenEntity;
 import org.smalltech.hashtaglocal_backend.entity.UserEntity;
 import org.smalltech.hashtaglocal_backend.event.IssueStatusChangedEvent;
 import org.smalltech.hashtaglocal_backend.infra.notification.FcmSender;
 import org.smalltech.hashtaglocal_backend.model.IssueStatusModel;
-import org.smalltech.hashtaglocal_backend.repository.DeviceTokenRepository;
 import org.smalltech.hashtaglocal_backend.repository.IssueActionRepository;
+import org.smalltech.hashtaglocal_backend.repository.UserAuthSessionRepository;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,7 +22,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
 public class IssueNotificationListener {
 
   private final IssueActionRepository issueActionRepository;
-  private final DeviceTokenRepository deviceTokenRepository;
+  private final UserAuthSessionRepository userAuthSessionRepository;
   private final FcmSender fcmSender;
 
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
@@ -42,9 +41,7 @@ public class IssueNotificationListener {
     }
 
     List<String> tokens =
-        deviceTokenRepository.findAllByUserId(reporter.getId()).stream()
-            .map(DeviceTokenEntity::getToken)
-            .toList();
+        userAuthSessionRepository.findActiveNotificationTokensByUserId(reporter.getId());
 
     if (tokens.isEmpty()) {
       return;
@@ -61,6 +58,6 @@ public class IssueNotificationListener {
         fcmSender.sendMulticast(
             tokens, "Issue is live", "Your report has been approved and is now open.", data);
 
-    stale.forEach(deviceTokenRepository::deleteByToken);
+    stale.forEach(userAuthSessionRepository::clearNotificationToken);
   }
 }

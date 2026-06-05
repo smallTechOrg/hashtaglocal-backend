@@ -1,52 +1,39 @@
 package org.smalltech.hashtaglocal_backend.service;
 
 import jakarta.transaction.Transactional;
-import org.smalltech.hashtaglocal_backend.entity.DeviceTokenEntity;
-import org.smalltech.hashtaglocal_backend.entity.UserEntity;
+import org.smalltech.hashtaglocal_backend.entity.UserAuthSessionEntity;
 import org.smalltech.hashtaglocal_backend.model.Platform;
-import org.smalltech.hashtaglocal_backend.repository.DeviceTokenRepository;
-import org.smalltech.hashtaglocal_backend.repository.UserRepository;
+import org.smalltech.hashtaglocal_backend.repository.UserAuthSessionRepository;
 import org.springframework.stereotype.Service;
 
 @Service
 public class DeviceTokenService {
 
-  private final DeviceTokenRepository deviceTokenRepository;
-  private final UserRepository userRepository;
+  private final UserAuthSessionRepository userAuthSessionRepository;
 
-  public DeviceTokenService(
-      DeviceTokenRepository deviceTokenRepository, UserRepository userRepository) {
-    this.deviceTokenRepository = deviceTokenRepository;
-    this.userRepository = userRepository;
+  public DeviceTokenService(UserAuthSessionRepository userAuthSessionRepository) {
+    this.userAuthSessionRepository = userAuthSessionRepository;
   }
 
-  /**
-   * Upserts a device token for the authenticated user. If the token already exists (re-used
-   * device), its user_id is updated to the current user.
-   */
   @Transactional
-  public void register(Long userId, String token, Platform platform) {
-    UserEntity user =
-        userRepository
-            .findById(userId)
-            .orElseThrow(() -> new IllegalArgumentException("User not found: " + userId));
+  public void register(String accessToken, String notificationToken, Platform platform) {
+    UserAuthSessionEntity session =
+        userAuthSessionRepository
+            .findByAccessToken(accessToken)
+            .orElseThrow(() -> new RuntimeException("Session not found"));
 
-    deviceTokenRepository
-        .findByToken(token)
-        .ifPresentOrElse(
-            existing -> existing.setUser(user),
-            () ->
-                deviceTokenRepository.save(
-                    DeviceTokenEntity.builder()
-                        .user(user)
-                        .token(token)
-                        .platform(platform)
-                        .build()));
+    if (notificationToken != null && (platform == Platform.android || platform == Platform.ios)) {
+      userAuthSessionRepository.deactivateByUserIdAndPlatformWithToken(
+          session.getUser().getId(), platform);
+    }
+
+    session.setNotificationToken(notificationToken);
+    session.setPlatform(platform);
+    userAuthSessionRepository.save(session);
   }
 
-  /** Deletes all device tokens for the authenticated user on the given platform. */
   @Transactional
   public void remove(Long userId, Platform platform) {
-    deviceTokenRepository.deleteByUserIdAndPlatform(userId, platform);
+    userAuthSessionRepository.clearNotificationTokenByUserIdAndPlatform(userId, platform);
   }
 }

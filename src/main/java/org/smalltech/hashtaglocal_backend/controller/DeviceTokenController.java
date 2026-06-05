@@ -10,6 +10,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -26,9 +27,11 @@ public class DeviceTokenController {
   @PostMapping
   public ResponseEntity<NewAPIResponse<RegisterDeviceTokenRequest>> register(
       @AuthenticationPrincipal Long userId,
+      @RequestHeader("Authorization") String authHeader,
       @RequestBody Map<String, RegisterDeviceTokenRequest> body) {
     RegisterDeviceTokenRequest request = body.get("data");
-    deviceTokenService.register(userId, request.getToken(), request.getPlatform());
+    String accessToken = authHeader.substring("Bearer ".length());
+    deviceTokenService.register(accessToken, request.getNotificationToken(), request.getPlatform());
     return ResponseEntity.ok(
         NewAPIResponse.<RegisterDeviceTokenRequest>builder().data(request).build());
   }

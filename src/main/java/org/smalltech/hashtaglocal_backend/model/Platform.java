@@ -2,5 +2,7 @@ package org.smalltech.hashtaglocal_backend.model;
 
 public enum Platform {
   android,
-  ios
+  ios,
+  WEB_ANDROID,
+  WEB_IOS
 }
