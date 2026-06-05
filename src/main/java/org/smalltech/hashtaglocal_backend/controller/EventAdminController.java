@@ -136,30 +136,6 @@ public class EventAdminController {
   }
 
   /**
-   * Soft-deletes an event by setting {@code is_active = false}. The row and its approval record are
-   * retained in the database but excluded from all public and admin views.
-   *
-   * @param eventId ID of the event to soft-delete
-   */
-  @DeleteMapping("/event/{eventId}")
-  @Operation(
-      summary = "Delete an event",
-      description =
-          "Soft-deletes the event (is_active = false). The row is retained in the database but hidden from all views.")
-  public ResponseEntity<Void> deleteEvent(@PathVariable Long eventId) {
-    EventEntity event =
-        eventRepository
-            .findById(eventId)
-            .orElseThrow(
-                () ->
-                    new ResponseStatusException(
-                        HttpStatus.NOT_FOUND, "Event not found: " + eventId));
-    event.setActive(false);
-    eventRepository.save(event);
-    return ResponseEntity.noContent().build();
-  }
-
-  /**
    * Creates an event manually (bypassing the scraper), auto-approves it, and triggers geocoding so
    * it appears on the public site as soon as a location can be resolved.
    */
@@ -341,6 +317,14 @@ public class EventAdminController {
     approval.setStatus(EventApprovalStatus.REJECTED);
     approval.setReviewedAt(LocalDateTime.now());
     eventApprovalRepository.save(approval);
+
+    eventRepository
+        .findById(eventId)
+        .ifPresent(
+            event -> {
+              event.setActive(false);
+              eventRepository.save(event);
+            });
 
     return ResponseEntity.ok(NewAPIResponse.<Long>builder().data(eventId).build());
   }
