@@ -18,4 +18,7 @@ public class AuthRefreshRequest {
 
   @JsonProperty("notification_token")
   private String notificationToken;
+
+  @JsonProperty("device_id")
+  private String deviceId;
 }

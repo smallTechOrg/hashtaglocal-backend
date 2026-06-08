@@ -121,6 +121,8 @@ auth:
     expiry-seconds: ${AUTH_ACCESS_TOKEN_EXPIRY_SECONDS:10}
   refresh-token:
     expiry-seconds: ${AUTH_REFRESH_TOKEN_EXPIRY_SECONDS:30}
+  session:
+    cleanup-cron: ${AUTH_SESSION_CLEANUP_CRON:0 0 3 * * *}
 
 events:
   scrape:

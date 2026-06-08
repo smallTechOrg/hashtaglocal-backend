@@ -17,16 +17,21 @@
 
     <script>
         (function() {
-            // Extract access_token from URL fragment (#)
+            // Extract fields from URL fragment (#access_token=...&state=...)
             const fragment = window.location.hash.substring(1);
             const fragmentParams = new URLSearchParams(fragment);
             const accessToken = fragmentParams.get('access_token');
-            
-            // Extract query params
+
+            // platform and device_id are encoded in the OAuth state parameter so they
+            // survive the Google redirect without requiring registered query params on the URI.
+            const stateStr = fragmentParams.get('state');
+            const stateParams = stateStr ? new URLSearchParams(stateStr) : new URLSearchParams();
+            const platform = stateParams.get('platform');
+            const deviceId = stateParams.get('device_id');
+
+            // Legacy fallback: read directly from query params if state is absent.
             const queryParams = new URLSearchParams(window.location.search);
             const redirectUrl = queryParams.get('redirect_url');
-            const platform = queryParams.get('platform');
-            const deviceId = queryParams.get('device_id');
 
             const statusEl = document.getElementById('status');
 

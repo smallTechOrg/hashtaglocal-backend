@@ -1,5 +1,6 @@
 package org.smalltech.hashtaglocal_backend.repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import org.smalltech.hashtaglocal_backend.entity.UserAuthSessionEntity;
@@ -46,15 +47,38 @@ public interface UserAuthSessionRepository extends JpaRepository<UserAuthSession
   int clearNotificationTokenByUserIdAndPlatform(
       @Param("userId") Long userId, @Param("platform") Platform platform);
 
+  // ---- Session cap ----
+
+  /** Returns active session IDs for a user, oldest first — used to enforce the per-user cap. */
+  @Query(
+      "SELECT s.id FROM UserAuthSessionEntity s "
+          + "WHERE s.user.id = :userId AND s.isActive = true "
+          + "ORDER BY s.createdAt ASC")
+  List<Long> findActiveSessionIdsByUserIdOrderByCreatedAsc(@Param("userId") Long userId);
+
+  /** Bulk-deactivates sessions by ID. Used to evict the oldest sessions when the cap is hit. */
+  @Modifying
+  @Query("UPDATE UserAuthSessionEntity s SET s.isActive = false WHERE s.id IN :ids")
+  int deactivateByIds(@Param("ids") List<Long> ids);
+
+  // ---- Cleanup ----
+
   /**
-   * Deactivates active sessions for this user+platform that already hold a notification token,
-   * preventing duplicate FCM delivery to the same platform.
+   * Deletes sessions whose refresh token expired before the given epoch-second cutoff. Safe to
+   * delete: an expired refresh token can never be used to authenticate again.
    */
   @Modifying
   @Query(
-      "UPDATE UserAuthSessionEntity s SET s.isActive = false "
-          + "WHERE s.user.id = :userId AND s.platform = :platform "
-          + "AND s.notificationToken IS NOT NULL AND s.isActive = true")
-  int deactivateByUserIdAndPlatformWithToken(
-      @Param("userId") Long userId, @Param("platform") Platform platform);
+      "DELETE FROM UserAuthSessionEntity s "
+          + "WHERE s.refreshTokenExpiryTs IS NOT NULL AND s.refreshTokenExpiryTs < :cutoffEpochSeconds")
+  int deleteByRefreshTokenExpiredBefore(@Param("cutoffEpochSeconds") long cutoffEpochSeconds);
+
+  /**
+   * Deletes inactive sessions that have not been touched in a long time. Catches rows deactivated
+   * by account deletion or manual revocation.
+   */
+  @Modifying
+  @Query(
+      "DELETE FROM UserAuthSessionEntity s " + "WHERE s.isActive = false AND s.updatedAt < :cutoff")
+  int deleteInactiveSessionsOlderThan(@Param("cutoff") LocalDateTime cutoff);
 }

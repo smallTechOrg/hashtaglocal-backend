@@ -23,7 +23,7 @@ public class DeviceTokenService {
             .orElseThrow(() -> new RuntimeException("Session not found"));
 
     if (notificationToken != null && (platform == Platform.android || platform == Platform.ios)) {
-      userAuthSessionRepository.deactivateByUserIdAndPlatformWithToken(
+      userAuthSessionRepository.clearNotificationTokenByUserIdAndPlatform(
           session.getUser().getId(), platform);
     }
 

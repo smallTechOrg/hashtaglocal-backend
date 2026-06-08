@@ -6,6 +6,7 @@ import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.jackson2.JacksonFactory;
 import jakarta.transaction.Transactional;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import org.smalltech.hashtaglocal_backend.entity.UserAuthProviderEntity;
@@ -216,6 +217,8 @@ public class GoogleAuthService implements OAuthService {
     return createSession(user, provider, isNewUser, notificationToken, platform, deviceId);
   }
 
+  private static final int MAX_ACTIVE_SESSIONS = 10;
+
   private AuthTokenResponseData createSession(
       UserEntity user,
       UserAuthProviderEntity provider,
@@ -223,6 +226,14 @@ public class GoogleAuthService implements OAuthService {
       String notificationToken,
       Platform platform,
       String deviceId) {
+
+    // Enforce per-user session cap — deactivate oldest sessions if over the limit
+    List<Long> activeIds =
+        userAuthSessionRepository.findActiveSessionIdsByUserIdOrderByCreatedAsc(user.getId());
+    if (activeIds.size() >= MAX_ACTIVE_SESSIONS) {
+      List<Long> toDeactivate = activeIds.subList(0, activeIds.size() - MAX_ACTIVE_SESSIONS + 1);
+      userAuthSessionRepository.deactivateByIds(toDeactivate);
+    }
 
     String accessToken = tokenService.generateToken();
     String refreshToken = tokenService.generateToken();
