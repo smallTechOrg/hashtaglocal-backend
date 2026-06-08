@@ -1,6 +1,5 @@
 package org.smalltech.hashtaglocal_backend.service;
 
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -94,15 +93,13 @@ public class EventImportService {
 
     // Create a PENDING approval row for every newly imported event so it lands in the
     // admin review queue before appearing on the public site.
-    // Auto-approve all imported events — admins delete/reject unwanted ones after the fact.
     List<EventApprovalEntity> approvals =
         saved.stream()
             .map(
                 e ->
                     EventApprovalEntity.builder()
                         .eventId(e.getId())
-                        .status(EventApprovalStatus.APPROVED)
-                        .reviewedAt(LocalDateTime.now())
+                        .status(EventApprovalStatus.PENDING)
                         .build())
             .toList();
     eventApprovalRepository.saveAll(approvals);
