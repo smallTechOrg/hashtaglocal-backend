@@ -46,6 +46,7 @@ public class FcmSender {
 
     try {
       firebaseMessaging.send(builder.build());
+      log.info("FCM sent successfully to token {}", token);
     } catch (FirebaseMessagingException e) {
       log.warn("FCM send failed for token {}: {}", token, e.getMessagingErrorCode());
     }
@@ -76,9 +77,12 @@ public class FcmSender {
     try {
       var response = firebaseMessaging.sendEachForMulticast(builder.build());
       List<SendResponse> responses = response.getResponses();
+      int successCount = 0;
       for (int i = 0; i < responses.size(); i++) {
         SendResponse sr = responses.get(i);
-        if (!sr.isSuccessful()) {
+        if (sr.isSuccessful()) {
+          successCount++;
+        } else {
           MessagingErrorCode code = sr.getException().getMessagingErrorCode();
           if (code == MessagingErrorCode.UNREGISTERED
               || code == MessagingErrorCode.INVALID_ARGUMENT) {
@@ -88,6 +92,7 @@ public class FcmSender {
           }
         }
       }
+      log.info("FCM multicast: {}/{} sent successfully", successCount, tokens.size());
     } catch (FirebaseMessagingException e) {
       log.error("FCM multicast failed: {}", e.getMessage());
     }

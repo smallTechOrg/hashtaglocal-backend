@@ -38,10 +38,11 @@ public class DeviceTokenController {
 
   @DeleteMapping
   public ResponseEntity<NewAPIResponse<RemoveDeviceTokenRequest>> remove(
-      @AuthenticationPrincipal Long userId,
+      @RequestHeader("Authorization") String authHeader,
       @RequestBody Map<String, RemoveDeviceTokenRequest> body) {
     RemoveDeviceTokenRequest request = body.get("data");
-    deviceTokenService.remove(userId, request.getPlatform());
+    String accessToken = authHeader.substring("Bearer ".length());
+    deviceTokenService.remove(accessToken);
     return ResponseEntity.ok(
         NewAPIResponse.<RemoveDeviceTokenRequest>builder().data(request).build());
   }

@@ -2,7 +2,6 @@ package org.smalltech.hashtaglocal_backend.service;
 
 import jakarta.transaction.Transactional;
 import org.smalltech.hashtaglocal_backend.entity.UserAuthSessionEntity;
-import org.smalltech.hashtaglocal_backend.model.Platform;
 import org.smalltech.hashtaglocal_backend.repository.UserAuthSessionRepository;
 import org.springframework.stereotype.Service;
 
@@ -33,7 +32,13 @@ public class DeviceTokenService {
   }
 
   @Transactional
-  public void remove(Long userId, Platform platform) {
-    userAuthSessionRepository.clearNotificationTokenByUserIdAndPlatform(userId, platform);
+  public void remove(String accessToken) {
+    UserAuthSessionEntity session =
+        userAuthSessionRepository
+            .findByAccessToken(accessToken)
+            .orElseThrow(() -> new RuntimeException("Session not found"));
+    session.setNotificationToken(null);
+    session.setIsActive(false);
+    userAuthSessionRepository.save(session);
   }
 }

@@ -4,7 +4,8 @@
 -- Step 1: extend user_auth_sessions
 ALTER TABLE user_auth_sessions
   ADD COLUMN notification_token TEXT,
-  ADD COLUMN platform VARCHAR(15);
+  ADD COLUMN platform VARCHAR(15),
+  ADD COLUMN device_id VARCHAR(2000);
 
 -- Step 2: drop the replaced table
 -- (no data migration — tokens may be stale; clients re-register via POST /account/device-token)
@@ -28,5 +29,5 @@ CREATE INDEX idx_uas_user_platform
 -- DROP INDEX idx_uas_user_platform;
 -- DROP INDEX idx_uas_refresh_token;
 -- DROP INDEX idx_uas_access_token;
--- ALTER TABLE user_auth_sessions DROP COLUMN notification_token, DROP COLUMN platform;
+-- ALTER TABLE user_auth_sessions DROP COLUMN notification_token, DROP COLUMN platform, DROP COLUMN device_id;
 -- Restore device_tokens from a pre-migration DB snapshot if required.
