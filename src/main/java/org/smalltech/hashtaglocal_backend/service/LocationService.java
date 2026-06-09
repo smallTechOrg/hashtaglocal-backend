@@ -21,6 +21,10 @@ public class LocationService {
   private final LocalityRepository localityRepository;
   private final LocalityResolver localityResolver;
 
+  public Location save(Location location) {
+    return locationRepository.save(location);
+  }
+
   public Location createAndSaveLocation(
       Double lat, Double lng, Map<String, Object> metaData, String fallbackName) {
     if (lat == null || lng == null) {

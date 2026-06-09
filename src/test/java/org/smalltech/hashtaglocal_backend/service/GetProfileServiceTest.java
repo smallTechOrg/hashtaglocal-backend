@@ -31,6 +31,8 @@ class GetProfileServiceTest {
 
   @Mock private LocalityRepository localityRepository;
 
+  @Mock private LocationService locationService;
+
   @Mock private IssueRepository issueRepository;
 
   @Mock private IssueActionRepository issueActionRepository;
@@ -176,8 +178,8 @@ class GetProfileServiceTest {
 
       when(userAuthSessionRepository.findByAccessToken(accessToken))
           .thenReturn(Optional.of(validSession));
-      when(localityRepository.findContainingLocality(latitude, longitude))
-          .thenReturn(Optional.of(locality));
+      when(localityRepository.findAllContainingLocalities(latitude, longitude))
+          .thenReturn(List.of(locality));
 
       // Act
       Optional<UserProfileModel> result =
@@ -191,7 +193,7 @@ class GetProfileServiceTest {
       assertEquals("#bangalore", profile.getHashtag());
 
       verify(userAuthSessionRepository, times(1)).findByAccessToken(accessToken);
-      verify(localityRepository, times(1)).findContainingLocality(latitude, longitude);
+      verify(localityRepository, times(1)).findAllContainingLocalities(latitude, longitude);
       verify(localityRepository, never()).findNearestLocality(anyDouble(), anyDouble());
     }
 
@@ -218,8 +220,8 @@ class GetProfileServiceTest {
 
       when(userAuthSessionRepository.findByAccessToken(accessToken))
           .thenReturn(Optional.of(validSession));
-      when(localityRepository.findContainingLocality(latitude, longitude))
-          .thenReturn(Optional.empty());
+      when(localityRepository.findAllContainingLocalities(latitude, longitude))
+          .thenReturn(List.of());
       when(localityRepository.findNearestLocality(latitude, longitude))
           .thenReturn(Optional.of(locality));
 
@@ -235,7 +237,7 @@ class GetProfileServiceTest {
       assertEquals("#chennai", profile.getHashtag());
 
       verify(userAuthSessionRepository, times(1)).findByAccessToken(accessToken);
-      verify(localityRepository, times(1)).findContainingLocality(latitude, longitude);
+      verify(localityRepository, times(1)).findAllContainingLocalities(latitude, longitude);
       verify(localityRepository, times(1)).findNearestLocality(latitude, longitude);
     }
 
@@ -260,8 +262,8 @@ class GetProfileServiceTest {
 
       when(userAuthSessionRepository.findByAccessToken(accessToken))
           .thenReturn(Optional.of(validSession));
-      when(localityRepository.findContainingLocality(latitude, longitude))
-          .thenReturn(Optional.empty());
+      when(localityRepository.findAllContainingLocalities(latitude, longitude))
+          .thenReturn(List.of());
       when(localityRepository.findNearestLocality(latitude, longitude))
           .thenReturn(Optional.empty());
 
@@ -277,7 +279,7 @@ class GetProfileServiceTest {
       assertEquals("#local", profile.getHashtag());
 
       verify(userAuthSessionRepository, times(1)).findByAccessToken(accessToken);
-      verify(localityRepository, times(1)).findContainingLocality(latitude, longitude);
+      verify(localityRepository, times(1)).findAllContainingLocalities(latitude, longitude);
       verify(localityRepository, times(1)).findNearestLocality(latitude, longitude);
     }
 
@@ -304,8 +306,8 @@ class GetProfileServiceTest {
 
       when(userAuthSessionRepository.findByAccessToken(accessToken))
           .thenReturn(Optional.of(validSession));
-      when(localityRepository.findContainingLocality(latitude, longitude))
-          .thenReturn(Optional.of(locality));
+      when(localityRepository.findAllContainingLocalities(latitude, longitude))
+          .thenReturn(List.of(locality));
 
       // Act
       Optional<UserProfileModel> result =
@@ -319,7 +321,7 @@ class GetProfileServiceTest {
       assertEquals("#local", profile.getHashtag());
 
       verify(userAuthSessionRepository, times(1)).findByAccessToken(accessToken);
-      verify(localityRepository, times(1)).findContainingLocality(latitude, longitude);
+      verify(localityRepository, times(1)).findAllContainingLocalities(latitude, longitude);
     }
 
     @Test
@@ -578,8 +580,8 @@ class GetProfileServiceTest {
 
       when(userAuthSessionRepository.findByAccessToken(accessToken))
           .thenReturn(Optional.of(session));
-      when(localityRepository.findContainingLocality(latitude, longitude))
-          .thenReturn(Optional.of(locality));
+      when(localityRepository.findAllContainingLocalities(latitude, longitude))
+          .thenReturn(List.of(locality));
       when(issueRepository.countByUserExcludingRejected(1L)).thenReturn(3L);
       when(issueRepository.countByUserAndStatus(1L, IssueStatusModel.ONHOLD)).thenReturn(1L);
       when(issueRepository.countByUserAndStatusIn(

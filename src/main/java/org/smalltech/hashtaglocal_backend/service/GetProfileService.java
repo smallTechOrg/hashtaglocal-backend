@@ -1,7 +1,11 @@
 package org.smalltech.hashtaglocal_backend.service;
 
+import jakarta.transaction.Transactional;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
+import org.smalltech.hashtaglocal_backend.entity.Locality;
 import org.smalltech.hashtaglocal_backend.entity.UserAuthSessionEntity;
 import org.smalltech.hashtaglocal_backend.entity.UserEntity;
 import org.smalltech.hashtaglocal_backend.model.IssueActionModel;
@@ -21,6 +25,7 @@ public class GetProfileService {
 
   private final UserAuthSessionRepository userAuthSessionRepository;
   private final LocalityRepository localityRepository;
+  private final LocationService locationService;
   private final IssueRepository issueRepository;
   private final IssueActionRepository issueActionRepository;
   private final KarmaService karmaService;
@@ -30,27 +35,21 @@ public class GetProfileService {
       UserRepository userRepository,
       UserAuthSessionRepository userAuthSessionRepository,
       LocalityRepository localityRepository,
+      LocationService locationService,
       IssueRepository issueRepository,
       IssueActionRepository issueActionRepository,
       KarmaService karmaService) {
     this.userAuthSessionRepository = userAuthSessionRepository;
     this.localityRepository = localityRepository;
+    this.locationService = locationService;
     this.issueRepository = issueRepository;
     this.issueActionRepository = issueActionRepository;
     this.karmaService = karmaService;
   }
 
-  /**
-   * Get user profile for the authenticated user (me), based on the access token.
-   *
-   * @param accessToken The bearer token from the Authorization header
-   * @param latitude Optional latitude coordinate
-   * @param longitude Optional longitude coordinate
-   * @return Optional containing the user profile model if found and token is valid
-   */
+  @Transactional
   public Optional<UserProfileModel> getMyProfile(
       String accessToken, Double latitude, Double longitude) {
-    // Find the auth session by access token
     Optional<UserAuthSessionEntity> authSession =
         userAuthSessionRepository.findByAccessToken(accessToken);
 
@@ -60,38 +59,28 @@ public class GetProfileService {
 
     UserAuthSessionEntity session = authSession.get();
 
-    // Verify session is still active
     if (!session.getIsActive()) {
       return Optional.empty();
     }
 
-    // Check if token has expired
     if (session.getAccessTokenExpiryTs() != null
         && session.getAccessTokenExpiryTs() < System.currentTimeMillis() / 1000) {
       return Optional.empty();
     }
 
-    // Get the user associated with this session
     return Optional.of(mapToProfileModel(session.getUser(), latitude, longitude));
   }
 
-  /** Map UserEntity to UserProfileModel with optional location-based hashtag resolution */
   private UserProfileModel mapToProfileModel(UserEntity user, Double latitude, Double longitude) {
-    String hashtag = DEFAULT_HASHTAG;
+    List<String> hashtags;
 
-    // If lat/lng provided, try to resolve locality
     if (latitude != null && longitude != null) {
-      var locality =
-          localityRepository
-              .findContainingLocality(latitude, longitude)
-              .or(() -> localityRepository.findNearestLocality(latitude, longitude));
-
-      if (locality.isPresent() && locality.get().getHashtag() != null) {
-        hashtag = locality.get().getHashtag();
-      }
+      hashtags = resolveHashtags(latitude, longitude);
+      logLocation(user, latitude, longitude);
+    } else {
+      hashtags = List.of(DEFAULT_HASHTAG);
     }
 
-    // Award daily login karma (idempotent)
     karmaService.tryAwardDailyLoginKarma(user);
 
     UserSummaryModel userSummary = buildUserSummary(user);
@@ -100,12 +89,44 @@ public class GetProfileService {
         .username(user.getUsername())
         .picture(user.getProfilePicture())
         .userRole(user.getRole().name())
-        .hashtag(hashtag)
+        .hashtag(hashtags.get(0))
+        .hashtags(hashtags)
         .userSummary(userSummary)
         .build();
   }
 
-  /** Build user summary with issue counts and karma */
+  private List<String> resolveHashtags(double latitude, double longitude) {
+    List<Locality> containing = localityRepository.findAllContainingLocalities(latitude, longitude);
+
+    if (containing.isEmpty()) {
+      var nearest = localityRepository.findNearestLocality(latitude, longitude);
+      if (nearest.isPresent()) {
+        containing = List.of(nearest.get());
+      }
+    }
+
+    if (containing.isEmpty()) {
+      return List.of(DEFAULT_HASHTAG);
+    }
+
+    LinkedHashSet<String> hashtags = new LinkedHashSet<>();
+    for (Locality loc : containing) {
+      if (loc.getHashtag() != null) hashtags.add(loc.getHashtag());
+      Locality parent = loc.getParent();
+      if (parent != null && parent.getHashtag() != null) hashtags.add(parent.getHashtag());
+    }
+    return hashtags.isEmpty() ? List.of(DEFAULT_HASHTAG) : new ArrayList<>(hashtags);
+  }
+
+  /** Logs one Location row per app open — raw lat/lng + which user opened the app. */
+  private void logLocation(UserEntity user, double latitude, double longitude) {
+    var location = locationService.createAndSaveLocation(latitude, longitude, null, null);
+    if (location != null) {
+      location.setUser(user);
+      locationService.save(location);
+    }
+  }
+
   public UserSummaryModel buildUserSummary(UserEntity user) {
     Long userId = user.getId();
     long total = issueRepository.countByUserExcludingRejected(userId);

@@ -1,5 +1,6 @@
 package org.smalltech.hashtaglocal_backend.repository;
 
+import java.util.List;
 import java.util.Optional;
 import org.smalltech.hashtaglocal_backend.entity.Locality;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -32,5 +33,14 @@ public interface LocalityRepository extends JpaRepository<Locality, Long> {
           "SELECT * FROM localities l ORDER BY ST_Distance(l.geo_boundary::geography, ST_SetSRID(ST_MakePoint(:lng, :lat), ST_SRID(l.geo_boundary))::geography) ASC LIMIT 1",
       nativeQuery = true)
   Optional<Locality> findNearestLocality(
+      @Param("lat") double latitude, @Param("lng") double longitude);
+
+  @Query(
+      value =
+          "SELECT * FROM localities l WHERE l.geo_boundary IS NOT NULL"
+              + " AND ST_Contains(l.geo_boundary, ST_SetSRID(ST_MakePoint(:lng, :lat), ST_SRID(l.geo_boundary)))"
+              + " ORDER BY ST_Area(l.geo_boundary) ASC",
+      nativeQuery = true)
+  List<Locality> findAllContainingLocalities(
       @Param("lat") double latitude, @Param("lng") double longitude);
 }

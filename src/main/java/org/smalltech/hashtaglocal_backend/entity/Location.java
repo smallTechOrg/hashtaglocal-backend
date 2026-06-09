@@ -28,6 +28,10 @@ public class Location {
   @JoinColumn(name = "locality_id")
   private Locality locality;
 
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "user_id")
+  private UserEntity user;
+
   @Column(nullable = false)
   private String name;
 
