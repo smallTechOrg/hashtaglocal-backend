@@ -1,7 +1,9 @@
 package org.smalltech.hashtaglocal_backend.service;
 
+import jakarta.transaction.Transactional;
 import java.util.List;
 import java.util.Optional;
+import org.smalltech.hashtaglocal_backend.entity.Location;
 import org.smalltech.hashtaglocal_backend.entity.UserAuthSessionEntity;
 import org.smalltech.hashtaglocal_backend.entity.UserEntity;
 import org.smalltech.hashtaglocal_backend.model.IssueActionModel;
@@ -19,8 +21,10 @@ import org.springframework.stereotype.Service;
 @Service
 public class GetProfileService {
 
+  private final UserRepository userRepository;
   private final UserAuthSessionRepository userAuthSessionRepository;
   private final LocalityRepository localityRepository;
+  private final LocationService locationService;
   private final IssueRepository issueRepository;
   private final IssueActionRepository issueActionRepository;
   private final KarmaService karmaService;
@@ -30,11 +34,14 @@ public class GetProfileService {
       UserRepository userRepository,
       UserAuthSessionRepository userAuthSessionRepository,
       LocalityRepository localityRepository,
+      LocationService locationService,
       IssueRepository issueRepository,
       IssueActionRepository issueActionRepository,
       KarmaService karmaService) {
+    this.userRepository = userRepository;
     this.userAuthSessionRepository = userAuthSessionRepository;
     this.localityRepository = localityRepository;
+    this.locationService = locationService;
     this.issueRepository = issueRepository;
     this.issueActionRepository = issueActionRepository;
     this.karmaService = karmaService;
@@ -48,6 +55,7 @@ public class GetProfileService {
    * @param longitude Optional longitude coordinate
    * @return Optional containing the user profile model if found and token is valid
    */
+  @Transactional
   public Optional<UserProfileModel> getMyProfile(
       String accessToken, Double latitude, Double longitude) {
     // Find the auth session by access token
@@ -79,7 +87,7 @@ public class GetProfileService {
   private UserProfileModel mapToProfileModel(UserEntity user, Double latitude, Double longitude) {
     String hashtag = DEFAULT_HASHTAG;
 
-    // If lat/lng provided, try to resolve locality
+    // If lat/lng provided, resolve locality for hashtag and persist user's location
     if (latitude != null && longitude != null) {
       var locality =
           localityRepository
@@ -89,6 +97,11 @@ public class GetProfileService {
       if (locality.isPresent() && locality.get().getHashtag() != null) {
         hashtag = locality.get().getHashtag();
       }
+
+      Location updatedLocation =
+          locationService.upsertUserLocation(user.getLocation(), latitude, longitude);
+      user.setLocation(updatedLocation);
+      userRepository.save(user);
     }
 
     // Award daily login karma (idempotent)
