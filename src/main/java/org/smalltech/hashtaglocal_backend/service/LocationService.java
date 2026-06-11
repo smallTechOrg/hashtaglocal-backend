@@ -51,6 +51,31 @@ public class LocationService {
    *
    * @return the number of locations that were successfully linked to a locality
    */
+  /**
+   * Creates a new Location or updates an existing one in-place for the given coordinates. Used to
+   * persist the user's current location on profile fetch.
+   */
+  public Location upsertUserLocation(Location existingLocation, Double lat, Double lng) {
+    if (lat == null || lng == null) return existingLocation;
+
+    var defaultLocality = localityRepository.findById(1L).orElse(null);
+    var locality = localityResolver.resolve(lat, lng, defaultLocality);
+    var point = LocationUtil.createPoint(lat, lng);
+
+    if (existingLocation != null) {
+      existingLocation.setPoint(point);
+      existingLocation.setLocality(locality);
+      return locationRepository.save(existingLocation);
+    }
+
+    return locationRepository.save(
+        Location.builder()
+            .point(point)
+            .name(locality != null ? locality.getName() : "User Location")
+            .locality(locality)
+            .build());
+  }
+
   public int relinkLocalities() {
     var defaultLocality = localityRepository.findById(1L).orElse(null);
     List<Location> unlinked = locationRepository.findByLocalityIsNull();

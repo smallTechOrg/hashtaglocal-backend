@@ -1,6 +1,7 @@
 package org.smalltech.hashtaglocal_backend.service;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 import java.util.List;
@@ -13,6 +14,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.smalltech.hashtaglocal_backend.entity.Locality;
+import org.smalltech.hashtaglocal_backend.entity.Location;
 import org.smalltech.hashtaglocal_backend.entity.UserAuthSessionEntity;
 import org.smalltech.hashtaglocal_backend.entity.UserEntity;
 import org.smalltech.hashtaglocal_backend.model.IssueActionModel;
@@ -22,14 +24,19 @@ import org.smalltech.hashtaglocal_backend.repository.IssueActionRepository;
 import org.smalltech.hashtaglocal_backend.repository.IssueRepository;
 import org.smalltech.hashtaglocal_backend.repository.LocalityRepository;
 import org.smalltech.hashtaglocal_backend.repository.UserAuthSessionRepository;
+import org.smalltech.hashtaglocal_backend.repository.UserRepository;
 
 /** Unit tests for GetProfileService. */
 @DisplayName("GetProfileService Tests")
 class GetProfileServiceTest {
 
+  @Mock private UserRepository userRepository;
+
   @Mock private UserAuthSessionRepository userAuthSessionRepository;
 
   @Mock private LocalityRepository localityRepository;
+
+  @Mock private LocationService locationService;
 
   @Mock private IssueRepository issueRepository;
 
@@ -178,6 +185,8 @@ class GetProfileServiceTest {
           .thenReturn(Optional.of(validSession));
       when(localityRepository.findContainingLocality(latitude, longitude))
           .thenReturn(Optional.of(locality));
+      when(locationService.upsertUserLocation(any(), eq(latitude), eq(longitude)))
+          .thenReturn(mock(Location.class));
 
       // Act
       Optional<UserProfileModel> result =
@@ -222,6 +231,8 @@ class GetProfileServiceTest {
           .thenReturn(Optional.empty());
       when(localityRepository.findNearestLocality(latitude, longitude))
           .thenReturn(Optional.of(locality));
+      when(locationService.upsertUserLocation(any(), eq(latitude), eq(longitude)))
+          .thenReturn(mock(Location.class));
 
       // Act
       Optional<UserProfileModel> result =
@@ -264,6 +275,8 @@ class GetProfileServiceTest {
           .thenReturn(Optional.empty());
       when(localityRepository.findNearestLocality(latitude, longitude))
           .thenReturn(Optional.empty());
+      when(locationService.upsertUserLocation(any(), eq(latitude), eq(longitude)))
+          .thenReturn(mock(Location.class));
 
       // Act
       Optional<UserProfileModel> result =
@@ -306,6 +319,8 @@ class GetProfileServiceTest {
           .thenReturn(Optional.of(validSession));
       when(localityRepository.findContainingLocality(latitude, longitude))
           .thenReturn(Optional.of(locality));
+      when(locationService.upsertUserLocation(any(), eq(latitude), eq(longitude)))
+          .thenReturn(mock(Location.class));
 
       // Act
       Optional<UserProfileModel> result =
@@ -580,6 +595,8 @@ class GetProfileServiceTest {
           .thenReturn(Optional.of(session));
       when(localityRepository.findContainingLocality(latitude, longitude))
           .thenReturn(Optional.of(locality));
+      when(locationService.upsertUserLocation(any(), eq(latitude), eq(longitude)))
+          .thenReturn(mock(Location.class));
       when(issueRepository.countByUserExcludingRejected(1L)).thenReturn(3L);
       when(issueRepository.countByUserAndStatus(1L, IssueStatusModel.ONHOLD)).thenReturn(1L);
       when(issueRepository.countByUserAndStatusIn(
