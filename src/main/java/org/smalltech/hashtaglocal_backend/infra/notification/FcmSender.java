@@ -1,6 +1,7 @@
 package org.smalltech.hashtaglocal_backend.infra.notification;
 
 import com.google.firebase.messaging.AndroidConfig;
+import com.google.firebase.messaging.AndroidNotification;
 import com.google.firebase.messaging.FirebaseMessaging;
 import com.google.firebase.messaging.FirebaseMessagingException;
 import com.google.firebase.messaging.Message;
@@ -40,7 +41,14 @@ public class FcmSender {
             .setToken(token)
             .setNotification(Notification.builder().setTitle(title).setBody(body).build())
             .setAndroidConfig(
-                AndroidConfig.builder().setPriority(AndroidConfig.Priority.HIGH).build());
+                AndroidConfig.builder()
+                    .setPriority(AndroidConfig.Priority.HIGH)
+                    .setNotification(
+                        AndroidNotification.builder()
+                            .setIcon("ic_notification")
+                            .setColor("#22c55e")
+                            .build())
+                    .build());
 
     data.forEach(builder::putData);
 
@@ -65,7 +73,14 @@ public class FcmSender {
             .addAllTokens(tokens)
             .setNotification(Notification.builder().setTitle(title).setBody(body).build())
             .setAndroidConfig(
-                AndroidConfig.builder().setPriority(AndroidConfig.Priority.HIGH).build());
+                AndroidConfig.builder()
+                    .setPriority(AndroidConfig.Priority.HIGH)
+                    .setNotification(
+                        AndroidNotification.builder()
+                            .setIcon("ic_notification")
+                            .setColor("#22c55e")
+                            .build())
+                    .build());
 
     data.forEach(builder::putData);
 
