@@ -15,4 +15,10 @@ public class AuthRefreshRequest {
   @NotBlank(message = "refresh_token is required")
   @JsonProperty("refresh_token")
   private String refreshToken;
+
+  @JsonProperty("notification_token")
+  private String notificationToken;
+
+  @JsonProperty("device_id")
+  private String deviceId;
 }

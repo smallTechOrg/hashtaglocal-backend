@@ -1,5 +1,6 @@
-package org.smalltech.hashtaglocal_backend.model.request;
+package org.smalltech.hashtaglocal_backend.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -10,15 +11,10 @@ import org.smalltech.hashtaglocal_backend.model.Platform;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class OAuthRequest {
+public class RegisterDeviceTokenRequest {
 
-  private String code;
-  private String codeVerifier;
-  private String redirectUri;
-  private String accessToken;
-  private String identityToken;
-  private String fullName;
+  @JsonProperty("notification_token")
   private String notificationToken;
+
   private Platform platform;
-  private String deviceId;
 }

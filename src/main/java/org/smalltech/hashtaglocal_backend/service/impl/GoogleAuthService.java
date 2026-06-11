@@ -6,12 +6,14 @@ import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.jackson2.JacksonFactory;
 import jakarta.transaction.Transactional;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import org.smalltech.hashtaglocal_backend.entity.UserAuthProviderEntity;
 import org.smalltech.hashtaglocal_backend.entity.UserAuthSessionEntity;
 import org.smalltech.hashtaglocal_backend.entity.UserEntity;
 import org.smalltech.hashtaglocal_backend.model.GoogleUserResponse;
+import org.smalltech.hashtaglocal_backend.model.Platform;
 import org.smalltech.hashtaglocal_backend.model.TokenResponse;
 import org.smalltech.hashtaglocal_backend.model.request.OAuthRequest;
 import org.smalltech.hashtaglocal_backend.model.response.AuthTokenResponseData;
@@ -72,14 +74,28 @@ public class GoogleAuthService implements OAuthService {
   @Override
   public AuthTokenResponseData authenticate(OAuthRequest request) {
     if (request.getAccessToken() != null && !request.getAccessToken().isBlank()) {
-      return handleAccessToken(request.getAccessToken());
+      return handleAccessToken(
+          request.getAccessToken(),
+          request.getNotificationToken(),
+          request.getPlatform(),
+          request.getDeviceId());
     }
     return handleAuthorizationCode(
-        request.getCode(), request.getCodeVerifier(), request.getRedirectUri());
+        request.getCode(),
+        request.getCodeVerifier(),
+        request.getRedirectUri(),
+        request.getNotificationToken(),
+        request.getPlatform(),
+        request.getDeviceId());
   }
 
   public AuthTokenResponseData handleAuthorizationCode(
-      String code, String codeVerifier, String clientRedirectUri) {
+      String code,
+      String codeVerifier,
+      String clientRedirectUri,
+      String notificationToken,
+      Platform platform,
+      String deviceId) {
 
     System.out.println("Exchanging auth code for Google tokens");
 
@@ -114,10 +130,14 @@ public class GoogleAuthService implements OAuthService {
         payload.getSubject(),
         payload.getEmail(),
         (String) payload.get("picture"),
-        (String) payload.get("name"));
+        (String) payload.get("name"),
+        notificationToken,
+        platform,
+        deviceId);
   }
 
-  public AuthTokenResponseData handleAccessToken(String accessToken) {
+  public AuthTokenResponseData handleAccessToken(
+      String accessToken, String notificationToken, Platform platform, String deviceId) {
 
     System.out.println("Fetching Google user info");
 
@@ -128,11 +148,23 @@ public class GoogleAuthService implements OAuthService {
             USERINFO_URL + "?access_token=" + accessToken, GoogleUserResponse.class);
 
     return loginOrSignup(
-        googleUser.getId(), googleUser.getEmail(), googleUser.getPicture(), googleUser.getName());
+        googleUser.getId(),
+        googleUser.getEmail(),
+        googleUser.getPicture(),
+        googleUser.getName(),
+        notificationToken,
+        platform,
+        deviceId);
   }
 
   private AuthTokenResponseData loginOrSignup(
-      String providerUserId, String email, String picture, String name) {
+      String providerUserId,
+      String email,
+      String picture,
+      String name,
+      String notificationToken,
+      Platform platform,
+      String deviceId) {
 
     System.out.println("Google userId: " + providerUserId);
 
@@ -182,11 +214,26 @@ public class GoogleAuthService implements OAuthService {
       isNewUser = true;
     }
 
-    return createSession(user, provider, isNewUser);
+    return createSession(user, provider, isNewUser, notificationToken, platform, deviceId);
   }
 
+  private static final int MAX_ACTIVE_SESSIONS = 10;
+
   private AuthTokenResponseData createSession(
-      UserEntity user, UserAuthProviderEntity provider, boolean isNewUser) {
+      UserEntity user,
+      UserAuthProviderEntity provider,
+      boolean isNewUser,
+      String notificationToken,
+      Platform platform,
+      String deviceId) {
+
+    // Enforce per-user session cap — deactivate oldest sessions if over the limit
+    List<Long> activeIds =
+        userAuthSessionRepository.findActiveSessionIdsByUserIdOrderByCreatedAsc(user.getId());
+    if (activeIds.size() >= MAX_ACTIVE_SESSIONS) {
+      List<Long> toDeactivate = activeIds.subList(0, activeIds.size() - MAX_ACTIVE_SESSIONS + 1);
+      userAuthSessionRepository.deactivateByIds(toDeactivate);
+    }
 
     String accessToken = tokenService.generateToken();
     String refreshToken = tokenService.generateToken();
@@ -200,6 +247,9 @@ public class GoogleAuthService implements OAuthService {
                 .refreshToken(refreshToken)
                 .accessTokenExpiryTs(tokenService.accessExpiryEpochSeconds())
                 .refreshTokenExpiryTs(tokenService.refreshExpiryEpochSeconds())
+                .notificationToken(notificationToken)
+                .platform(platform)
+                .deviceId(deviceId)
                 .isActive(true)
                 .build());
 

@@ -10,10 +10,12 @@ import com.nimbusds.jwt.proc.ConfigurableJWTProcessor;
 import com.nimbusds.jwt.proc.DefaultJWTProcessor;
 import jakarta.transaction.Transactional;
 import java.net.URL;
+import java.util.List;
 import java.util.Optional;
 import org.smalltech.hashtaglocal_backend.entity.UserAuthProviderEntity;
 import org.smalltech.hashtaglocal_backend.entity.UserAuthSessionEntity;
 import org.smalltech.hashtaglocal_backend.entity.UserEntity;
+import org.smalltech.hashtaglocal_backend.model.Platform;
 import org.smalltech.hashtaglocal_backend.model.TokenResponse;
 import org.smalltech.hashtaglocal_backend.model.request.OAuthRequest;
 import org.smalltech.hashtaglocal_backend.model.response.AuthTokenResponseData;
@@ -63,15 +65,25 @@ public class AppleAuthService implements OAuthService {
 
   @Override
   public AuthTokenResponseData authenticate(OAuthRequest request) {
-    return handleIdentityToken(request.getIdentityToken(), request.getFullName());
+    return handleIdentityToken(
+        request.getIdentityToken(),
+        request.getFullName(),
+        request.getNotificationToken(),
+        request.getPlatform(),
+        request.getDeviceId());
   }
 
-  public AuthTokenResponseData handleIdentityToken(String identityToken, String fullName) {
+  public AuthTokenResponseData handleIdentityToken(
+      String identityToken,
+      String fullName,
+      String notificationToken,
+      Platform platform,
+      String deviceId) {
     System.out.println("âž¡ï¸ Verifying Apple identity token");
     JWTClaimsSet claims = verifyIdentityToken(identityToken);
     String sub = claims.getSubject();
     String email = (String) claims.getClaim("email");
-    return loginOrSignup(sub, email, fullName);
+    return loginOrSignup(sub, email, fullName, notificationToken, platform, deviceId);
   }
 
   private JWTClaimsSet verifyIdentityToken(String identityToken) {
@@ -101,7 +113,12 @@ public class AppleAuthService implements OAuthService {
   }
 
   private AuthTokenResponseData loginOrSignup(
-      String providerUserId, String email, String fullName) {
+      String providerUserId,
+      String email,
+      String fullName,
+      String notificationToken,
+      Platform platform,
+      String deviceId) {
 
     System.out.println("ðŸ‘¤ Apple userId: " + providerUserId);
 
@@ -142,10 +159,26 @@ public class AppleAuthService implements OAuthService {
       System.out.println("âœ… Provider saved | ID: " + provider.getId());
     }
 
-    return createSession(user, provider);
+    return createSession(user, provider, notificationToken, platform, deviceId);
   }
 
-  private AuthTokenResponseData createSession(UserEntity user, UserAuthProviderEntity provider) {
+  private static final int MAX_ACTIVE_SESSIONS = 10;
+
+  private AuthTokenResponseData createSession(
+      UserEntity user,
+      UserAuthProviderEntity provider,
+      String notificationToken,
+      Platform platform,
+      String deviceId) {
+
+    // Enforce per-user session cap — deactivate oldest sessions if over the limit
+    List<Long> activeIds =
+        userAuthSessionRepository.findActiveSessionIdsByUserIdOrderByCreatedAsc(user.getId());
+    if (activeIds.size() >= MAX_ACTIVE_SESSIONS) {
+      List<Long> toDeactivate = activeIds.subList(0, activeIds.size() - MAX_ACTIVE_SESSIONS + 1);
+      userAuthSessionRepository.deactivateByIds(toDeactivate);
+    }
+
     String accessToken = tokenService.generateToken();
     String refreshToken = tokenService.generateToken();
 
@@ -158,6 +191,9 @@ public class AppleAuthService implements OAuthService {
                 .refreshToken(refreshToken)
                 .accessTokenExpiryTs(tokenService.accessExpiryEpochSeconds())
                 .refreshTokenExpiryTs(tokenService.refreshExpiryEpochSeconds())
+                .notificationToken(notificationToken)
+                .platform(platform)
+                .deviceId(deviceId)
                 .isActive(true)
                 .build());
 
