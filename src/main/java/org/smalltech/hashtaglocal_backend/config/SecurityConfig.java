@@ -50,6 +50,9 @@ public class SecurityConfig {
                     // Admin feed routes are covered by the /admin/** rule below.
                     .requestMatchers(HttpMethod.POST, "/api/v1/feed")
                     .authenticated()
+                    // Bulletin reads are public; submitting a quiz attempt requires a user.
+                    .requestMatchers(HttpMethod.POST, "/api/v1/quiz/**")
+                    .authenticated()
                     // account deletion endpoint must be authenticated so only the owning user can
                     // initiate it
                     .requestMatchers(HttpMethod.POST, "/account/delete-request")

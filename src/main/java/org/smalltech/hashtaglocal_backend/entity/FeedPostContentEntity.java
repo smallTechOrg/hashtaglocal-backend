@@ -58,6 +58,11 @@ public class FeedPostContentEntity {
   @JoinColumn(name = "image_media_id")
   private MediaEntity imageMedia;
 
+  /** For {@code BULLETIN} — the daily city bulletin this post surfaces in the feed. */
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "bulletin_id")
+  private BulletinEntity bulletin;
+
   // --- generic structured columns reused across kinds ---
 
   @Column(length = 500)

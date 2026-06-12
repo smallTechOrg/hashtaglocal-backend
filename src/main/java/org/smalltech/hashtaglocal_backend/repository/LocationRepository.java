@@ -9,4 +9,7 @@ import org.springframework.stereotype.Repository;
 public interface LocationRepository extends JpaRepository<Location, Long> {
 
   List<Location> findByLocalityIsNull();
+
+  /** Any saved location inside a locality — coordinate fallback for boundary-less localities. */
+  java.util.Optional<Location> findFirstByLocalityId(Long localityId);
 }
