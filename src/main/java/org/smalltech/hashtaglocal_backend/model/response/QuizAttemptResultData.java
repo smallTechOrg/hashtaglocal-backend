@@ -9,7 +9,7 @@ import lombok.Data;
 public class QuizAttemptResultData {
 
   private Long quizId;
-  private boolean isCorrect;
+  private Boolean isCorrect;
 
   /** 1-based; null when the attempt was a timeout. */
   private Integer selectedOptionIndex;

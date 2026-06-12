@@ -47,7 +47,7 @@ public class BulletinData {
   @Data
   @Builder
   public static class AttemptData {
-    private boolean isCorrect;
+    private Boolean isCorrect;
 
     /** 1-based; null = timed out without answering. */
     private Integer selectedOptionIndex;
