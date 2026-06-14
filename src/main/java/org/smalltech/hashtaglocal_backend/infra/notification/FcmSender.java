@@ -46,7 +46,7 @@ public class FcmSender {
                     .setNotification(
                         AndroidNotification.builder()
                             .setIcon("ic_notification")
-                            .setColor("#22c55e")
+                            .setColor("#256D1B")
                             .build())
                     .build());
 
@@ -78,7 +78,7 @@ public class FcmSender {
                     .setNotification(
                         AndroidNotification.builder()
                             .setIcon("ic_notification")
-                            .setColor("#22c55e")
+                            .setColor("#256D1B")
                             .build())
                     .build());
 
