@@ -30,8 +30,7 @@ public class EventGeocodingService {
   private static final long DELAY_BETWEEN_REQUESTS_MS = 100;
 
   public GeocodingResult run() {
-    List<EventEntity> events =
-        eventRepository.findByLocationIsNullAndAddressIsNotNullAndActiveTrue();
+    List<EventEntity> events = eventRepository.findByLocationIsNullAndAddressIsNotNull();
     log.info("Found {} events without a geocoded location", events.size());
 
     int success = 0;

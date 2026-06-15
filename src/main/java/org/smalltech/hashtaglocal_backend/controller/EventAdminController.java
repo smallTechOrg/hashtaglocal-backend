@@ -215,14 +215,15 @@ public class EventAdminController {
   }
 
   /**
-   * Returns all pending events that have a geocoded location, oldest first. Events still awaiting
-   * geocoding are excluded — they cannot be shown on the map yet.
+   * Returns all pending events, including those still awaiting geocoding. Events without a resolved
+   * location are included so admins can see and act on them; the ops portal shows a "geocoding
+   * pending" indicator for those rows.
    */
   @GetMapping("/event/pending")
   @Operation(
       summary = "List pending events",
       description =
-          "Returns all scraped events awaiting admin review that have a resolved location.")
+          "Returns all scraped events awaiting admin review, including those not yet geocoded.")
   public ResponseEntity<NewAPIResponse<EventListResponseData>> getPendingEvents() {
     List<EventApprovalEntity> pendingApprovals =
         eventApprovalRepository.findByStatus(EventApprovalStatus.PENDING);
@@ -233,7 +234,6 @@ public class EventAdminController {
 
     var pendingEvents =
         eventService.findByIds(approvalMap.keySet()).stream()
-            .filter(e -> e.getLocation() != null)
             .map(e -> eventService.toAdminEventData(e, approvalMap.get(e.getId())));
 
     // Also surface events that have NO approval row at all — otherwise they are invisible
@@ -241,7 +241,6 @@ public class EventAdminController {
     // implicitly pending (toAdminEventData maps a null approval to PENDING).
     var orphanEvents =
         eventRepository.findWithoutApprovalRow().stream()
-            .filter(e -> e.getLocation() != null)
             .map(e -> eventService.toAdminEventData(e, null));
 
     var events = java.util.stream.Stream.concat(pendingEvents, orphanEvents).toList();
@@ -342,6 +341,21 @@ public class EventAdminController {
       throw new ResponseStatusException(HttpStatus.NOT_FOUND, "No event found for id " + eventId);
     }
     return EventApprovalEntity.builder().eventId(eventId).build();
+  }
+
+  /**
+   * Manually triggers the geocoding pass — useful for unblocking events stuck without a location.
+   */
+  @PostMapping("/event/geocode")
+  @Operation(
+      summary = "Trigger event geocoding",
+      description =
+          "Runs the geocoding pass immediately for all events that have an address but no location."
+              + " Returns a summary of total/success/failed counts.")
+  public ResponseEntity<NewAPIResponse<EventGeocodingService.GeocodingResult>> triggerGeocode() {
+    EventGeocodingService.GeocodingResult result = eventGeocodingService.run();
+    return ResponseEntity.ok(
+        NewAPIResponse.<EventGeocodingService.GeocodingResult>builder().data(result).build());
   }
 
   @GetMapping("/event/history")

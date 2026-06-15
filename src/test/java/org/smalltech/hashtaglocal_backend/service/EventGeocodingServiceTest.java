@@ -127,8 +127,7 @@ class EventGeocodingServiceTest {
       int expectedLocalitiesLinked)
       throws Exception {
     EventEntity event = eventWithAddress(1L, address);
-    when(eventRepository.findByLocationIsNullAndAddressIsNotNullAndActiveTrue())
-        .thenReturn(List.of(event));
+    when(eventRepository.findByLocationIsNullAndAddressIsNotNull()).thenReturn(List.of(event));
 
     LocationMetadataDTO metadata = LocationMetadataDTO.builder().city(city).name(name).build();
     GoogleMapsGeocodingService.ForwardGeocodeResult geocodeResult =
@@ -161,8 +160,7 @@ class EventGeocodingServiceTest {
   @DisplayName("Google Maps API is never called when no events need geocoding")
   void googleMapsNotCalledForSkipScenario(String scenario, String description) {
     // repository returns empty list — simulates all events already having a location
-    when(eventRepository.findByLocationIsNullAndAddressIsNotNullAndActiveTrue())
-        .thenReturn(List.of());
+    when(eventRepository.findByLocationIsNullAndAddressIsNotNull()).thenReturn(List.of());
 
     geocodingService2.run();
 
@@ -179,8 +177,7 @@ class EventGeocodingServiceTest {
   @DisplayName("Geocodes event — creates Location row and links it back to the event")
   void geocodesEventAndLinksLocation() {
     EventEntity event = eventWithAddress(1L, "Lalbagh Main Gate, Bengaluru");
-    when(eventRepository.findByLocationIsNullAndAddressIsNotNullAndActiveTrue())
-        .thenReturn(List.of(event));
+    when(eventRepository.findByLocationIsNullAndAddressIsNotNull()).thenReturn(List.of(event));
 
     LocationMetadataDTO metadata =
         LocationMetadataDTO.builder().city("Bengaluru").name("Lalbagh").build();
@@ -205,8 +202,7 @@ class EventGeocodingServiceTest {
   @DisplayName("Counts as failed when Google Maps returns no result — event is left un-geocoded")
   void countsFailedWhenGeocodingReturnsNull() {
     EventEntity event = eventWithAddress(1L, "Unknown Location XYZ");
-    when(eventRepository.findByLocationIsNullAndAddressIsNotNullAndActiveTrue())
-        .thenReturn(List.of(event));
+    when(eventRepository.findByLocationIsNullAndAddressIsNotNull()).thenReturn(List.of(event));
     when(geocodingService.forwardGeocode(anyString())).thenReturn(null);
 
     EventGeocodingService.GeocodingResult result = geocodingService2.run();
@@ -221,8 +217,7 @@ class EventGeocodingServiceTest {
   @DisplayName("Counts as failed when LocationService returns null — event is left un-geocoded")
   void countsFailedWhenLocationServiceReturnsNull() {
     EventEntity event = eventWithAddress(1L, "Some Address");
-    when(eventRepository.findByLocationIsNullAndAddressIsNotNullAndActiveTrue())
-        .thenReturn(List.of(event));
+    when(eventRepository.findByLocationIsNullAndAddressIsNotNull()).thenReturn(List.of(event));
 
     GoogleMapsGeocodingService.ForwardGeocodeResult geocodeResult =
         new GoogleMapsGeocodingService.ForwardGeocodeResult(
@@ -241,8 +236,7 @@ class EventGeocodingServiceTest {
   @Test
   @DisplayName("Returns total=0, success=0, failed=0 when there are no un-geocoded events")
   void returnsZeroCountsWhenNoEventsNeedGeocoding() {
-    when(eventRepository.findByLocationIsNullAndAddressIsNotNullAndActiveTrue())
-        .thenReturn(List.of());
+    when(eventRepository.findByLocationIsNullAndAddressIsNotNull()).thenReturn(List.of());
 
     EventGeocodingService.GeocodingResult result = geocodingService2.run();
 
@@ -262,8 +256,7 @@ class EventGeocodingServiceTest {
   @DisplayName("localitiesLinked count from relinkLocalities() is propagated in result")
   void localitiesLinkedCountIsPropagatedInResult() {
     EventEntity event = eventWithAddress(1L, "Lalbagh Main Gate, Bengaluru");
-    when(eventRepository.findByLocationIsNullAndAddressIsNotNullAndActiveTrue())
-        .thenReturn(List.of(event));
+    when(eventRepository.findByLocationIsNullAndAddressIsNotNull()).thenReturn(List.of(event));
 
     LocationMetadataDTO metadata =
         LocationMetadataDTO.builder().city("Bengaluru").name("Lalbagh").build();
@@ -283,7 +276,7 @@ class EventGeocodingServiceTest {
   @Test
   @DisplayName("relinkLocalities() is called even when all geocoding fails")
   void relinkLocalitiesIsCalledEvenWhenAllGeocodingFails() {
-    when(eventRepository.findByLocationIsNullAndAddressIsNotNullAndActiveTrue())
+    when(eventRepository.findByLocationIsNullAndAddressIsNotNull())
         .thenReturn(
             List.of(
                 eventWithAddress(1L, "Bad Address One"), eventWithAddress(2L, "Bad Address Two")));
@@ -298,8 +291,7 @@ class EventGeocodingServiceTest {
   @DisplayName("localitiesLinked is 0 when relinkLocalities() returns 0 — localities table empty")
   void localitiesLinkedIsZeroWhenNoLocalitiesExist() {
     EventEntity event = eventWithAddress(1L, "Juhu Beach, Mumbai");
-    when(eventRepository.findByLocationIsNullAndAddressIsNotNullAndActiveTrue())
-        .thenReturn(List.of(event));
+    when(eventRepository.findByLocationIsNullAndAddressIsNotNull()).thenReturn(List.of(event));
 
     LocationMetadataDTO metadata =
         LocationMetadataDTO.builder().city("Mumbai").name("Juhu Beach").build();
@@ -319,7 +311,7 @@ class EventGeocodingServiceTest {
   @Test
   @DisplayName("relinkLocalities() is called exactly once per run regardless of event count")
   void relinkLocalitiesIsCalledExactlyOncePerRun() {
-    when(eventRepository.findByLocationIsNullAndAddressIsNotNullAndActiveTrue())
+    when(eventRepository.findByLocationIsNullAndAddressIsNotNull())
         .thenReturn(
             List.of(
                 eventWithAddress(1L, "Lalbagh Main Gate, Bengaluru"),
