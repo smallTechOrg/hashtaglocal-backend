@@ -34,12 +34,14 @@ public class EventGeocodingService {
       GoogleMapsGeocodingService.ForwardGeocodeResult result =
           geocodingService.forwardGeocode(event.getAddress());
       if (result == null) {
-        log.warn("No geocoding result for event id={}, address='{}'", event.getId(), event.getAddress());
+        log.warn(
+            "No geocoding result for event id={}, address='{}'", event.getId(), event.getAddress());
         return false;
       }
       Location location =
           locationService.createAndSaveLocation(
-              result.lat(), result.lng(),
+              result.lat(),
+              result.lng(),
               geocodingService.metadataToMap(result.metadata()),
               result.metadata().getName());
       if (location == null) {
