@@ -21,11 +21,11 @@ public class AuthRefreshService {
     this.tokenService = tokenService;
   }
 
-  public AuthTokenResponseData refreshTokens(String refreshToken) {
+  public AuthTokenResponseData refreshTokens(
+      String refreshToken, String notificationToken, String deviceId) {
 
     System.out.println("Attempting to refresh tokens");
 
-    // Find the session by refresh token
     Optional<UserAuthSessionEntity> sessionOpt =
         userAuthSessionRepository.findByRefreshToken(refreshToken);
 
@@ -36,7 +36,6 @@ public class AuthRefreshService {
 
     UserAuthSessionEntity session = sessionOpt.get();
 
-    // Check if session is active
     if (!session.getIsActive()) {
       System.out.println(" Session is inactive");
       throw new RuntimeException("Session is inactive");
@@ -44,17 +43,31 @@ public class AuthRefreshService {
 
     long currentEpochSeconds = tokenService.nowEpochSeconds();
 
-    // Check if refresh token is expired
-    if (session.getRefreshTokenExpiryTs() < currentEpochSeconds) {
+    Long refreshExpiry = session.getRefreshTokenExpiryTs();
+    if (refreshExpiry == null || refreshExpiry < currentEpochSeconds) {
       System.out.println(" Refresh token expired");
       throw new RuntimeException("Refresh token has expired");
     }
 
     System.out.println(" Valid refresh token found | Session ID: " + session.getId());
 
-    // Check access token expiry
-    if (session.getAccessTokenExpiryTs() > currentEpochSeconds) {
+    // Always apply side-channel updates when provided, regardless of whether
+    // auth tokens are rotated — keeps session metadata current.
+    if (notificationToken != null) {
+      session.setNotificationToken(notificationToken);
+    }
+    // Backfill device_id for sessions created before it was tracked (e.g. Google OAuth sessions).
+    if (deviceId != null && session.getDeviceId() == null) {
+      session.setDeviceId(deviceId);
+    }
+
+    Long accessExpiry = session.getAccessTokenExpiryTs();
+    if (accessExpiry != null && accessExpiry > currentEpochSeconds) {
       System.out.println(" Access token is still active, returning existing tokens");
+      // Save only if we updated the notification token
+      if (notificationToken != null) {
+        userAuthSessionRepository.save(session);
+      }
       return AuthTokenResponseData.builder()
           .accessToken(
               TokenResponse.builder()
@@ -69,14 +82,12 @@ public class AuthRefreshService {
           .build();
     }
 
-    // Generate new tokens
     String newAccessToken = tokenService.generateToken();
     String newRefreshToken = tokenService.generateToken();
 
     long newAccessTokenExpiry = tokenService.accessExpiryEpochSeconds();
     long newRefreshTokenExpiry = tokenService.refreshExpiryEpochSeconds();
 
-    // Update session with new tokens
     session.setAccessToken(newAccessToken);
     session.setAccessTokenExpiryTs(newAccessTokenExpiry);
     session.setRefreshToken(newRefreshToken);

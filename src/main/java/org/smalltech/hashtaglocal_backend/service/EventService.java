@@ -163,6 +163,7 @@ public class EventService {
         .approvalStatus(
             approval != null ? approval.getStatus().name() : EventApprovalStatus.PENDING.name())
         .displayName(approval != null ? approval.getDisplayName() : null)
+        .createdAt(entity.getCreatedAt())
         .build();
   }
 }

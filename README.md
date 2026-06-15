@@ -18,13 +18,21 @@ You can do this via the GUI or via this command:
 ./gradlew build
 ```
 
-### Connect with GCS buckey
+### Connect with GCS bucket
 Once you have downloaded the SA key in your local, you can set your credential using this command:
 ```declarative
 $env:GOOGLE_APPLICATION_CREDENTIALS="C:\GCS-key.json"
 ```
 
 Or simply add "gcs-key.json" to the repo.
+
+### Connect with Firebase for notifications
+Once you have downloaded the Firebase private key in your local, you can set your credential using this command:
+```declarative
+$env:GOOGLE_APPLICATION_CREDENTIALS="C:\firebase-key.json"
+```
+
+Or simply add "firebase-key.json" to the repo.
 
 If Gradle is running, stop it using:
 ```declarative

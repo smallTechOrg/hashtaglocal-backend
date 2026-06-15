@@ -72,7 +72,7 @@ class AuthRefreshServiceTest {
     when(tokenService.refreshExpiryEpochSeconds()).thenReturn(newRefreshTokenExpiry);
 
     // Act
-    AuthTokenResponseData response = authRefreshService.refreshTokens(REFRESH_TOKEN);
+    AuthTokenResponseData response = authRefreshService.refreshTokens(REFRESH_TOKEN, null, null);
 
     // Assert
     assertNotNull(response);
@@ -109,7 +109,7 @@ class AuthRefreshServiceTest {
     when(tokenService.nowEpochSeconds()).thenReturn(CURRENT_TIME);
 
     // Act
-    AuthTokenResponseData response = authRefreshService.refreshTokens(REFRESH_TOKEN);
+    AuthTokenResponseData response = authRefreshService.refreshTokens(REFRESH_TOKEN, null, null);
 
     // Assert
     assertNotNull(response);
@@ -138,7 +138,9 @@ class AuthRefreshServiceTest {
 
     // Act & Assert
     RuntimeException exception =
-        assertThrows(RuntimeException.class, () -> authRefreshService.refreshTokens(REFRESH_TOKEN));
+        assertThrows(
+            RuntimeException.class,
+            () -> authRefreshService.refreshTokens(REFRESH_TOKEN, null, null));
     assertEquals("Invalid refresh token", exception.getMessage());
 
     verify(userAuthSessionRepository).findByRefreshToken(REFRESH_TOKEN);
@@ -161,7 +163,9 @@ class AuthRefreshServiceTest {
 
     // Act & Assert
     RuntimeException exception =
-        assertThrows(RuntimeException.class, () -> authRefreshService.refreshTokens(REFRESH_TOKEN));
+        assertThrows(
+            RuntimeException.class,
+            () -> authRefreshService.refreshTokens(REFRESH_TOKEN, null, null));
     assertEquals("Refresh token has expired", exception.getMessage());
 
     verify(userAuthSessionRepository).findByRefreshToken(REFRESH_TOKEN);
@@ -180,7 +184,9 @@ class AuthRefreshServiceTest {
 
     // Act & Assert
     RuntimeException exception =
-        assertThrows(RuntimeException.class, () -> authRefreshService.refreshTokens(REFRESH_TOKEN));
+        assertThrows(
+            RuntimeException.class,
+            () -> authRefreshService.refreshTokens(REFRESH_TOKEN, null, null));
     assertEquals("Session is inactive", exception.getMessage());
 
     verify(userAuthSessionRepository).findByRefreshToken(REFRESH_TOKEN);
@@ -202,7 +208,9 @@ class AuthRefreshServiceTest {
 
     // Act & Assert
     RuntimeException exception =
-        assertThrows(RuntimeException.class, () -> authRefreshService.refreshTokens(REFRESH_TOKEN));
+        assertThrows(
+            RuntimeException.class,
+            () -> authRefreshService.refreshTokens(REFRESH_TOKEN, null, null));
     // Should fail on inactive session check before refresh token expiry check
     assertEquals("Session is inactive", exception.getMessage());
 
@@ -224,7 +232,7 @@ class AuthRefreshServiceTest {
     when(tokenService.nowEpochSeconds()).thenReturn(CURRENT_TIME);
 
     // Act
-    authRefreshService.refreshTokens(REFRESH_TOKEN);
+    authRefreshService.refreshTokens(REFRESH_TOKEN, null, null);
 
     // Assert
     // Verify that token generation methods were never called
@@ -259,7 +267,7 @@ class AuthRefreshServiceTest {
     when(tokenService.refreshExpiryEpochSeconds()).thenReturn(newRefreshTokenExpiry);
 
     // Act
-    authRefreshService.refreshTokens(REFRESH_TOKEN);
+    authRefreshService.refreshTokens(REFRESH_TOKEN, null, null);
 
     // Assert
     verify(userAuthSessionRepository)

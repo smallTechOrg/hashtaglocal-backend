@@ -55,6 +55,12 @@ public class FeedPostData {
   private Long issueId;
   private Long eventId;
 
+  // --- BULLETIN ---
+  private Long bulletinId;
+
+  /** Full bulletin payload (weather, summary, quiz with answer hidden) for BULLETIN posts. */
+  private BulletinData bulletin;
+
   /** Type-specific tail (poll options, quiz questions, etc.). */
   private Map<String, Object> data;
 

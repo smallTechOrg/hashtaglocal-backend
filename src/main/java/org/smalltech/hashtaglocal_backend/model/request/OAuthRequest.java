@@ -4,6 +4,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.smalltech.hashtaglocal_backend.model.Platform;
 
 @Data
 @NoArgsConstructor
@@ -17,4 +18,7 @@ public class OAuthRequest {
   private String accessToken;
   private String identityToken;
   private String fullName;
+  private String notificationToken;
+  private Platform platform;
+  private String deviceId;
 }

@@ -160,6 +160,23 @@ public interface FeedPostRepository extends JpaRepository<FeedPostEntity, Long> 
   long countIssueRefPosts(@Param("issueId") Long issueId);
 
   /**
+   * Whether a BULLETIN post already exists for a bulletin — the daily job's idempotency check so a
+   * re-run never publishes the same bulletin to the feed twice.
+   */
+  @Query(
+      "SELECT COUNT(p) > 0 FROM FeedPostEntity p "
+          + "WHERE p.kind = org.smalltech.hashtaglocal_backend.model.FeedPostKind.BULLETIN "
+          + "AND p.content.bulletin.id = :bulletinId")
+  boolean existsBulletinPost(@Param("bulletinId") Long bulletinId);
+
+  /** The BULLETIN post for a bulletin, if any — used to sync edited summaries into the feed. */
+  @Query(
+      "SELECT p FROM FeedPostEntity p "
+          + "WHERE p.kind = org.smalltech.hashtaglocal_backend.model.FeedPostKind.BULLETIN "
+          + "AND p.content.bulletin.id = :bulletinId")
+  List<FeedPostEntity> findBulletinPosts(@Param("bulletinId") Long bulletinId);
+
+  /**
    * Hide every ISSUE_REF post for an issue (set to {@code ADMIN_HIDDEN}) when the issue leaves the
    * publicly-visible OPEN/RESOLVED states (rejected or put back on hold). The public timeline shows
    * {@code PUBLISHED} only, so hidden posts drop out immediately.

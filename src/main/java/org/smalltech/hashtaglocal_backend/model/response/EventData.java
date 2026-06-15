@@ -63,6 +63,9 @@ public class EventData {
    */
   private String displayName;
 
+  /** When the event record was first created. Null in public API. */
+  private LocalDateTime createdAt;
+
   @Data
   @Builder
   public static class LocationData {

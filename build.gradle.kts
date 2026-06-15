@@ -31,6 +31,7 @@ dependencies {
     // Added to send admin notification emails when a user requests account deletion
     implementation("org.springframework.boot:spring-boot-starter-mail")
     implementation("com.google.cloud:google-cloud-storage:2.55.0")
+    implementation("com.google.firebase:firebase-admin:9.2.0")
     implementation("org.locationtech.jts:jts-core:1.19.0")
     implementation("com.vladmihalcea:hibernate-types-60:2.21.1")
     // Feed link-preview scraping (Open Graph / oEmbed parsing)

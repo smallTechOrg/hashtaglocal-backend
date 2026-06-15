@@ -50,8 +50,8 @@ public class AccessTokenAuthFilter extends OncePerRequestFilter {
             .filter(UserAuthSessionEntity::getIsActive)
             .filter(
                 s ->
-                    s.getAccessTokenExpiryTs() == null
-                        || s.getAccessTokenExpiryTs() > Instant.now().getEpochSecond())
+                    s.getAccessTokenExpiryTs() != null
+                        && s.getAccessTokenExpiryTs() > Instant.now().getEpochSecond())
             .orElse(null);
 
     if (session == null) {
