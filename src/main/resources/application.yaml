@@ -151,6 +151,24 @@ feed:
     # Auto-post an ISSUE_REF to the feed when a new issue is created (FEED_DESIGN.md §1.2)
     enabled: ${FEED_AUTO_ISSUE_REF_ENABLED:true}
 
+# City bulletin: daily weather (cron, saved-user localities only) + manual quizzes + Groq texts
+bulletin:
+  enabled: ${BULLETIN_ENABLED:true}
+  weather:
+    # Daily at 8:00 AM. Use '-' to disable.
+    cron: ${BULLETIN_WEATHER_CRON:0 0 8 * * *}
+    # Active WeatherProvider implementation; open-meteo is free and keyless.
+    provider: ${BULLETIN_WEATHER_PROVIDER:open-meteo}
+    open-meteo:
+      url: ${BULLETIN_OPEN_METEO_URL:https://api.open-meteo.com/v1/forecast}
+
+# Groq (weather summary + quiz explanation generation)
+groq:
+  api:
+    key: ${GROQ_API_KEY:}
+    url: ${GROQ_API_URL:https://api.groq.com/openai/v1/chat/completions}
+    model: ${GROQ_MODEL:llama-3.3-70b-versatile}
+
 portalissue:
   enabled: ${PORTALISSUE_ENABLED:true}
   cron: ${PORTALISSUE_CRON:0 0 1 * * *}

@@ -18,6 +18,7 @@ import org.springframework.stereotype.Component;
 public class FeedPostMapper {
 
   private final GCSService gcsService;
+  private final BulletinViewMapper bulletinViewMapper;
 
   public FeedPostData toData(FeedPostEntity post, Long viewerUserId) {
     FeedPostContentEntity content = post.getContent();
@@ -64,6 +65,10 @@ public class FeedPostMapper {
       }
       if (content.getEvent() != null) {
         b.eventId(content.getEvent().getId());
+      }
+      if (content.getBulletin() != null) {
+        b.bulletinId(content.getBulletin().getId())
+            .bulletin(bulletinViewMapper.toData(content.getBulletin(), viewerUserId));
       }
     }
 
