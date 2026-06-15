@@ -29,9 +29,38 @@ public class EventGeocodingService {
 
   private static final long DELAY_BETWEEN_REQUESTS_MS = 100;
 
+  public boolean geocodeSingle(EventEntity event) {
+    try {
+      GoogleMapsGeocodingService.ForwardGeocodeResult result =
+          geocodingService.forwardGeocode(event.getAddress());
+      if (result == null) {
+        log.warn(
+            "No geocoding result for event id={}, address='{}'", event.getId(), event.getAddress());
+        return false;
+      }
+      Location location =
+          locationService.createAndSaveLocation(
+              result.lat(),
+              result.lng(),
+              geocodingService.metadataToMap(result.metadata()),
+              result.metadata().getName());
+      if (location == null) {
+        log.warn("Failed to create location for event id={}", event.getId());
+        return false;
+      }
+      event.setLocation(location);
+      eventRepository.save(event);
+      locationService.relinkLocalities();
+      log.info("Geocoded event id={}: lat={}, lng={}", event.getId(), result.lat(), result.lng());
+      return true;
+    } catch (Exception e) {
+      log.error("Error geocoding event id={}: {}", event.getId(), e.getMessage());
+      return false;
+    }
+  }
+
   public GeocodingResult run() {
-    List<EventEntity> events =
-        eventRepository.findByLocationIsNullAndAddressIsNotNullAndActiveTrue();
+    List<EventEntity> events = eventRepository.findByLocationIsNullAndAddressIsNotNull();
     log.info("Found {} events without a geocoded location", events.size());
 
     int success = 0;
