@@ -129,7 +129,7 @@ public class EventAdminController {
     }
 
     if (addressChanged) {
-      eventGeocodingService.run();
+      eventGeocodingService.geocodeSingle(event);
     }
 
     return ResponseEntity.ok(NewAPIResponse.<Long>builder().data(eventId).build());
