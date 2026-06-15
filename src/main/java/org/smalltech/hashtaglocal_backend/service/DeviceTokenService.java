@@ -2,6 +2,7 @@ package org.smalltech.hashtaglocal_backend.service;
 
 import jakarta.transaction.Transactional;
 import org.smalltech.hashtaglocal_backend.entity.UserAuthSessionEntity;
+import org.smalltech.hashtaglocal_backend.model.Platform;
 import org.smalltech.hashtaglocal_backend.repository.UserAuthSessionRepository;
 import org.springframework.stereotype.Service;
 
@@ -21,7 +22,8 @@ public class DeviceTokenService {
             .findByAccessToken(accessToken)
             .orElseThrow(() -> new RuntimeException("Session not found"));
 
-    if (notificationToken != null && (platform == Platform.android || platform == Platform.ios)) {
+    if (notificationToken != null
+        && (platform == Platform.ANDROID || platform == Platform.IOS || platform == Platform.WEB)) {
       userAuthSessionRepository.clearNotificationTokenByUserIdAndPlatform(
           session.getUser().getId(), platform);
     }
