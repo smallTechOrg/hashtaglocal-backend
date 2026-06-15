@@ -31,7 +31,7 @@ public class EventGeocodingService {
 
   public GeocodingResult run() {
     List<EventEntity> events =
-        eventRepository.findByLocationIsNullAndAddressIsNotNullAndActiveTrue();
+        eventRepository.findByLocationIsNullAndAddressIsNotNull();
     log.info("Found {} events without a geocoded location", events.size());
 
     int success = 0;
