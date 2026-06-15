@@ -343,7 +343,9 @@ public class EventAdminController {
     return EventApprovalEntity.builder().eventId(eventId).build();
   }
 
-  /** Manually triggers the geocoding pass — useful for unblocking events stuck without a location. */
+  /**
+   * Manually triggers the geocoding pass — useful for unblocking events stuck without a location.
+   */
   @PostMapping("/event/geocode")
   @Operation(
       summary = "Trigger event geocoding",
@@ -352,7 +354,8 @@ public class EventAdminController {
               + " Returns a summary of total/success/failed counts.")
   public ResponseEntity<NewAPIResponse<EventGeocodingService.GeocodingResult>> triggerGeocode() {
     EventGeocodingService.GeocodingResult result = eventGeocodingService.run();
-    return ResponseEntity.ok(NewAPIResponse.<EventGeocodingService.GeocodingResult>builder().data(result).build());
+    return ResponseEntity.ok(
+        NewAPIResponse.<EventGeocodingService.GeocodingResult>builder().data(result).build());
   }
 
   @GetMapping("/event/history")
