@@ -1,6 +1,6 @@
 # Notification 01 — Issue Approved (ONHOLD → OPEN)
 
-**Type:** `ISSUE_UPDATE`  
+**Type:** `ISSUE_DETAIL`  
 **Event:** `STATUS_CHANGE → OPEN`  
 **Recipient:** The reporter (the user who submitted the original `REPORT` action)
 
@@ -32,7 +32,7 @@ The notification listener hooks in the same way — a second independent listene
 
 ```json
 {
-  "type":    "ISSUE_UPDATE",
+  "type":    "ISSUE_DETAIL",
   "issueId": "42",
   "status":  "OPEN",
   "event":   "STATUS_CHANGE"
