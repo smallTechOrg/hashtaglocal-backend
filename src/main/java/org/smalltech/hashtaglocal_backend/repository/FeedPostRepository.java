@@ -68,6 +68,7 @@ public interface FeedPostRepository extends JpaRepository<FeedPostEntity, Long> 
           + "AND (p.status = :status "
           + "     OR (:viewerUserId IS NOT NULL AND p.author.id = :viewerUserId)) "
           + "AND p.pinned = false "
+          + "AND p.kind != org.smalltech.hashtaglocal_backend.model.FeedPostKind.BULLETIN "
           + "AND (p.publishedAt IS NULL OR p.publishedAt <= :now) "
           + "ORDER BY p.createdAt DESC, p.id DESC")
   List<FeedPostEntity> findAggregatedTimelineFirstPage(
@@ -84,6 +85,7 @@ public interface FeedPostRepository extends JpaRepository<FeedPostEntity, Long> 
           + "AND (p.status = :status "
           + "     OR (:viewerUserId IS NOT NULL AND p.author.id = :viewerUserId)) "
           + "AND p.pinned = false "
+          + "AND p.kind != org.smalltech.hashtaglocal_backend.model.FeedPostKind.BULLETIN "
           + "AND (p.publishedAt IS NULL OR p.publishedAt <= :now) "
           + "AND (p.createdAt < :cursorCreatedAt "
           + "     OR (p.createdAt = :cursorCreatedAt AND p.id < :cursorId)) "
