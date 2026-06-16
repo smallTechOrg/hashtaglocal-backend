@@ -21,15 +21,18 @@ Push notifications are delivered via Firebase Cloud Messaging (FCM).
 | Feature | Status |
 |---|---|
 | Device token register / remove | ✅ Done |
-| `ISSUE_UPDATE` — `STATUS_CHANGE` → `OPEN` (reporter only) | ✅ Done |
-| `ISSUE_UPDATE` — other status changes (`ONHOLD`, `RESOLVED`, `REJECTED`) | ⬜ Planned |
-| `ISSUE_UPDATE` — `VERIFIED` / `RESOLVED_BY_USER` events | ⬜ Planned |
+| `ISSUE_DETAIL` — `STATUS_CHANGE` → `OPEN` (reporter only) | ✅ Done |
+| `ISSUE_DETAIL` — other status changes (`ONHOLD`, `RESOLVED`, `REJECTED`) | ⬜ Planned |
+| `ISSUE_DETAIL` — `VERIFIED` / `RESOLVED_BY_USER` events | ⬜ Planned |
 | Notify verifiers (not just reporter) | ⬜ Planned |
 | `NEARBY_ISSUE` | ⬜ Planned |
+| `BULLETIN` | ⬜ Planned |
+| `CHAT` | ⬜ Planned |
+| `BROADCAST` — ops-portal "send to everyone" (`POST /admin/notification`) | ✅ Done |
 | `PORTAL_ISSUE_CLOSED` | ⬜ Planned |
 | `ACTIVITY_REMINDER` | ⬜ Planned |
 | Don't-notify-actor / dedup rules | ⬜ Planned |
-| iOS APNs support | ⬜ Planned |
+| iOS APNs support | ✅ Done |
 
 ---
 
@@ -146,7 +149,7 @@ All FCM `data` values must be **strings** (no numbers or booleans). `notificatio
 
 ---
 
-### 4.1 `ISSUE_UPDATE`
+### 4.1 `ISSUE_DETAIL`
 
 > **Status:** Partially implemented. Only `STATUS_CHANGE → OPEN` is live, and only the reporter is notified. Other events and verifier notifications are planned.
 
@@ -162,7 +165,7 @@ All FCM `data` values must be **strings** (no numbers or booleans). `notificatio
 **Payload**
 ```json
 {
-  "type":    "ISSUE_UPDATE",
+  "type":    "ISSUE_DETAIL",
   "issueId": "uuid-string",
   "status":  "RESOLVED",
   "event":   "STATUS_CHANGE"
@@ -224,7 +227,41 @@ notifications:
 
 ---
 
-### 4.3 `PORTAL_ISSUE_CLOSED` ⬜ Planned
+### 4.3 `BROADCAST` ✅ Done
+
+**When:** an admin sends one manually from the ops portal (`/ops/broadcast`).
+
+**Recipients:** every user with an active device token (i.e. all of `findAllActiveNotificationTokens()`), batched at 500 tokens per FCM multicast call.
+
+**Endpoint:** `POST /admin/notification` (ADMIN role required). `notification.type` must be `BROADCAST` — other types are rejected with `400`.
+```json
+// Request
+{
+  "notification": {
+    "type": "BROADCAST",
+    "payload": {
+      "title": "New feature: City Bulletins",
+      "body": "Check the weather and answer today's quiz."
+    }
+  }
+}
+
+// Response — notification_delivered excludes stale tokens dropped by FCM
+{ "data": { "notification_delivered": 479 } }
+```
+
+**Payload sent to devices**
+```json
+{
+  "type": "BROADCAST"
+}
+```
+
+**App behaviour:** tapping opens the home (map) tab. No history is stored — fire-and-forget by design.
+
+---
+
+### 4.4 `PORTAL_ISSUE_CLOSED` ⬜ Planned
 
 **When:** the `PortalIssueTrackingJob` cron detects that a `GovPortalEntity` status has changed from `OPEN` to closed/resolved on the government portal.
 
@@ -300,8 +337,8 @@ notifications:
 
 | Backend event | Type | Recipients | Multicast? |
 |---|---|---|---|
-| Issue status changes | `ISSUE_UPDATE` | Reporter + all verifiers | No — per user |
-| VERIFY/RESOLVE action approved | `ISSUE_UPDATE` | Reporter + all verifiers | No — per user |
+| Issue status changes | `ISSUE_DETAIL` | Reporter + all verifiers | No — per user |
+| VERIFY/RESOLVE action approved | `ISSUE_DETAIL` | Reporter + all verifiers | No — per user |
 | New issue status → OPEN | `NEARBY_ISSUE` | All users in same locality | Yes |
 | Portal cron detects OPEN → closed | `PORTAL_ISSUE_CLOSED` | Reporter + all verifiers | No — per user |
 | Inactivity threshold crossed | `ACTIVITY_REMINDER` | Reporter | No — per user |
