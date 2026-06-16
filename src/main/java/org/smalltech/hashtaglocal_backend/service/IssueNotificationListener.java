@@ -49,7 +49,7 @@ public class IssueNotificationListener {
 
     Map<String, String> data =
         Map.of(
-            "type", "ISSUE_UPDATE",
+            "type", "ISSUE_DETAIL",
             "issueId", issueId.toString(),
             "status", "OPEN",
             "event", "STATUS_CHANGE");

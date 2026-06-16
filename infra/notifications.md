@@ -63,7 +63,7 @@ Inject `FcmSender` into any service and call:
 ```java
 // Single device
 fcmSender.send(deviceToken, "Issue resolved", "The pothole on MG Road is fixed.", Map.of(
-    "type", "ISSUE_UPDATE",
+    "type", "ISSUE_DETAIL",
     "issueId", issue.getId().toString()
 ));
 
@@ -83,10 +83,13 @@ All `data` values must be strings (FCM requirement).
 
 | `type` | Extra fields | App navigates to |
 |---|---|---|
-| `ISSUE_UPDATE` | `issueId` | Issue detail screen |
+| `ISSUE_DETAIL` | `issueId` | Issue detail screen |
 | `ISSUE_COMMENT` | `issueId` | Issue detail screen |
 | `NEARBY_ISSUE` | `issueId` (optional) | Map tab |
 | `KARMA_UPDATE` | — | Map tab |
+| `BULLETIN` | — | Bulletin screen |
+| `CHAT` | — | Chat tab |
+| `BROADCAST` | — | Home (map) tab — re-engagement |
 
 ---
 
@@ -94,10 +97,13 @@ All `data` values must be strings (FCM requirement).
 
 | Event | Type | Recipient |
 |---|---|---|
-| Issue status changes | `ISSUE_UPDATE` | Reporter |
+| Issue status changes | `ISSUE_DETAIL` | Reporter |
 | New comment on issue | `ISSUE_COMMENT` | Reporter |
 | New issue within X km | `NEARBY_ISSUE` | Users in radius |
 | Karma earned/confirmed | `KARMA_UPDATE` | That user |
+| New bulletin published | `BULLETIN` | All users (multicast) |
+| New chat message | `CHAT` | Recipient user |
+| Re-engagement / admin push | `BROADCAST` | All users (multicast) |
 
 ---
 
@@ -158,6 +164,6 @@ Both endpoints return `2xx` with `{ "data": { ... } }` on success.
 Use Firebase Console → Messaging → New campaign → **Firebase Notification messages**:
 
 1. Fill in title + body
-2. Additional options → Custom data → add `type` = `ISSUE_UPDATE`, `issueId` = `123`
+2. Additional options → Custom data → add `type` = `ISSUE_DETAIL`, `issueId` = `123`
 3. Target → Single device → paste the FCM token from the app logs
 4. Send
