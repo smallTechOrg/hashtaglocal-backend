@@ -2,6 +2,7 @@ package org.smalltech.hashtaglocal_backend.infra.notification;
 
 import com.google.firebase.messaging.AndroidConfig;
 import com.google.firebase.messaging.AndroidNotification;
+import com.google.firebase.messaging.FcmOptions;
 import com.google.firebase.messaging.FirebaseMessaging;
 import com.google.firebase.messaging.FirebaseMessagingException;
 import com.google.firebase.messaging.Message;
@@ -10,6 +11,7 @@ import com.google.firebase.messaging.MulticastMessage;
 import com.google.firebase.messaging.Notification;
 import com.google.firebase.messaging.SendResponse;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.slf4j.Logger;
@@ -30,16 +32,31 @@ public class FcmSender {
     this.firebaseMessaging = firebaseMessaging;
   }
 
-  /** Sends to a single device. Silently drops send-level errors (token already logged). */
-  public void send(String token, String title, String body, Map<String, String> data) {
+  /**
+   * Result of a multicast send.
+   *
+   * @param tokenToMessageId token → FCM message ID for successful sends only
+   * @param staleTokens UNREGISTERED/INVALID tokens — caller clears these from DB
+   */
+  public record MulticastResult(Map<String, String> tokenToMessageId, List<String> staleTokens) {
+    public int successCount() {
+      return tokenToMessageId.size();
+    }
+  }
+
+  /** Sends to a single device. Returns the FCM message ID on success, null if FCM rejected. */
+  @Nullable
+  public String send(
+      String token, String title, String body, Map<String, String> data, String analyticsLabel) {
     if (firebaseMessaging == null) {
       log.debug("FCM not configured; skipping notification to token {}", token);
-      return;
+      return null;
     }
     Message.Builder builder =
         Message.builder()
             .setToken(token)
             .setNotification(Notification.builder().setTitle(title).setBody(body).build())
+            .setFcmOptions(FcmOptions.withAnalyticsLabel(analyticsLabel))
             .setAndroidConfig(
                 AndroidConfig.builder()
                     .setPriority(AndroidConfig.Priority.HIGH)
@@ -53,25 +70,37 @@ public class FcmSender {
     data.forEach(builder::putData);
 
     try {
-      firebaseMessaging.send(builder.build());
+      String messageId = firebaseMessaging.send(builder.build());
       log.info("FCM sent successfully to token {}", token);
+      return messageId;
     } catch (FirebaseMessagingException e) {
       log.warn("FCM send failed for token {}: {}", token, e.getMessagingErrorCode());
+      return null;
     }
   }
 
   /**
    * Sends to up to 500 devices in one FCM multicast call.
    *
-   * @return tokens that FCM reports as unregistered/invalid — caller should delete these from DB
+   * @return {@link MulticastResult} with per-token message IDs and stale tokens to clean up
    */
-  public List<String> sendMulticast(
-      List<String> tokens, String title, String body, Map<String, String> data) {
+  public MulticastResult sendMulticast(
+      List<String> tokens,
+      String title,
+      String body,
+      Map<String, String> data,
+      String analyticsLabel) {
+
+    if (firebaseMessaging == null) {
+      log.debug("FCM not configured; skipping multicast to {} tokens", tokens.size());
+      return new MulticastResult(Map.of(), List.of());
+    }
 
     MulticastMessage.Builder builder =
         MulticastMessage.builder()
             .addAllTokens(tokens)
             .setNotification(Notification.builder().setTitle(title).setBody(body).build())
+            .setFcmOptions(FcmOptions.withAnalyticsLabel(analyticsLabel))
             .setAndroidConfig(
                 AndroidConfig.builder()
                     .setPriority(AndroidConfig.Priority.HIGH)
@@ -84,33 +113,33 @@ public class FcmSender {
 
     data.forEach(builder::putData);
 
-    if (firebaseMessaging == null) {
-      log.debug("FCM not configured; skipping multicast to {} tokens", tokens.size());
-      return List.of();
-    }
+    Map<String, String> tokenToMessageId = new HashMap<>();
     List<String> staleTokens = new ArrayList<>();
+
     try {
       var response = firebaseMessaging.sendEachForMulticast(builder.build());
       List<SendResponse> responses = response.getResponses();
-      int successCount = 0;
       for (int i = 0; i < responses.size(); i++) {
         SendResponse sr = responses.get(i);
+        String token = tokens.get(i);
         if (sr.isSuccessful()) {
-          successCount++;
+          tokenToMessageId.put(token, sr.getMessageId());
         } else {
-          MessagingErrorCode code = sr.getException().getMessagingErrorCode();
+          FirebaseMessagingException ex = sr.getException();
+          MessagingErrorCode code = ex != null ? ex.getMessagingErrorCode() : null;
           if (code == MessagingErrorCode.UNREGISTERED
               || code == MessagingErrorCode.INVALID_ARGUMENT) {
-            staleTokens.add(tokens.get(i));
+            staleTokens.add(token);
           } else {
-            log.warn("FCM send failed for token {}: {}", tokens.get(i), code);
+            log.warn("FCM send failed for token {}: {}", token, code);
           }
         }
       }
-      log.info("FCM multicast: {}/{} sent successfully", successCount, tokens.size());
+      log.info("FCM multicast: {}/{} sent successfully", tokenToMessageId.size(), tokens.size());
     } catch (FirebaseMessagingException e) {
       log.error("FCM multicast failed: {}", e.getMessage());
     }
-    return staleTokens;
+
+    return new MulticastResult(tokenToMessageId, staleTokens);
   }
 }
