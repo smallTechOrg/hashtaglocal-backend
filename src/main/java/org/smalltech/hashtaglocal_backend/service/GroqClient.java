@@ -16,10 +16,51 @@ import org.springframework.web.client.RestClient;
  * engaging weather summary and the quiz explanation. Both callers treat a failure as non-fatal —
  * methods return a fallback/empty string rather than throwing, so the daily job and admin quiz save
  * never block on Groq.
+ *
+ * <p>Prompt templates use {@code {{placeholder}}} syntax. The ops portal exposes them read-only via
+ * {@code GET /admin/ai-prompts} so the team can review what is being sent to the model.
  */
 @Component
 @Slf4j
 public class GroqClient {
+
+  // ── Prompt templates ({{placeholder}} replaced at call time) ─────────────
+
+  public static final String WEATHER_SUMMARY_TEMPLATE =
+      "Role: You are a helpful weather assistant writing localized daily advice.\n"
+          + "\n"
+          + "Task: Write exactly one short, practical sentence of advice based on the provided"
+          + " weather data.\n"
+          + "\n"
+          + "Rules:\n"
+          + "1. Do NOT start the sentence with the city name or phrases like \"Residents of...\".\n"
+          + "2. Do NOT mention or repeat raw numbers (e.g., temperature, humidity, rain chance)"
+          + " because the user can already see them on screen.\n"
+          + "3. Focus entirely on actionable advice — what the person should DO or WATCH OUT FOR"
+          + " based on how the day feels.\n"
+          + "4. Keep the tone direct and friendly.\n"
+          + "5. Use at most one emoji.\n"
+          + "6. Reply with ONLY the sentence. No preamble, no intro, no conversational filler.\n"
+          + "\n"
+          + "Thresholds & Logic:\n"
+          + "- If rain probability is low (under 50%), treat it as a fine, standard day. Do NOT"
+          + " give precautionary warnings like \"carry an umbrella\" or \"watch out for rain.\""
+          + " Instead, give routine advice for a pleasant day (e.g., enjoying the weather, staying"
+          + " comfortable).\n"
+          + "- Only advise carrying an umbrella or preparing for wet weather if the rain probability"
+          + " is 50% or higher.\n"
+          + "\n"
+          + "{{weatherData}}, Location: {{localityName}}, India.";
+
+  public static final String QUIZ_EXPLANATION_TEMPLATE =
+      "Write 1-2 short sentences explaining why this answer is correct for a local community quiz."
+          + " Weave in one interesting or useful fact if it fits naturally — skip it if it doesn't."
+          + " Keep it simple; no jargon.\n"
+          + "Question: {{question}}\n"
+          + "Correct answer: {{correctOption}}\n"
+          + "Reply with ONLY the explanation, no preamble.";
+
+  // ─────────────────────────────────────────────────────────────────────────
 
   private final RestClient restClient;
   private final ObjectMapper objectMapper;
@@ -41,37 +82,27 @@ public class GroqClient {
   }
 
   /**
-   * 1–2 engaging, practical sentences about today's weather (e.g. "Light showers expected this
-   * evening — carry an umbrella!"). Falls back to a plain templated line if Groq is unavailable.
+   * One punchy, actionable sentence about today's weather. Falls back to a plain templated line if
+   * Groq is unavailable.
    */
   public String generateWeatherSummary(String localityName, WeatherSnapshot weather) {
     String prompt =
-        "Write a short, engaging 1-2 sentence weather summary for residents of "
-            + localityName
-            + ", India. Be practical and friendly (e.g. suggest carrying an umbrella if rain is"
-            + " likely). Do not use emojis excessively (at most one). Today's data: "
-            + describe(weather)
-            + ". Reply with ONLY the summary text, no preamble.";
+        WEATHER_SUMMARY_TEMPLATE
+            .replace("{{localityName}}", localityName)
+            .replace("{{weatherData}}", describe(weather));
     String summary = complete(prompt);
     return summary != null ? summary : fallbackSummary(weather);
   }
 
   /**
-   * An engaging, interesting explanation of a quiz answer. Returns an empty string on failure so
+   * 1–2 short sentences explaining the correct quiz answer. Returns an empty string on failure so
    * ops can fill it in manually in the portal.
    */
-  public String generateQuizExplanation(
-      String question, List<String> options, String correctOption) {
+  public String generateQuizExplanation(String question, String correctOption) {
     String prompt =
-        "A local community app shows users a daily quiz. Write a short, engaging and interesting"
-            + " explanation (2-3 sentences) of the correct answer, including a fun or useful fact"
-            + " if possible.\nQuestion: "
-            + question
-            + "\nOptions: "
-            + String.join(" | ", options)
-            + "\nCorrect answer: "
-            + correctOption
-            + "\nReply with ONLY the explanation text, no preamble.";
+        QUIZ_EXPLANATION_TEMPLATE
+            .replace("{{question}}", question)
+            .replace("{{correctOption}}", correctOption);
     String explanation = complete(prompt);
     return explanation != null ? explanation : "";
   }

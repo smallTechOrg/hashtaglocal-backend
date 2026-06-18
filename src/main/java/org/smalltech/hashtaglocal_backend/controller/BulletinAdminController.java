@@ -14,7 +14,9 @@ import org.smalltech.hashtaglocal_backend.model.request.UpdateQuizRequest;
 import org.smalltech.hashtaglocal_backend.model.response.AdminBulletinData;
 import org.smalltech.hashtaglocal_backend.model.response.AdminLocalityOptionData;
 import org.smalltech.hashtaglocal_backend.model.response.AdminQuizData;
+import org.smalltech.hashtaglocal_backend.model.response.AiPromptData;
 import org.smalltech.hashtaglocal_backend.service.BulletinGenerationService;
+import org.smalltech.hashtaglocal_backend.service.GroqClient;
 import org.smalltech.hashtaglocal_backend.service.QuizAdminService;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
@@ -144,5 +146,29 @@ public class BulletinAdminController {
         NewAPIResponse.<BulletinGenerationService.GenerationResult>builder()
             .data(bulletinGenerationService.generateForAllUserLocalities())
             .build());
+  }
+
+  @GetMapping("/ai-prompts")
+  @Operation(
+      summary = "Read-only view of the Groq prompt templates",
+      description =
+          "Returns the prompt templates currently used to generate weather summaries and"
+              + " quiz explanations. Edit GroqClient.java to change them.")
+  public ResponseEntity<NewAPIResponse<List<AiPromptData>>> aiPrompts() {
+    List<AiPromptData> prompts =
+        List.of(
+            AiPromptData.builder()
+                .key("WEATHER_SUMMARY")
+                .description("Weather Summary — the one-line advice shown in the daily bulletin")
+                .template(GroqClient.WEATHER_SUMMARY_TEMPLATE)
+                .variables("localityName, weatherData")
+                .build(),
+            AiPromptData.builder()
+                .key("QUIZ_EXPLANATION")
+                .description("Quiz Explanation — shown to the user after they answer the quiz")
+                .template(GroqClient.QUIZ_EXPLANATION_TEMPLATE)
+                .variables("question, correctOption")
+                .build());
+    return ResponseEntity.ok(NewAPIResponse.<List<AiPromptData>>builder().data(prompts).build());
   }
 }
