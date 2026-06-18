@@ -75,9 +75,7 @@ public class QuizAdminService {
         req.getExplanation() != null && !req.getExplanation().isBlank()
             ? req.getExplanation()
             : groqClient.generateQuizExplanation(
-                req.getQuestion(),
-                req.getOptions(),
-                req.getOptions().get(req.getAnswerOptionIndex() - 1));
+                req.getQuestion(), req.getOptions().get(req.getAnswerOptionIndex() - 1));
 
     QuizEntity quiz =
         quizRepository.save(
@@ -119,7 +117,7 @@ public class QuizAdminService {
       List<String> options = BulletinViewMapper.optionTexts(quiz);
       quiz.setExplanation(
           groqClient.generateQuizExplanation(
-              quiz.getQuestion(), options, options.get(quiz.getAnswerOptionIndex() - 1)));
+              quiz.getQuestion(), options.get(quiz.getAnswerOptionIndex() - 1)));
     } else if (req.getExplanation() != null) {
       quiz.setExplanation(req.getExplanation());
     }
