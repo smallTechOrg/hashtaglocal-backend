@@ -1,6 +1,7 @@
 package org.smalltech.hashtaglocal_backend.service;
 
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -50,7 +51,7 @@ public class BulletinGenerationService {
 
   /** Runs the daily generation over all saved-user localities. Returns a per-run summary. */
   public GenerationResult generateForAllUserLocalities() {
-    LocalDate today = LocalDate.now();
+    LocalDate today = LocalDate.now(ZoneId.of("Asia/Kolkata"));
     List<Locality> localities = userRepository.findDistinctUserLocalities();
     log.info(
         "Bulletin generation started for {} user localities (date={})", localities.size(), today);
