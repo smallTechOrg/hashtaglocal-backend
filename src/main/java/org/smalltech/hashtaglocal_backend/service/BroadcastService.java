@@ -18,6 +18,7 @@ import org.smalltech.hashtaglocal_backend.model.request.SendNotificationRequest.
 import org.smalltech.hashtaglocal_backend.repository.NotificationLogRepository;
 import org.smalltech.hashtaglocal_backend.repository.UserAuthSessionRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /** Ops-portal admin-triggered push notifications. */
 @Service
@@ -33,6 +34,7 @@ public class BroadcastService {
   private final FcmSender fcmSender;
   private final ObjectMapper objectMapper;
 
+  @Transactional
   public NotificationResult sendNotification(NotificationBody notification) {
     if (!"BROADCAST".equalsIgnoreCase(notification.getType())) {
       throw new IllegalArgumentException(

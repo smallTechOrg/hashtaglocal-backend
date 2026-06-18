@@ -14,7 +14,9 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.type.SqlTypes;
 import org.smalltech.hashtaglocal_backend.model.NotificationSource;
 import org.smalltech.hashtaglocal_backend.model.NotificationType;
 
@@ -51,6 +53,7 @@ public class NotificationLogEntity {
   private String body;
 
   // FCM data map serialised as JSON (issueId, status, etc.)
+  @JdbcTypeCode(SqlTypes.JSON)
   @Column(columnDefinition = "jsonb", nullable = false)
   private String payload;
 
