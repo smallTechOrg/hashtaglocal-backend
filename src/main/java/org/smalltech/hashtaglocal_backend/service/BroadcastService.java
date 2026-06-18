@@ -2,6 +2,7 @@ package org.smalltech.hashtaglocal_backend.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import lombok.Builder;
@@ -10,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.smalltech.hashtaglocal_backend.entity.NotificationLogEntity;
 import org.smalltech.hashtaglocal_backend.infra.notification.FcmSender;
+import org.smalltech.hashtaglocal_backend.infra.notification.FcmSender.MulticastResult;
 import org.smalltech.hashtaglocal_backend.model.NotificationSource;
 import org.smalltech.hashtaglocal_backend.model.NotificationType;
 import org.smalltech.hashtaglocal_backend.model.request.SendNotificationRequest.NotificationBody;
@@ -41,32 +43,38 @@ public class BroadcastService {
     String body = notification.getPayload().getBody();
 
     List<String> tokens = userAuthSessionRepository.findAllActiveNotificationTokens();
-    Map<String, String> data = Map.of("type", "BROADCAST");
+    Map<String, String> payload = Map.of("type", "BROADCAST");
 
-    NotificationLogEntity logEntry = notificationLogRepository.save(
-        NotificationLogEntity.builder()
-            .source(NotificationSource.ADMIN)
-            .notificationType(NotificationType.BROADCAST)
-            .title(title)
-            .body(body)
-            .payload(toJson(data))
-            .build());
+    NotificationLogEntity logEntry =
+        notificationLogRepository.save(
+            NotificationLogEntity.builder()
+                .source(NotificationSource.ADMIN)
+                .type(NotificationType.BROADCAST)
+                .title(title)
+                .body(body)
+                .payload(toJson(payload))
+                .build());
 
-    int staleCount = 0;
+    // FCM data = business payload + notificationLogId so the device can report opens back
+    Map<String, String> fcmData = new HashMap<>(payload);
+    fcmData.put("notificationLogId", logEntry.getId().toString());
+
+    int totalSuccess = 0;
     for (int i = 0; i < tokens.size(); i += FCM_BATCH_SIZE) {
       List<String> batch = tokens.subList(i, Math.min(i + FCM_BATCH_SIZE, tokens.size()));
-      List<String> stale = fcmSender.sendMulticast(batch, title, body, data);
-      stale.forEach(userAuthSessionRepository::clearNotificationToken);
-      staleCount += stale.size();
+      MulticastResult result =
+          fcmSender.sendMulticast(batch, title, body, fcmData, "broadcast_admin");
+      result.staleTokens().forEach(userAuthSessionRepository::clearNotificationToken);
+      totalSuccess += result.successCount();
     }
 
-    int delivered = tokens.size() - staleCount;
-    log.info("Broadcast sent: {} recipients, {} stale tokens dropped", tokens.size(), staleCount);
+    log.info("Broadcast sent: {} recipients, {} FCM accepted", tokens.size(), totalSuccess);
 
-    logEntry.setRecipientCount(delivered);
+    logEntry.setRecipientCount(tokens.size());
+    logEntry.setSuccessCount(totalSuccess);
     notificationLogRepository.save(logEntry);
 
-    return NotificationResult.builder().notificationDelivered(delivered).build();
+    return NotificationResult.builder().notificationDelivered(totalSuccess).build();
   }
 
   private String toJson(Map<String, String> map) {

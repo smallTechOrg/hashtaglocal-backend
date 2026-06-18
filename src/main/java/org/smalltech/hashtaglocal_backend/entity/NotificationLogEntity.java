@@ -31,18 +31,18 @@ public class NotificationLogEntity {
   private Long id;
 
   @Enumerated(EnumType.STRING)
-  @Column(length = 10, nullable = false)
+  @Column(length = 50, nullable = false)
   private NotificationSource source;
 
   // Polymorphic pointer to the triggering record — no FK by design (references different tables)
-  @Column(length = 50)
+  @Column(length = 100)
   private String sourceRefType;
 
   private Long sourceRefId;
 
   @Enumerated(EnumType.STRING)
-  @Column(length = 20, nullable = false)
-  private NotificationType notificationType;
+  @Column(length = 100, nullable = false)
+  private NotificationType type;
 
   @Column(length = 500, nullable = false)
   private String title;
@@ -56,6 +56,9 @@ public class NotificationLogEntity {
 
   // Null until all FCM calls finish, then updated to total tokens attempted
   private Integer recipientCount;
+
+  // FCM accepted (message ID returned) — subset of recipientCount; null until send completes
+  private Integer successCount;
 
   @CreationTimestamp
   @Column(nullable = false, updatable = false)
