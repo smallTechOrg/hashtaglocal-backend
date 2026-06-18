@@ -24,7 +24,7 @@ public class BulletinWeatherJob {
   @Value("${bulletin.weather.cron:0 0 8 * * *}")
   private String scheduleExpression;
 
-  @Scheduled(cron = "${bulletin.weather.cron:0 0 8 * * *}")
+  @Scheduled(cron = "${bulletin.weather.cron:0 0 8 * * *}", zone = "Asia/Kolkata")
   public void run() {
     log.info("Bulletin weather job started (cron={})", scheduleExpression);
     bulletinGenerationService.generateForAllUserLocalities();
