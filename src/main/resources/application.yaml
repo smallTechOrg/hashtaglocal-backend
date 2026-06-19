@@ -53,6 +53,10 @@ logging:
 app:
   geo:
     verify-radius-meters: 100
+  # This backend's own public base URL, sent as X-Backend-Url to the shared scraper
+  # service so it can dedupe FETCH_EVENTS results against the correct database
+  # (staging and production both call the same scraper deployment).
+  self-base-url: ${APP_SELF_BASE_URL:}
 
 # Added: account deletion workflow config — admin-email receives deletion notifications;
 # from-email is used as the SMTP sender address
