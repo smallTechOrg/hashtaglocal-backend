@@ -75,9 +75,18 @@ google:
 apple:
   bundle-id: ${APPLE_BUNDLE_ID:com.smalltech.hashtaglocal}
 
-# Slack alert posted to ops when a user reports a new issue
+# Base URL of the ops admin web app (hashtaglocal-frontend-web), linked from Slack alerts.
+ops:
+  base-url: ${OPS_BASE_URL:https://local.smalltech.in}
+
+# Slack alert webhooks, keyed by channel. "default" is used when a more specific
+# channel (review / cron / account_deletion) has no webhook of its own configured.
 slack:
-  issue-webhook-url: ${SLACK_ISSUE_WEBHOOK_URL:}
+  webhooks:
+    default: ${SLACK_WEBHOOK_URL:}
+    review: ${SLACK_REVIEW_WEBHOOK_URL:}
+    cron: ${SLACK_CRON_WEBHOOK_URL:}
+    account_deletion: ${SLACK_ACCOUNT_DELETION_WEBHOOK_URL:}
 
 management:
   health:

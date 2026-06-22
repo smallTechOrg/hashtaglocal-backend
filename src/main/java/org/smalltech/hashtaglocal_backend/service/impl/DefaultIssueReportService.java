@@ -7,7 +7,7 @@ import org.smalltech.hashtaglocal_backend.entity.IssueEntity;
 import org.smalltech.hashtaglocal_backend.entity.Location;
 import org.smalltech.hashtaglocal_backend.entity.MediaEntity;
 import org.smalltech.hashtaglocal_backend.entity.UserEntity;
-import org.smalltech.hashtaglocal_backend.event.IssueReportedEvent;
+import org.smalltech.hashtaglocal_backend.event.IssueActionPendingEvent;
 import org.smalltech.hashtaglocal_backend.model.IssueActionApprovalStatus;
 import org.smalltech.hashtaglocal_backend.model.IssueActionModel;
 import org.smalltech.hashtaglocal_backend.model.IssueActionResult;
@@ -69,7 +69,8 @@ public class DefaultIssueReportService implements IssueReportService {
             .build();
 
     issue = issueRepository.save(issue);
-    eventPublisher.publishEvent(new IssueReportedEvent(issue.getId()));
+    eventPublisher.publishEvent(
+        new IssueActionPendingEvent(issue.getId(), IssueActionModel.REPORT, user.getId()));
 
     // Create one REPORT action per media item. The first action carries PENDING approval
     // (governs issue ONHOLD → OPEN transition); additional actions are NOT_REQUIRED (pure

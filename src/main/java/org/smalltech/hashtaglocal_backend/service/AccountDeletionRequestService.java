@@ -5,6 +5,8 @@ import java.time.LocalDateTime;
 import org.smalltech.hashtaglocal_backend.entity.AccountDeletionRequestEntity;
 import org.smalltech.hashtaglocal_backend.entity.UserAuthProviderEntity;
 import org.smalltech.hashtaglocal_backend.entity.UserEntity;
+import org.smalltech.hashtaglocal_backend.infra.notification.SlackChannel;
+import org.smalltech.hashtaglocal_backend.infra.notification.SlackNotifier;
 import org.smalltech.hashtaglocal_backend.model.AccountDeletionRequestStatus;
 import org.smalltech.hashtaglocal_backend.model.response.AccountDeletionRequestResponseData;
 import org.smalltech.hashtaglocal_backend.repository.AccountDeletionRequestRepository;
@@ -32,6 +34,7 @@ public class AccountDeletionRequestService {
   private final UserAuthProviderRepository userAuthProviderRepository;
   private final UserAuthSessionRepository userAuthSessionRepository;
   private final JavaMailSender mailSender;
+  private final SlackNotifier slackNotifier;
 
   @Value("${account.deletion.admin-email:}")
   private String adminEmail;
@@ -44,12 +47,14 @@ public class AccountDeletionRequestService {
       UserRepository userRepository,
       UserAuthProviderRepository userAuthProviderRepository,
       UserAuthSessionRepository userAuthSessionRepository,
-      JavaMailSender mailSender) {
+      JavaMailSender mailSender,
+      SlackNotifier slackNotifier) {
     this.accountDeletionRequestRepository = accountDeletionRequestRepository;
     this.userRepository = userRepository;
     this.userAuthProviderRepository = userAuthProviderRepository;
     this.userAuthSessionRepository = userAuthSessionRepository;
     this.mailSender = mailSender;
+    this.slackNotifier = slackNotifier;
   }
 
   @Transactional
@@ -89,9 +94,10 @@ public class AccountDeletionRequestService {
             + "; deactivated sessions="
             + deactivatedSessions);
 
-    // Send only once per new request; retries should not spam the admin inbox.
+    // Send only once per new request; retries should not spam the admin inbox/channel.
     if (newlyCreated) {
       sendAdminEmail(deletionRequest);
+      notifySlack(deletionRequest);
     }
 
     return mapToResponse(deletionRequest);
@@ -101,6 +107,25 @@ public class AccountDeletionRequestService {
     return accountDeletionRequestRepository
         .findByUserIdAndStatus(userId, AccountDeletionRequestStatus.PENDING)
         .isPresent();
+  }
+
+  // Independent of sendAdminEmail — fires even if SMTP isn't configured or the send fails, so
+  // ops still finds out a manual deletion is due within 24 hours.
+  private void notifySlack(AccountDeletionRequestEntity deletionRequest) {
+    UserEntity user = deletionRequest.getUser();
+    String providerEmail =
+        userAuthProviderRepository
+            .findFirstByUserIdOrderByIdAsc(user.getId())
+            .map(UserAuthProviderEntity::getEmail)
+            .orElse("N/A");
+
+    String text =
+        String.format(
+            ":warning: *Account deletion requested* — user #%d (%s)\n*Provider email:* %s\n"
+                + "*Scheduled deletion:* %s\nComplete within 24 hours.",
+            user.getId(), user.getUsername(), providerEmail, deletionRequest.getScheduledDeletionAt());
+
+    slackNotifier.send(SlackChannel.ACCOUNT_DELETION, text);
   }
 
   private void sendAdminEmail(AccountDeletionRequestEntity deletionRequest) {

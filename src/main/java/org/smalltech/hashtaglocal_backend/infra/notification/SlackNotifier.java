@@ -3,36 +3,43 @@ package org.smalltech.hashtaglocal_backend.infra.notification;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
+import org.smalltech.hashtaglocal_backend.config.CustomProperties;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
-/** Posts simple text alerts to a Slack channel via an Incoming Webhook URL. */
+/**
+ * Posts simple text alerts to Slack via Incoming Webhook URLs, one per {@link SlackChannel}. A
+ * channel with no webhook configured falls back to {@code slack.webhooks.default}; if that's also
+ * unset, the alert is dropped (logged at debug).
+ */
 @Component
 public class SlackNotifier {
 
   private static final Logger log = LoggerFactory.getLogger(SlackNotifier.class);
+  private static final String DEFAULT_KEY = "default";
 
   private final RestTemplate restTemplate;
-  private final String webhookUrl;
+  private final Map<String, String> webhooks;
 
-  public SlackNotifier(
-      RestTemplate restTemplate, @Value("${slack.issue-webhook-url:}") String webhookUrl) {
+  public SlackNotifier(RestTemplate restTemplate, CustomProperties.Slack slackProperties) {
     this.restTemplate = restTemplate;
-    this.webhookUrl = webhookUrl;
+    this.webhooks = slackProperties.getWebhooks();
   }
 
-  /** Sends {@code text} to the configured webhook. No-op (logged) if no webhook is configured. */
-  public void send(String text) {
-    if (webhookUrl == null || webhookUrl.isBlank()) {
-      log.debug("Slack webhook not configured; skipping alert");
+  public void send(SlackChannel channel, String text) {
+    String url = webhooks.get(channel.key());
+    if (url == null || url.isBlank()) {
+      url = webhooks.get(DEFAULT_KEY);
+    }
+    if (url == null || url.isBlank()) {
+      log.debug("No Slack webhook configured for channel '{}' — skipping alert", channel.key());
       return;
     }
     try {
-      restTemplate.postForEntity(webhookUrl, Map.of("text", text), String.class);
+      restTemplate.postForEntity(url, Map.of("text", text), String.class);
     } catch (RestClientException e) {
-      log.warn("Slack alert failed: {}", e.getMessage());
+      log.warn("Slack alert to '{}' failed: {}", channel.key(), e.getMessage());
     }
   }
 }
