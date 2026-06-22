@@ -7,6 +7,7 @@ import org.smalltech.hashtaglocal_backend.entity.IssueEntity;
 import org.smalltech.hashtaglocal_backend.entity.Location;
 import org.smalltech.hashtaglocal_backend.entity.MediaEntity;
 import org.smalltech.hashtaglocal_backend.entity.UserEntity;
+import org.smalltech.hashtaglocal_backend.event.IssueReportedEvent;
 import org.smalltech.hashtaglocal_backend.model.IssueActionApprovalStatus;
 import org.smalltech.hashtaglocal_backend.model.IssueActionModel;
 import org.smalltech.hashtaglocal_backend.model.IssueActionResult;
@@ -23,6 +24,7 @@ import org.smalltech.hashtaglocal_backend.repository.UserRepository;
 import org.smalltech.hashtaglocal_backend.service.IssueReportService;
 import org.smalltech.hashtaglocal_backend.service.KarmaService;
 import org.smalltech.hashtaglocal_backend.service.LocationService;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,6 +39,7 @@ public class DefaultIssueReportService implements IssueReportService {
   private final LocationService locationService;
   private final IssueActionRepository issueActionRepository;
   private final KarmaService karmaService;
+  private final ApplicationEventPublisher eventPublisher;
 
   @Override
   public IssueActionResult createIssue(Long userId, IssueReportRequest request) {
@@ -66,6 +69,7 @@ public class DefaultIssueReportService implements IssueReportService {
             .build();
 
     issue = issueRepository.save(issue);
+    eventPublisher.publishEvent(new IssueReportedEvent(issue.getId()));
 
     // Create one REPORT action per media item. The first action carries PENDING approval
     // (governs issue ONHOLD → OPEN transition); additional actions are NOT_REQUIRED (pure

@@ -75,6 +75,10 @@ google:
 apple:
   bundle-id: ${APPLE_BUNDLE_ID:com.smalltech.hashtaglocal}
 
+# Slack alert posted to ops when a user reports a new issue
+slack:
+  issue-webhook-url: ${SLACK_ISSUE_WEBHOOK_URL:}
+
 management:
   health:
     diskspace:
