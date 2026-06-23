@@ -6,7 +6,6 @@ import org.smalltech.hashtaglocal_backend.entity.IssueEntity;
 import org.smalltech.hashtaglocal_backend.entity.Locality;
 import org.smalltech.hashtaglocal_backend.entity.UserEntity;
 import org.smalltech.hashtaglocal_backend.event.IssueActionPendingEvent;
-import org.smalltech.hashtaglocal_backend.infra.notification.SlackChannel;
 import org.smalltech.hashtaglocal_backend.infra.notification.SlackNotifier;
 import org.smalltech.hashtaglocal_backend.model.IssueActionModel;
 import org.smalltech.hashtaglocal_backend.repository.IssueRepository;
@@ -19,9 +18,9 @@ import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
 /**
- * Alerts the ops Slack review-queue channel whenever any issue action (REPORT, VERIFY, or
- * RESOLVE) lands in the admin pending-approval queue — the single alert for "something needs
- * review in the backend."
+ * Alerts the ops Slack review-queue channel whenever any issue action (REPORT, VERIFY, or RESOLVE)
+ * lands in the admin pending-approval queue — the single alert for "something needs review in the
+ * backend."
  */
 @Component
 @RequiredArgsConstructor
@@ -52,15 +51,10 @@ public class IssueActionPendingSlackListener {
 
     String text;
     if (event.actionType() == IssueActionModel.REPORT) {
-      String description =
-          issue.getDescription() != null && !issue.getDescription().isBlank()
-              ? issue.getDescription()
-              : "(no description)";
       text =
           String.format(
-              ":rotating_light: *New issue reported — pending review* (#%d)\n*Type:* %s\n"
-                  + "*Reporter:* %s\n*Location:* %s\n*Description:* %s\n%s",
-              issue.getId(), issue.getType(), actor, location, description, reviewLink);
+              ":rotating_light: *New issue reported — pending review* (#%d)\n*Reporter:* %s\n%s",
+              issue.getId(), actor, reviewLink);
     } else {
       text =
           String.format(
@@ -69,6 +63,6 @@ public class IssueActionPendingSlackListener {
               event.actionType(), issue.getId(), issue.getType(), actor, location, reviewLink);
     }
 
-    slackNotifier.send(SlackChannel.REVIEW, text);
+    slackNotifier.send(text);
   }
 }

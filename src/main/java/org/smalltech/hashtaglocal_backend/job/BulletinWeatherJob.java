@@ -2,7 +2,6 @@ package org.smalltech.hashtaglocal_backend.job;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.smalltech.hashtaglocal_backend.infra.notification.SlackChannel;
 import org.smalltech.hashtaglocal_backend.infra.notification.SlackNotifier;
 import org.smalltech.hashtaglocal_backend.service.BulletinGenerationService;
 import org.springframework.beans.factory.annotation.Value;
@@ -35,7 +34,6 @@ public class BulletinWeatherJob {
           bulletinGenerationService.generateForAllUserLocalities();
       if (result.getFailed() > 0) {
         slackNotifier.send(
-            SlackChannel.CRON,
             String.format(
                 ":warning: Bulletin weather job (%s): %d/%d localities failed (%d generated, %d"
                     + " skipped)",
@@ -47,7 +45,7 @@ public class BulletinWeatherJob {
       }
     } catch (Exception e) {
       log.error("Bulletin weather job failed", e);
-      slackNotifier.send(SlackChannel.CRON, ":x: Bulletin weather job failed: " + e.getMessage());
+      slackNotifier.send(":x: Bulletin weather job failed: " + e.getMessage());
       throw e;
     }
   }

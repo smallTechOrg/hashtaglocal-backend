@@ -9,37 +9,31 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
 /**
- * Posts simple text alerts to Slack via Incoming Webhook URLs, one per {@link SlackChannel}. A
- * channel with no webhook configured falls back to {@code slack.webhooks.default}; if that's also
- * unset, the alert is dropped (logged at debug).
+ * Posts simple text alerts to Slack via a single Incoming Webhook URL. If no webhook is
+ * configured, the alert is dropped (logged at debug).
  */
 @Component
 public class SlackNotifier {
 
   private static final Logger log = LoggerFactory.getLogger(SlackNotifier.class);
-  private static final String DEFAULT_KEY = "default";
 
   private final RestTemplate restTemplate;
-  private final Map<String, String> webhooks;
+  private final String webhookUrl;
 
   public SlackNotifier(RestTemplate restTemplate, CustomProperties.Slack slackProperties) {
     this.restTemplate = restTemplate;
-    this.webhooks = slackProperties.getWebhooks();
+    this.webhookUrl = slackProperties.getWebhookUrl();
   }
 
-  public void send(SlackChannel channel, String text) {
-    String url = webhooks.get(channel.key());
-    if (url == null || url.isBlank()) {
-      url = webhooks.get(DEFAULT_KEY);
-    }
-    if (url == null || url.isBlank()) {
-      log.debug("No Slack webhook configured for channel '{}' — skipping alert", channel.key());
+  public void send(String text) {
+    if (webhookUrl == null || webhookUrl.isBlank()) {
+      log.debug("No Slack webhook configured — skipping alert");
       return;
     }
     try {
-      restTemplate.postForEntity(url, Map.of("text", text), String.class);
+      restTemplate.postForEntity(webhookUrl, Map.of("text", text), String.class);
     } catch (RestClientException e) {
-      log.warn("Slack alert to '{}' failed: {}", channel.key(), e.getMessage());
+      log.warn("Slack alert failed: {}", e.getMessage());
     }
   }
 }

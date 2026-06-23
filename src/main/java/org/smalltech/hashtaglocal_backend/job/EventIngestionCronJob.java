@@ -4,7 +4,6 @@ import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.smalltech.hashtaglocal_backend.dto.ScrapeEventDTO;
-import org.smalltech.hashtaglocal_backend.infra.notification.SlackChannel;
 import org.smalltech.hashtaglocal_backend.infra.notification.SlackNotifier;
 import org.smalltech.hashtaglocal_backend.service.EventGeocodingService;
 import org.smalltech.hashtaglocal_backend.service.EventImportService;
@@ -53,8 +52,7 @@ public class EventIngestionCronJob {
 
       if (rawEvents.isEmpty()) {
         log.info("No events returned from scrape service — skipping import and geocoding");
-        slackNotifier.send(
-            SlackChannel.CRON, ":calendar: Event ingestion job ran — found 0 events.\n" + reviewLink);
+        slackNotifier.send(":calendar: Event ingestion job ran — found 0 events.\n" + reviewLink);
         return;
       }
 
@@ -67,7 +65,6 @@ public class EventIngestionCronJob {
       log.info("Geocoding complete: {}", geocodeResult);
 
       slackNotifier.send(
-          SlackChannel.CRON,
           String.format(
               ":calendar: Event ingestion job ran — found %d event(s), imported %d new. %s\n%s",
               found, imported, geocodeResult, reviewLink));

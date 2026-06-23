@@ -5,7 +5,6 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.smalltech.hashtaglocal_backend.infra.notification.SlackChannel;
 import org.smalltech.hashtaglocal_backend.infra.notification.SlackNotifier;
 import org.smalltech.hashtaglocal_backend.repository.UserAuthSessionRepository;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -49,7 +48,8 @@ public class SessionCleanupJob {
           userAuthSessionRepository.deleteByRefreshTokenExpiredBefore(expiredCutoff);
 
       LocalDateTime inactiveCutoff = LocalDateTime.now().minusDays(INACTIVE_GRACE_DAYS);
-      int inactiveDeleted = userAuthSessionRepository.deleteInactiveSessionsOlderThan(inactiveCutoff);
+      int inactiveDeleted =
+          userAuthSessionRepository.deleteInactiveSessionsOlderThan(inactiveCutoff);
 
       log.info(
           "[SessionCleanup] Done — deleted {} expired-token sessions, {} stale inactive sessions",
@@ -57,7 +57,7 @@ public class SessionCleanupJob {
           inactiveDeleted);
     } catch (Exception e) {
       log.error("[SessionCleanup] Job failed", e);
-      slackNotifier.send(SlackChannel.CRON, ":x: Session cleanup job failed: " + e.getMessage());
+      slackNotifier.send(":x: Session cleanup job failed: " + e.getMessage());
       throw e;
     }
   }

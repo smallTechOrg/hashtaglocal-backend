@@ -1,7 +1,5 @@
 package org.smalltech.hashtaglocal_backend.config;
 
-import java.util.HashMap;
-import java.util.Map;
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
@@ -20,15 +18,12 @@ public class CustomProperties {
     }
   }
 
-  /**
-   * Slack Incoming Webhook URLs keyed by alert channel (see {@code SlackChannel}). {@code default}
-   * is used when a more specific channel has no webhook configured.
-   */
+  /** Slack Incoming Webhook URL used for all alert notifications. */
   @Configuration
   @ConfigurationProperties(prefix = "slack")
   @Data
   public static class Slack {
-    private Map<String, String> webhooks = new HashMap<>();
+    private String webhookUrl;
   }
 
   @Configuration

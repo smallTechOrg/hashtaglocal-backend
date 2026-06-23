@@ -5,7 +5,6 @@ import java.time.LocalDateTime;
 import org.smalltech.hashtaglocal_backend.entity.AccountDeletionRequestEntity;
 import org.smalltech.hashtaglocal_backend.entity.UserAuthProviderEntity;
 import org.smalltech.hashtaglocal_backend.entity.UserEntity;
-import org.smalltech.hashtaglocal_backend.infra.notification.SlackChannel;
 import org.smalltech.hashtaglocal_backend.infra.notification.SlackNotifier;
 import org.smalltech.hashtaglocal_backend.model.AccountDeletionRequestStatus;
 import org.smalltech.hashtaglocal_backend.model.response.AccountDeletionRequestResponseData;
@@ -123,9 +122,12 @@ public class AccountDeletionRequestService {
         String.format(
             ":warning: *Account deletion requested* — user #%d (%s)\n*Provider email:* %s\n"
                 + "*Scheduled deletion:* %s\nComplete within 24 hours.",
-            user.getId(), user.getUsername(), providerEmail, deletionRequest.getScheduledDeletionAt());
+            user.getId(),
+            user.getUsername(),
+            providerEmail,
+            deletionRequest.getScheduledDeletionAt());
 
-    slackNotifier.send(SlackChannel.ACCOUNT_DELETION, text);
+    slackNotifier.send(text);
   }
 
   private void sendAdminEmail(AccountDeletionRequestEntity deletionRequest) {

@@ -182,7 +182,8 @@ public class IssueActionService {
     }
 
     // VERIFY/RESOLVE land in the admin review queue (PENDING) — alert ops.
-    if (issueActionModel == IssueActionModel.VERIFY || issueActionModel == IssueActionModel.RESOLVE) {
+    if (issueActionModel == IssueActionModel.VERIFY
+        || issueActionModel == IssueActionModel.RESOLVE) {
       eventPublisher.publishEvent(new IssueActionPendingEvent(issueId, issueActionModel, userId));
     }
 

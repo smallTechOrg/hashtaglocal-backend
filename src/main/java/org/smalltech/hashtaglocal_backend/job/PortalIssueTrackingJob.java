@@ -2,7 +2,6 @@ package org.smalltech.hashtaglocal_backend.job;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.smalltech.hashtaglocal_backend.infra.notification.SlackChannel;
 import org.smalltech.hashtaglocal_backend.infra.notification.SlackNotifier;
 import org.smalltech.hashtaglocal_backend.service.PortalIssueTrackingService;
 import org.springframework.beans.factory.annotation.Value;
@@ -29,8 +28,7 @@ public class PortalIssueTrackingJob {
       portalIssueTrackingService.runCycle();
     } catch (Exception e) {
       log.error("Portal issue tracking job failed", e);
-      slackNotifier.send(
-          SlackChannel.CRON, ":x: Portal issue tracking job failed: " + e.getMessage());
+      slackNotifier.send(":x: Portal issue tracking job failed: " + e.getMessage());
       throw e;
     }
   }

@@ -79,14 +79,9 @@ apple:
 ops:
   base-url: ${OPS_BASE_URL:https://local.smalltech.in}
 
-# Slack alert webhooks, keyed by channel. "default" is used when a more specific
-# channel (review / cron / account_deletion) has no webhook of its own configured.
+# Slack alert webhook, used for all alert notifications.
 slack:
-  webhooks:
-    default: ${SLACK_WEBHOOK_URL:}
-    review: ${SLACK_REVIEW_WEBHOOK_URL:}
-    cron: ${SLACK_CRON_WEBHOOK_URL:}
-    account_deletion: ${SLACK_ACCOUNT_DELETION_WEBHOOK_URL:}
+  webhook-url: ${SLACK_WEBHOOK_URL:}
 
 management:
   health:
@@ -131,18 +126,18 @@ geonames:
 
 auth:
   access-token:
-    expiry-seconds: ${AUTH_ACCESS_TOKEN_EXPIRY_SECONDS:10}
+    expiry-seconds: ${AUTH_ACCESS_TOKEN_EXPIRY_SECONDS:1000}
   refresh-token:
-    expiry-seconds: ${AUTH_REFRESH_TOKEN_EXPIRY_SECONDS:30}
+    expiry-seconds: ${AUTH_REFRESH_TOKEN_EXPIRY_SECONDS:3000}
   session:
-    cleanup-cron: ${AUTH_SESSION_CLEANUP_CRON:0 0 3 * * *}
+    cleanup-cron: ${AUTH_SESSION_CLEANUP_CRON:0 0 1 * * *}
 
 events:
   scrape:
     # URL of the external scrape service that provides raw event data
     url: ${EVENTS_SCRAPE_URL:https://staging.api.smalltech.in/webscraperstaging/api/v1/scrape}
     # Cron expression for the ingestion job. Use '-' to disable. Override via EVENTS_SCRAPE_CRON env var.
-    cron: ${EVENTS_SCRAPE_CRON:0 */5 * * * *}
+    cron: ${EVENTS_SCRAPE_CRON:0 0 1 * * *}
 
 # Per-hashtag feed / broadcast channel (see FEED_DESIGN.md)
 feed:
