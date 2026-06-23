@@ -83,6 +83,13 @@ ops:
 slack:
   webhook-url: ${SLACK_WEBHOOK_URL:}
 
+# Weekly ops digest — posted every Monday morning, covering the week that just ended.
+# Set digest.weekly.cron=- to disable without removing the job.
+digest:
+  weekly:
+    enabled: ${DIGEST_WEEKLY_ENABLED:true}
+    cron: ${DIGEST_WEEKLY_CRON:0 0 9 * * MON}
+
 management:
   health:
     diskspace:

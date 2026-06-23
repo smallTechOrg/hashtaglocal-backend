@@ -1,5 +1,6 @@
 package org.smalltech.hashtaglocal_backend.repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import org.smalltech.hashtaglocal_backend.entity.Locality;
@@ -11,6 +12,9 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface UserRepository extends JpaRepository<UserEntity, Long> {
   Optional<UserEntity> findByUsername(String username);
+
+  /** Used by the weekly ops digest to report new signups in a date range. */
+  long countByCreatedAtBetween(LocalDateTime start, LocalDateTime end);
 
   /**
    * The distinct localities that saved users belong to ({@code users.location_id} → {@code

@@ -127,4 +127,14 @@ public interface IssueRepository extends JpaRepository<IssueEntity, Long> {
       "SELECT COUNT(i) FROM IssueEntity i WHERE i.userEntity.id = :userId AND i.status IN :statuses")
   long countByUserAndStatusIn(
       @Param("userId") Long userId, @Param("statuses") List<IssueStatusModel> statuses);
+
+  /** Used by the weekly ops digest — total issues reported in a date range. */
+  long countByCreatedAtBetween(LocalDateTime start, LocalDateTime end);
+
+  /** Used by the weekly ops digest — unique reporters, not raw issue count. */
+  @Query(
+      "SELECT COUNT(DISTINCT i.userEntity.id) FROM IssueEntity i "
+          + "WHERE i.createdAt BETWEEN :start AND :end")
+  long countDistinctReportersByCreatedAtBetween(
+      @Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 }

@@ -1,5 +1,6 @@
 package org.smalltech.hashtaglocal_backend.repository;
 
+import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -95,4 +96,20 @@ public interface IssueActionRepository extends JpaRepository<IssueActionEntity, 
           + "AND ia.action = org.smalltech.hashtaglocal_backend.model.IssueActionModel.VERIFY "
           + "AND ia.approvalStatus = org.smalltech.hashtaglocal_backend.model.IssueActionApprovalStatus.APPROVED")
   Set<Long> findVerifiedIssueIds(@Param("issueIds") Collection<Long> issueIds);
+
+  /**
+   * Used by the weekly ops digest — counts distinct issues with an admin-approved action of the
+   * given type in the date range (by approval time, not submission time). Distinct on issue because
+   * VERIFY/RESOLVE can carry one action per media item, which would otherwise overcount a single
+   * multi-photo submission.
+   */
+  @Query(
+      "SELECT COUNT(DISTINCT ia.issueEntity.id) FROM IssueActionEntity ia "
+          + "WHERE ia.action = :action "
+          + "AND ia.approvalStatus = org.smalltech.hashtaglocal_backend.model.IssueActionApprovalStatus.APPROVED "
+          + "AND ia.approvedAt BETWEEN :start AND :end")
+  long countDistinctIssuesByApprovedActionBetween(
+      @Param("action") IssueActionModel action,
+      @Param("start") LocalDateTime start,
+      @Param("end") LocalDateTime end);
 }
