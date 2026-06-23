@@ -18,6 +18,7 @@ import org.smalltech.hashtaglocal_backend.model.request.UpdateQuizRequest;
 import org.smalltech.hashtaglocal_backend.model.response.AdminBulletinData;
 import org.smalltech.hashtaglocal_backend.model.response.AdminLocalityOptionData;
 import org.smalltech.hashtaglocal_backend.model.response.AdminQuizData;
+import org.smalltech.hashtaglocal_backend.model.response.WeekCoverageData;
 import org.smalltech.hashtaglocal_backend.repository.BulletinRepository;
 import org.smalltech.hashtaglocal_backend.repository.FeedPostRepository;
 import org.smalltech.hashtaglocal_backend.repository.LocalityRepository;
@@ -74,8 +75,7 @@ public class QuizAdminService {
     String explanation =
         req.getExplanation() != null && !req.getExplanation().isBlank()
             ? req.getExplanation()
-            : groqClient.generateQuizExplanation(
-                req.getQuestion(), req.getOptions().get(req.getAnswerOptionIndex() - 1));
+            : null;
 
     QuizEntity quiz =
         quizRepository.save(
@@ -113,12 +113,7 @@ public class QuizAdminService {
       quiz.setAnswerOptionIndex(req.getAnswerOptionIndex());
     }
 
-    if (Boolean.TRUE.equals(req.getRegenerateExplanation())) {
-      List<String> options = BulletinViewMapper.optionTexts(quiz);
-      quiz.setExplanation(
-          groqClient.generateQuizExplanation(
-              quiz.getQuestion(), options.get(quiz.getAnswerOptionIndex() - 1)));
-    } else if (req.getExplanation() != null) {
+    if (req.getExplanation() != null) {
       quiz.setExplanation(req.getExplanation());
     }
 
@@ -205,6 +200,46 @@ public class QuizAdminService {
                     .build())
         .sorted((a, b) -> a.getName().compareToIgnoreCase(b.getName()))
         .collect(Collectors.toList());
+  }
+
+  /** Coverage grid for a date range: which localities have a quiz on each day. */
+  @Transactional(readOnly = true)
+  public WeekCoverageData getWeekCoverage(LocalDate from, LocalDate to) {
+    List<Locality> localities = userRepository.findDistinctUserLocalities();
+    List<Object[]> covered = bulletinRepository.findCoveredLocalityDatePairs(from, to);
+
+    // Build a set of "localityId_date" keys for O(1) lookup
+    java.util.Set<String> coveredKeys =
+        covered.stream().map(r -> r[0] + "_" + r[1]).collect(Collectors.toSet());
+
+    List<LocalDate> dates = from.datesUntil(to.plusDays(1)).collect(Collectors.toList());
+
+    List<WeekCoverageData.LocalityCoverage> localityCoverage =
+        localities.stream()
+            .sorted((a, b) -> a.getName().compareToIgnoreCase(b.getName()))
+            .map(
+                loc -> {
+                  List<WeekCoverageData.DateSlot> slots =
+                      dates.stream()
+                          .map(
+                              d ->
+                                  new WeekCoverageData.DateSlot(
+                                      d, coveredKeys.contains(loc.getId() + "_" + d)))
+                          .collect(Collectors.toList());
+                  long missing = slots.stream().filter(s -> !s.hasQuiz()).count();
+                  return new WeekCoverageData.LocalityCoverage(
+                      loc.getId(), loc.getName(), loc.getHashtag(), slots, missing);
+                })
+            .collect(Collectors.toList());
+
+    long totalReady =
+        localityCoverage.stream()
+            .flatMap(l -> l.dates().stream())
+            .filter(WeekCoverageData.DateSlot::hasQuiz)
+            .count();
+    long totalExpected = (long) localities.size() * dates.size();
+    return new WeekCoverageData(
+        from, to, totalExpected, totalReady, totalExpected - totalReady, localityCoverage);
   }
 
   // ---------------------------------------------------------------- helpers

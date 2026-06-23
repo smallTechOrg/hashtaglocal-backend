@@ -2,6 +2,7 @@ package org.smalltech.hashtaglocal_backend.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
@@ -52,13 +53,34 @@ public class GroqClient {
           + "\n"
           + "{{weatherData}}, Location: {{localityName}}, India.";
 
-  public static final String QUIZ_EXPLANATION_TEMPLATE =
-      "Write 1-2 short sentences explaining why this answer is correct for a local community quiz."
-          + " Weave in one interesting or useful fact if it fits naturally — skip it if it doesn't."
-          + " Keep it simple; no jargon.\n"
-          + "Question: {{question}}\n"
-          + "Correct answer: {{correctOption}}\n"
-          + "Reply with ONLY the explanation, no preamble.";
+  public static final String QUIZ_GENERATION_TEMPLATE =
+      "You are generating a daily quiz question for residents of {{localityName}}, India, in a local"
+          + " community app.\n"
+          + "\n"
+          + "Generate one interesting, factual question about {{localityName}} — its history,"
+          + " geography, culture, famous landmarks, local governance, or civic facts. The question"
+          + " should be educational and relevant to people who live there.\n"
+          + "\n"
+          + "{{recentQuestions}}"
+          + "Return ONLY a valid JSON object in exactly this format, with no extra text, no markdown,"
+          + " no code block:\n"
+          + "{\n"
+          + "  \"question\": \"...\",\n"
+          + "  \"options\": [\"option1\", \"option2\", \"option3\", \"option4\"],\n"
+          + "  \"answer_option_index\": 1,\n"
+          + "  \"explanation\": \"...\"\n"
+          + "}\n"
+          + "\n"
+          + "Rules:\n"
+          + "- question: a clear, specific factual question\n"
+          + "- options: exactly 4 strings, one correct and three plausible wrong answers\n"
+          + "- answer_option_index: integer 1-4 (1-based index of the correct answer in options)\n"
+          + "- explanation: A deeply engaging sentence (1 sentence). It must unpack the \"why\""
+          + " behind the answer by sharing incredible local trivia, historical secrets, or a"
+          + " surprising context that makes a resident say, \"Wow, I didn't know that about my own"
+          + " town!\" Keep the tone witty and enthusiastic. One emoji allowed. Do NOT start with"
+          + " \"The answer is\", \"Correct!\", or \"Indeed\".\n"
+          + "- All text in English";
 
   // ─────────────────────────────────────────────────────────────────────────
 
@@ -90,24 +112,69 @@ public class GroqClient {
         WEATHER_SUMMARY_TEMPLATE
             .replace("{{localityName}}", localityName)
             .replace("{{weatherData}}", describe(weather));
-    String summary = complete(prompt);
+    String summary = complete(prompt, 200);
     return summary != null ? summary : fallbackSummary(weather);
   }
 
   /**
-   * 1–2 short sentences explaining the correct quiz answer. Returns an empty string on failure so
-   * ops can fill it in manually in the portal.
+   * Structured quiz generation: question + 4 options + answer index + explanation. Returns null on
+   * any failure so the weekly job can skip and continue to the next locality/date.
    */
-  public String generateQuizExplanation(String question, String correctOption) {
+  public record QuizDraft(
+      String question, List<String> options, int answerOptionIndex, String explanation) {}
+
+  public QuizDraft generateQuiz(String localityName, List<String> recentQuestions) {
+    String recentBlock =
+        recentQuestions.isEmpty()
+            ? ""
+            : "IMPORTANT — Do NOT generate any of these questions that have already been asked"
+                + " for this locality:\n"
+                + formatRecentQuestions(recentQuestions)
+                + "\n\n";
     String prompt =
-        QUIZ_EXPLANATION_TEMPLATE
-            .replace("{{question}}", question)
-            .replace("{{correctOption}}", correctOption);
-    String explanation = complete(prompt);
-    return explanation != null ? explanation : "";
+        QUIZ_GENERATION_TEMPLATE
+            .replace("{{localityName}}", localityName)
+            .replace("{{recentQuestions}}", recentBlock);
+    String raw = complete(prompt, 500);
+    if (raw == null) return null;
+    try {
+      // Strip markdown code fences the model may add
+      String json = raw.replaceAll("```(?:json)?", "").trim();
+      int start = json.indexOf('{');
+      int end = json.lastIndexOf('}');
+      if (start == -1 || end == -1) {
+        log.warn("Quiz generation response is not JSON for {}: {}", localityName, json);
+        return null;
+      }
+      json = json.substring(start, end + 1);
+      JsonNode node = objectMapper.readTree(json);
+      String question = node.get("question").asText();
+      List<String> options = new ArrayList<>();
+      for (JsonNode opt : node.get("options")) {
+        options.add(opt.asText());
+      }
+      int answerOptionIndex = node.get("answer_option_index").asInt();
+      String explanation = node.has("explanation") ? node.get("explanation").asText("") : "";
+      if (options.size() != 4 || answerOptionIndex < 1 || answerOptionIndex > 4) {
+        log.warn("Quiz generation response has invalid structure for {}", localityName);
+        return null;
+      }
+      return new QuizDraft(question, options, answerOptionIndex, explanation);
+    } catch (Exception e) {
+      log.warn("Failed to parse quiz generation response for {}: {}", localityName, e.getMessage());
+      return null;
+    }
   }
 
-  private String complete(String prompt) {
+  private String formatRecentQuestions(List<String> questions) {
+    StringBuilder sb = new StringBuilder();
+    for (int i = 0; i < questions.size(); i++) {
+      sb.append(i + 1).append(". ").append(questions.get(i)).append("\n");
+    }
+    return sb.toString();
+  }
+
+  private String complete(String prompt, int maxTokens) {
     if (apiKey == null || apiKey.isBlank()) {
       log.warn("GROQ_API_KEY is not configured; skipping Groq generation");
       return null;
@@ -122,7 +189,7 @@ public class GroqClient {
               "temperature",
               0.7,
               "max_tokens",
-              200);
+              maxTokens);
       String raw =
           restClient
               .post()

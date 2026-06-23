@@ -15,9 +15,11 @@ import org.smalltech.hashtaglocal_backend.model.response.AdminBulletinData;
 import org.smalltech.hashtaglocal_backend.model.response.AdminLocalityOptionData;
 import org.smalltech.hashtaglocal_backend.model.response.AdminQuizData;
 import org.smalltech.hashtaglocal_backend.model.response.AiPromptData;
+import org.smalltech.hashtaglocal_backend.model.response.WeekCoverageData;
 import org.smalltech.hashtaglocal_backend.service.BulletinGenerationService;
 import org.smalltech.hashtaglocal_backend.service.GroqClient;
 import org.smalltech.hashtaglocal_backend.service.QuizAdminService;
+import org.smalltech.hashtaglocal_backend.service.QuizGenerationService;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -46,6 +48,7 @@ public class BulletinAdminController {
 
   private final QuizAdminService quizAdminService;
   private final BulletinGenerationService bulletinGenerationService;
+  private final QuizGenerationService quizGenerationService;
 
   // ---------------------------------------------------------------- quizzes
 
@@ -75,11 +78,7 @@ public class BulletinAdminController {
   }
 
   @PutMapping("/quiz/{quizId}")
-  @Operation(
-      summary = "Edit a quiz",
-      description =
-          "Updates the provided fields. The explanation is ops-editable; set"
-              + " regenerate_explanation=true to have Groq rewrite it.")
+  @Operation(summary = "Edit a quiz", description = "Updates the provided fields.")
   public ResponseEntity<NewAPIResponse<AdminQuizData>> updateQuiz(
       @PathVariable Long quizId, @Valid @RequestBody UpdateQuizRequest request) {
     return ResponseEntity.ok(
@@ -95,6 +94,20 @@ public class BulletinAdminController {
   public ResponseEntity<Void> deleteQuiz(@PathVariable Long quizId) {
     quizAdminService.deleteQuiz(quizId);
     return ResponseEntity.noContent().build();
+  }
+
+  @GetMapping("/quiz/coverage")
+  @Operation(
+      summary = "Quiz coverage grid for a date range",
+      description =
+          "Returns a locality × date matrix showing which slots have a quiz. Used by the ops portal to surface missing quizzes.")
+  public ResponseEntity<NewAPIResponse<WeekCoverageData>> quizCoverage(
+      @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+      @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+    return ResponseEntity.ok(
+        NewAPIResponse.<WeekCoverageData>builder()
+            .data(quizAdminService.getWeekCoverage(from, to))
+            .build());
   }
 
   @GetMapping("/quiz/localities")
@@ -148,6 +161,21 @@ public class BulletinAdminController {
             .build());
   }
 
+  @PostMapping("/quiz/generate")
+  @Operation(
+      summary = "Manually trigger quiz generation for the current week",
+      description =
+          "Generates Groq quizzes for all saved-user localities from today through this Sunday"
+              + " (inclusive). Idempotent — skips any locality+date that already has a quiz, so"
+              + " re-running only retries failed ones. The Sunday 7 AM cron uses a separate path"
+              + " that generates the full next Mon–Sun week.")
+  public ResponseEntity<NewAPIResponse<QuizGenerationService.GenerationResult>> generateQuizzes() {
+    return ResponseEntity.ok(
+        NewAPIResponse.<QuizGenerationService.GenerationResult>builder()
+            .data(quizGenerationService.generateForCurrentWeek())
+            .build());
+  }
+
   @GetMapping("/ai-prompts")
   @Operation(
       summary = "Read-only view of the Groq prompt templates",
@@ -164,10 +192,12 @@ public class BulletinAdminController {
                 .variables("localityName, weatherData")
                 .build(),
             AiPromptData.builder()
-                .key("QUIZ_EXPLANATION")
-                .description("Quiz Explanation — shown to the user after they answer the quiz")
-                .template(GroqClient.QUIZ_EXPLANATION_TEMPLATE)
-                .variables("question, correctOption")
+                .key("QUIZ_GENERATION")
+                .description(
+                    "Quiz Generation — used by the weekly cron (and manual trigger) to generate"
+                        + " quiz question + options + answer + explanation for each locality")
+                .template(GroqClient.QUIZ_GENERATION_TEMPLATE)
+                .variables("localityName")
                 .build());
     return ResponseEntity.ok(NewAPIResponse.<List<AiPromptData>>builder().data(prompts).build());
   }
