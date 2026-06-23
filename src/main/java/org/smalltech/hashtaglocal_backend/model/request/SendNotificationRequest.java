@@ -5,7 +5,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
-/** Envelope for admin-triggered push notifications. Currently only type=BROADCAST is supported. */
+/** Envelope for admin-triggered push notifications. Supports BROADCAST, CHAT, ISSUE_DETAIL. */
 @Data
 public class SendNotificationRequest {
 
@@ -21,5 +21,7 @@ public class SendNotificationRequest {
   public static class NotificationPayload {
     @NotBlank private String title;
     @NotBlank private String body;
+    // Required when type = ISSUE_DETAIL; ignored for BROADCAST and CHAT
+    private String issueId;
   }
 }
