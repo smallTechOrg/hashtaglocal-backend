@@ -18,6 +18,14 @@ public class CustomProperties {
     }
   }
 
+  /** Slack Incoming Webhook URL used for all alert notifications. */
+  @Configuration
+  @ConfigurationProperties(prefix = "slack")
+  @Data
+  public static class Slack {
+    private String webhookUrl;
+  }
+
   @Configuration
   @ConfigurationProperties(prefix = "google")
   @Data
