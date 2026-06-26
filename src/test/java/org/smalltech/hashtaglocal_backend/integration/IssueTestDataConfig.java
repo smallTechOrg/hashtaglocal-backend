@@ -133,6 +133,8 @@ public class IssueTestDataConfig implements CommandLineRunner {
               .build();
       jaipurLocation = locationRepository.save(jaipurLocation);
 
+      LocalDateTime now = LocalDateTime.now();
+
       // Create issue 1 - older issue (world)
       IssueEntity issue1 =
           IssueEntity.builder()
@@ -140,8 +142,8 @@ public class IssueTestDataConfig implements CommandLineRunner {
               .type(IssueTypeModel.POTHOLE)
               .status(IssueStatusModel.OPEN)
               .description("Large pothole causing traffic issues")
-              .createdAt(LocalDateTime.parse("2025-12-25T10:00:00"))
-              .updatedAt(LocalDateTime.parse("2025-12-25T10:00:00"))
+              .createdAt(now.minusDays(5))
+              .updatedAt(now.minusDays(5))
               .userEntity(user)
               .location(location)
               .build();
@@ -191,8 +193,8 @@ public class IssueTestDataConfig implements CommandLineRunner {
               .type(IssueTypeModel.POTHOLE)
               .status(IssueStatusModel.OPEN)
               .description("Large pothole causing traffic issues")
-              .createdAt(LocalDateTime.parse("2025-12-26T18:00:00"))
-              .updatedAt(LocalDateTime.parse("2025-12-26T18:00:00"))
+              .createdAt(now.minusDays(3))
+              .updatedAt(now.minusDays(3))
               .userEntity(user)
               .location(location)
               .build();
@@ -242,8 +244,8 @@ public class IssueTestDataConfig implements CommandLineRunner {
               .type(IssueTypeModel.WASTE)
               .status(IssueStatusModel.ONHOLD)
               .description("Garbage pile needs attention")
-              .createdAt(LocalDateTime.parse("2025-12-27T12:00:00"))
-              .updatedAt(LocalDateTime.parse("2025-12-27T12:00:00"))
+              .createdAt(now.minusDays(2))
+              .updatedAt(now.minusDays(2))
               .userEntity(user)
               .location(location)
               .build();
@@ -275,8 +277,8 @@ public class IssueTestDataConfig implements CommandLineRunner {
               .type(IssueTypeModel.POTHOLE)
               .status(IssueStatusModel.OPEN)
               .description("Jaipur pothole issue")
-              .createdAt(LocalDateTime.parse("2025-12-28T09:00:00"))
-              .updatedAt(LocalDateTime.parse("2025-12-28T09:00:00"))
+              .createdAt(now.minusDays(1))
+              .updatedAt(now.minusDays(1))
               .userEntity(user)
               .location(jaipurLocation)
               .build();
