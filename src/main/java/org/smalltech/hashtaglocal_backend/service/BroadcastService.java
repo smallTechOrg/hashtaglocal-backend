@@ -87,7 +87,6 @@ public class BroadcastService {
 
     log.info("{} sent: {} recipients, {} FCM accepted", type, tokens.size(), totalSuccess);
 
-
     logEntry.setRecipientCount(tokens.size());
     logEntry.setSuccessCount(totalSuccess);
     notificationLogRepository.save(logEntry);
