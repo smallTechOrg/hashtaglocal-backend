@@ -56,4 +56,10 @@ public interface EventRepository extends JpaRepository<EventEntity, Long> {
           + "WHERE NOT EXISTS (SELECT 1 FROM EventApprovalEntity a WHERE a.eventId = e.id) "
           + "AND e.active = true")
   List<EventEntity> findWithoutApprovalRow();
+
+  @Query(
+      "SELECT COUNT(e) FROM EventEntity e "
+          + "WHERE NOT EXISTS (SELECT 1 FROM EventApprovalEntity a WHERE a.eventId = e.id) "
+          + "AND e.active = true")
+  long countWithoutApprovalRow();
 }

@@ -133,6 +133,15 @@ public class IssueTestDataConfig implements CommandLineRunner {
               .build();
       jaipurLocation = locationRepository.save(jaipurLocation);
 
+      LocalDateTime issue1At =
+          LocalDateTime.now().minusDays(30).withHour(10).withMinute(0).withSecond(0).withNano(0);
+      LocalDateTime issue2At =
+          LocalDateTime.now().minusDays(20).withHour(18).withMinute(0).withSecond(0).withNano(0);
+      LocalDateTime issue3At =
+          LocalDateTime.now().minusDays(15).withHour(12).withMinute(0).withSecond(0).withNano(0);
+      LocalDateTime issue4At =
+          LocalDateTime.now().minusDays(5).withHour(9).withMinute(0).withSecond(0).withNano(0);
+
       // Create issue 1 - older issue (world)
       IssueEntity issue1 =
           IssueEntity.builder()
@@ -140,8 +149,8 @@ public class IssueTestDataConfig implements CommandLineRunner {
               .type(IssueTypeModel.POTHOLE)
               .status(IssueStatusModel.OPEN)
               .description("Large pothole causing traffic issues")
-              .createdAt(LocalDateTime.parse("2025-12-25T10:00:00"))
-              .updatedAt(LocalDateTime.parse("2025-12-25T10:00:00"))
+              .createdAt(issue1At)
+              .updatedAt(issue1At)
               .userEntity(user)
               .location(location)
               .build();
@@ -163,7 +172,7 @@ public class IssueTestDataConfig implements CommandLineRunner {
               .action(IssueActionModel.REPORT)
               .approvalStatus(IssueActionApprovalStatus.NOT_REQUIRED)
               .media(media1)
-              .createdAt(issue1.getCreatedAt())
+              .createdAt(issue1At)
               .build());
 
       MediaEntity media2 =
@@ -181,7 +190,7 @@ public class IssueTestDataConfig implements CommandLineRunner {
               .action(IssueActionModel.REPORT)
               .approvalStatus(IssueActionApprovalStatus.NOT_REQUIRED)
               .media(media2)
-              .createdAt(issue1.getCreatedAt())
+              .createdAt(issue1At)
               .build());
 
       // Create issue 2 - newer issue (world)
@@ -191,8 +200,8 @@ public class IssueTestDataConfig implements CommandLineRunner {
               .type(IssueTypeModel.POTHOLE)
               .status(IssueStatusModel.OPEN)
               .description("Large pothole causing traffic issues")
-              .createdAt(LocalDateTime.parse("2025-12-26T18:00:00"))
-              .updatedAt(LocalDateTime.parse("2025-12-26T18:00:00"))
+              .createdAt(issue2At)
+              .updatedAt(issue2At)
               .userEntity(user)
               .location(location)
               .build();
@@ -214,7 +223,7 @@ public class IssueTestDataConfig implements CommandLineRunner {
               .action(IssueActionModel.REPORT)
               .approvalStatus(IssueActionApprovalStatus.NOT_REQUIRED)
               .media(media3)
-              .createdAt(issue2.getCreatedAt())
+              .createdAt(issue2At)
               .build());
 
       MediaEntity media4 =
@@ -232,7 +241,7 @@ public class IssueTestDataConfig implements CommandLineRunner {
               .action(IssueActionModel.REPORT)
               .approvalStatus(IssueActionApprovalStatus.NOT_REQUIRED)
               .media(media4)
-              .createdAt(issue2.getCreatedAt())
+              .createdAt(issue2At)
               .build());
 
       // Create issue 3 - ONHOLD issue (world, newest)
@@ -242,8 +251,8 @@ public class IssueTestDataConfig implements CommandLineRunner {
               .type(IssueTypeModel.WASTE)
               .status(IssueStatusModel.ONHOLD)
               .description("Garbage pile needs attention")
-              .createdAt(LocalDateTime.parse("2025-12-27T12:00:00"))
-              .updatedAt(LocalDateTime.parse("2025-12-27T12:00:00"))
+              .createdAt(issue3At)
+              .updatedAt(issue3At)
               .userEntity(user)
               .location(location)
               .build();
@@ -265,7 +274,7 @@ public class IssueTestDataConfig implements CommandLineRunner {
               .action(IssueActionModel.REPORT)
               .approvalStatus(IssueActionApprovalStatus.NOT_REQUIRED)
               .media(media5)
-              .createdAt(issue3.getCreatedAt())
+              .createdAt(issue3At)
               .build());
 
       // Create issue 4 - Jaipur locality
@@ -275,8 +284,8 @@ public class IssueTestDataConfig implements CommandLineRunner {
               .type(IssueTypeModel.POTHOLE)
               .status(IssueStatusModel.OPEN)
               .description("Jaipur pothole issue")
-              .createdAt(LocalDateTime.parse("2025-12-28T09:00:00"))
-              .updatedAt(LocalDateTime.parse("2025-12-28T09:00:00"))
+              .createdAt(issue4At)
+              .updatedAt(issue4At)
               .userEntity(user)
               .location(jaipurLocation)
               .build();
@@ -297,7 +306,7 @@ public class IssueTestDataConfig implements CommandLineRunner {
               .action(IssueActionModel.REPORT)
               .approvalStatus(IssueActionApprovalStatus.NOT_REQUIRED)
               .media(jaipurMedia)
-              .createdAt(jaipurIssue.getCreatedAt())
+              .createdAt(issue4At)
               .build());
     }
   }

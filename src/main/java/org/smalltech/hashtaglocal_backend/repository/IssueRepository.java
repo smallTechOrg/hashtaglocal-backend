@@ -127,4 +127,19 @@ public interface IssueRepository extends JpaRepository<IssueEntity, Long> {
       "SELECT COUNT(i) FROM IssueEntity i WHERE i.userEntity.id = :userId AND i.status IN :statuses")
   long countByUserAndStatusIn(
       @Param("userId") Long userId, @Param("statuses") List<IssueStatusModel> statuses);
+
+  // ---- Metrics ----
+
+  @Query(
+      "SELECT COUNT(i) FROM IssueEntity i WHERE i.createdAt BETWEEN :start AND :end"
+          + " AND i.status <> org.smalltech.hashtaglocal_backend.model.IssueStatusModel.REJECTED")
+  long countReportedBetween(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+
+  @EntityGraph(attributePaths = {"userEntity", "location", "location.locality"})
+  @Query(
+      "SELECT i FROM IssueEntity i WHERE i.createdAt BETWEEN :start AND :end"
+          + " AND i.status <> org.smalltech.hashtaglocal_backend.model.IssueStatusModel.REJECTED"
+          + " ORDER BY i.createdAt DESC")
+  List<IssueEntity> findReportedBetween(
+      @Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 }
