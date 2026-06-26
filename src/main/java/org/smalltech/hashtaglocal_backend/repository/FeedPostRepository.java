@@ -178,6 +178,14 @@ public interface FeedPostRepository extends JpaRepository<FeedPostEntity, Long> 
           + "AND p.content.bulletin.id = :bulletinId")
   List<FeedPostEntity> findBulletinPosts(@Param("bulletinId") Long bulletinId);
 
+  /** Count of posts awaiting human moderation (AI blocked or flagged). */
+  @Query(
+      "SELECT COUNT(p) FROM FeedPostEntity p "
+          + "WHERE p.status IN ("
+          + "  org.smalltech.hashtaglocal_backend.model.FeedPostStatus.AI_BLOCKED,"
+          + "  org.smalltech.hashtaglocal_backend.model.FeedPostStatus.FLAGGED)")
+  long countModerationQueue();
+
   /**
    * Hide every ISSUE_REF post for an issue (set to {@code ADMIN_HIDDEN}) when the issue leaves the
    * publicly-visible OPEN/RESOLVED states (rejected or put back on hold). The public timeline shows
