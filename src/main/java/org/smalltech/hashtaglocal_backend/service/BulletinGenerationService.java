@@ -119,7 +119,10 @@ public class BulletinGenerationService {
                 .source(weather.getSource())
                 .build());
 
-    String summaryText = groqClient.generateWeatherSummary(locality.getName(), weather);
+    List<String> recentSummaries =
+        bulletinRepository.findRecentWeatherSummaries(locality.getId(), 5);
+    String summaryText =
+        groqClient.generateWeatherSummary(locality.getName(), weather, recentSummaries);
     Map<String, Object> summary = new HashMap<>();
     summary.put("text", summaryText);
 
