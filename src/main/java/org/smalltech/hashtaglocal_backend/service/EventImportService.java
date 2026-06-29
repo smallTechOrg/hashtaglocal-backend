@@ -3,6 +3,7 @@ package org.smalltech.hashtaglocal_backend.service;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.smalltech.hashtaglocal_backend.dto.ScrapeEventDTO;
@@ -35,6 +36,11 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 @Slf4j
 public class EventImportService {
+
+  // Mirrors the one-time DB cleanup: UPDATE events SET link = regexp_replace(link,
+  // '&utm_[^&]*=[^&]*', '', 'g') WHERE link LIKE '%utm_%'. Applied to every new link
+  // before saving so freshly imported rows stay consistent with the cleaned-up ones.
+  private static final Pattern UTM_PARAM_PATTERN = Pattern.compile("&utm_[^&]*=[^&]*");
 
   private final EventService eventService;
   private final EventRepository eventRepository;
@@ -121,9 +127,16 @@ public class EventImportService {
         .startTime(dto.getStartTime())
         .endTime(dto.getEndTime())
         .address(dto.getAddress())
-        .link(dto.getLink())
+        .link(stripUtmParams(dto.getLink()))
         .media(media)
         .build();
+  }
+
+  private String stripUtmParams(String link) {
+    if (link == null || link.isBlank()) {
+      return link;
+    }
+    return UTM_PARAM_PATTERN.matcher(link).replaceAll("");
   }
 
   /**
