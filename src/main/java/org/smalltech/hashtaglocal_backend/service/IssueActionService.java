@@ -5,6 +5,7 @@ import java.util.Locale;
 import lombok.RequiredArgsConstructor;
 import org.smalltech.hashtaglocal_backend.config.CustomProperties;
 import org.smalltech.hashtaglocal_backend.entity.IssueActionEntity;
+import org.smalltech.hashtaglocal_backend.event.IssueActionPendingEvent;
 import org.smalltech.hashtaglocal_backend.model.IssueActionApprovalStatus;
 import org.smalltech.hashtaglocal_backend.model.IssueActionModel;
 import org.smalltech.hashtaglocal_backend.model.IssueActionResult;
@@ -16,6 +17,7 @@ import org.smalltech.hashtaglocal_backend.repository.IssueRepository;
 import org.smalltech.hashtaglocal_backend.repository.MediaRepository;
 import org.smalltech.hashtaglocal_backend.repository.UserRepository;
 import org.smalltech.hashtaglocal_backend.util.EnumParsers;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,6 +35,7 @@ public class IssueActionService {
   private final UserRepository userRepository;
   private final GeoFenceService geoFenceService;
   private final LocationService locationService;
+  private final ApplicationEventPublisher eventPublisher;
 
   public IssueActionResult handle(Long issueId, Long userId, IssueVerifyRequest request) {
 
@@ -176,6 +179,12 @@ public class IssueActionService {
               .createdAt(LocalDateTime.now())
               .build();
       issueActionRepository.save(issueActionEntity);
+    }
+
+    // VERIFY/RESOLVE land in the admin review queue (PENDING) — alert ops.
+    if (issueActionModel == IssueActionModel.VERIFY
+        || issueActionModel == IssueActionModel.RESOLVE) {
+      eventPublisher.publishEvent(new IssueActionPendingEvent(issueId, issueActionModel, userId));
     }
 
     // Action-based status update
