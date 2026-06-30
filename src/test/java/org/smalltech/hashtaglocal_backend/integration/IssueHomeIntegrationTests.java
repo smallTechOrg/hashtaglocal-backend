@@ -82,10 +82,16 @@ class IssueHomeIntegrationTests {
         .isEqualTo(3)
         .jsonPath("$.data.issues[0].id")
         .isEqualTo(4)
+        .jsonPath("$.data.issues[0].created_at")
+        .isNotEmpty()
         .jsonPath("$.data.issues[1].id")
         .isEqualTo(2)
+        .jsonPath("$.data.issues[1].created_at")
+        .isNotEmpty()
         .jsonPath("$.data.issues[2].id")
-        .isEqualTo(1);
+        .isEqualTo(1)
+        .jsonPath("$.data.issues[2].created_at")
+        .isNotEmpty();
   }
 
   @Test

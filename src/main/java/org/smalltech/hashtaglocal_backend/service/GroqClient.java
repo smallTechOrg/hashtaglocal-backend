@@ -27,30 +27,29 @@ public class GroqClient {
   // ── Prompt templates ({{placeholder}} replaced at call time) ─────────────
 
   public static final String WEATHER_SUMMARY_TEMPLATE =
-      "Role: You are a helpful weather assistant writing localized daily advice.\n"
+      "You are a witty, hyper-local weather companion. Write exactly ONE punchy sentence of"
+          + " daily advice for residents of {{localityName}}, India.\n"
           + "\n"
-          + "Task: Write exactly one short, practical sentence of advice based on the provided"
-          + " weather data.\n"
+          + "Weather data: {{weatherData}}\n"
+          + "\n"
+          + "{{recentSummaries}}"
+          + "BANNED openers — starting with any of these makes the response invalid:\n"
+          + "\"Be sure to\", \"Make sure to\", \"Stay hydrated\", \"Keep yourself\","
+          + " \"Residents of\", \"It's going to be\", \"Today is going to be\","
+          + " \"The weather today\", \"With temperatures\".\n"
+          + "\n"
+          + "BANNED phrases (do not use anywhere in the sentence):\n"
+          + "\"carry an umbrella\" (say something more specific like \"grab a raincoat\","
+          + " \"brace for downpours\", \"watch for waterlogging\", \"skip the two-wheeler\").\n"
           + "\n"
           + "Rules:\n"
-          + "1. Do NOT start the sentence with the city name or phrases like \"Residents of...\".\n"
-          + "2. Do NOT mention or repeat raw numbers (e.g., temperature, humidity, rain chance)"
-          + " because the user can already see them on screen.\n"
-          + "3. Focus entirely on actionable advice — what the person should DO or WATCH OUT FOR"
-          + " based on how the day feels.\n"
-          + "4. Keep the tone direct and friendly.\n"
-          + "5. Use at most one emoji.\n"
-          + "6. Reply with ONLY the sentence. No preamble, no intro, no conversational filler.\n"
-          + "\n"
-          + "Thresholds & Logic:\n"
-          + "- If rain probability is low (under 50%), treat it as a fine, standard day. Do NOT"
-          + " give precautionary warnings like \"carry an umbrella\" or \"watch out for rain.\""
-          + " Instead, give routine advice for a pleasant day (e.g., enjoying the weather, staying"
-          + " comfortable).\n"
-          + "- Only advise carrying an umbrella or preparing for wet weather if the rain probability"
-          + " is 50% or higher.\n"
-          + "\n"
-          + "{{weatherData}}, Location: {{localityName}}, India.";
+          + "1. Do NOT mention raw numbers — the user already sees temp, humidity, and rain % on"
+          + " screen.\n"
+          + "2. Advice must feel specific to TODAY's conditions, not a generic all-weather tip.\n"
+          + "3. Rain ≥ 50%: warn about wet conditions using varied, vivid language. Rain < 50%:"
+          + " zero rain warnings — focus on heat, humidity, breeze, or how the day feels.\n"
+          + "4. One emoji allowed (optional). Tone: direct, friendly, occasionally witty.\n"
+          + "5. Reply with ONLY the sentence. No preamble, no filler.";
 
   public static final String QUIZ_EXPLANATION_TEMPLATE =
       "Write 1-2 short sentences explaining why this answer is correct for a local community quiz."
@@ -83,15 +82,31 @@ public class GroqClient {
 
   /**
    * One punchy, actionable sentence about today's weather. Falls back to a plain templated line if
-   * Groq is unavailable.
+   * Groq is unavailable. Pass the last N summaries for this locality so the model avoids repeating
+   * them when conditions are similar across consecutive days.
    */
-  public String generateWeatherSummary(String localityName, WeatherSnapshot weather) {
+  public String generateWeatherSummary(
+      String localityName, WeatherSnapshot weather, List<String> recentSummaries) {
     String prompt =
         WEATHER_SUMMARY_TEMPLATE
             .replace("{{localityName}}", localityName)
-            .replace("{{weatherData}}", describe(weather));
+            .replace("{{weatherData}}", describe(weather))
+            .replace("{{recentSummaries}}", formatRecentSummaries(recentSummaries));
     String summary = complete(prompt);
     return summary != null ? summary : fallbackSummary(weather);
+  }
+
+  private String formatRecentSummaries(List<String> summaries) {
+    if (summaries == null || summaries.isEmpty()) return "";
+    StringBuilder sb =
+        new StringBuilder(
+            "RECENT SUMMARIES FOR THIS LOCALITY — do NOT repeat or closely paraphrase any of"
+                + " these:\n");
+    for (int i = 0; i < summaries.size(); i++) {
+      sb.append(i + 1).append(". ").append(summaries.get(i)).append("\n");
+    }
+    sb.append("\n");
+    return sb.toString();
   }
 
   /**
