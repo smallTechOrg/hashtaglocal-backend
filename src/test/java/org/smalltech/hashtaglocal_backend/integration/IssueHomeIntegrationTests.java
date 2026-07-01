@@ -69,7 +69,8 @@ class IssueHomeIntegrationTests {
 
   @Test
   void shouldReturnIssuesInReverseChronologicalOrder() throws Exception {
-    // ONHOLD issues are excluded; only 3 OPEN issues should appear, newest first.
+    // ONHOLD issues are excluded; only 3 OPEN issues should appear, newest first (issue4 > issue2 >
+    // issue1).
     webTestClient
         .get()
         .uri(ISSUES_API_URL)

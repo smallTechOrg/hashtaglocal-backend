@@ -53,6 +53,11 @@ public interface UserAuthSessionRepository extends JpaRepository<UserAuthSession
   int clearNotificationTokenByUserIdAndPlatform(
       @Param("userId") Long userId, @Param("platform") Platform platform);
 
+  // ---- Metrics ----
+
+  /** First session ever created for a user — used to determine signup platform. */
+  Optional<UserAuthSessionEntity> findFirstByUser_IdOrderByCreatedAtAsc(Long userId);
+
   // ---- Session cap ----
 
   /** Returns active session IDs for a user, oldest first — used to enforce the per-user cap. */

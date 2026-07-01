@@ -1,0 +1,18 @@
+package org.smalltech.hashtaglocal_backend.dto;
+
+import com.fasterxml.jackson.databind.PropertyNamingStrategies;
+import com.fasterxml.jackson.databind.annotation.JsonNaming;
+import lombok.Builder;
+import lombok.Data;
+
+@Data
+@Builder
+@JsonNaming(PropertyNamingStrategies.LowerCamelCaseStrategy.class)
+public class MetricDetailItem {
+
+  private String username;
+  private String locality;
+  private String platform;
+  private String date;
+  private String issueKey;
+}

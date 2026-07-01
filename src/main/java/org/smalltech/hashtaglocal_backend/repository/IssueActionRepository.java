@@ -1,5 +1,6 @@
 package org.smalltech.hashtaglocal_backend.repository;
 
+import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -95,4 +96,27 @@ public interface IssueActionRepository extends JpaRepository<IssueActionEntity, 
           + "AND ia.action = org.smalltech.hashtaglocal_backend.model.IssueActionModel.VERIFY "
           + "AND ia.approvalStatus = org.smalltech.hashtaglocal_backend.model.IssueActionApprovalStatus.APPROVED")
   Set<Long> findVerifiedIssueIds(@Param("issueIds") Collection<Long> issueIds);
+
+  // ---- Metrics ----
+
+  @Query(
+      "SELECT COUNT(ia) FROM IssueActionEntity ia WHERE ia.approvalStatus = org.smalltech.hashtaglocal_backend.model.IssueActionApprovalStatus.PENDING")
+  long countPendingActions();
+
+  @Query(
+      "SELECT COUNT(DISTINCT ia.issueEntity.id) FROM IssueActionEntity ia"
+          + " WHERE ia.action = org.smalltech.hashtaglocal_backend.model.IssueActionModel.VERIFY"
+          + " AND ia.approvalStatus = org.smalltech.hashtaglocal_backend.model.IssueActionApprovalStatus.APPROVED"
+          + " AND ia.approvedAt BETWEEN :start AND :end")
+  long countVerifiedIssuesBetween(
+      @Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+
+  @Query(
+      "SELECT DISTINCT ia FROM IssueActionEntity ia"
+          + " WHERE ia.action = org.smalltech.hashtaglocal_backend.model.IssueActionModel.VERIFY"
+          + " AND ia.approvalStatus = org.smalltech.hashtaglocal_backend.model.IssueActionApprovalStatus.APPROVED"
+          + " AND ia.approvedAt BETWEEN :start AND :end"
+          + " ORDER BY ia.approvedAt DESC")
+  List<IssueActionEntity> findVerifiedActionsBetween(
+      @Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 }
