@@ -12,4 +12,6 @@ public interface EventApprovalRepository extends JpaRepository<EventApprovalEnti
   List<EventApprovalEntity> findByStatus(EventApprovalStatus status);
 
   List<EventApprovalEntity> findByStatusIn(List<EventApprovalStatus> statuses);
+
+  long countByStatus(EventApprovalStatus status);
 }
