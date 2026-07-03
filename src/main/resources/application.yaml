@@ -169,6 +169,17 @@ groq:
     url: ${GROQ_API_URL:https://api.groq.com/openai/v1/chat/completions}
     model: ${GROQ_MODEL:llama-3.3-70b-versatile}
 
+# Daily quiz notification: automated reminder that today's quiz is live (type=CHAT, lands
+# on the chat page). Independent of the bulletin/weather job above — global send, no per-locality
+# targeting, no dependency on that day's bulletin generation succeeding.
+quiz:
+  notification:
+    enabled: ${QUIZ_NOTIFICATION_ENABLED:true}
+    # Daily at 8:30 AM IST — 30 min after the bulletin/weather job. Use '-' to disable.
+    cron: ${QUIZ_NOTIFICATION_CRON:0 30 8 * * *}
+    title: ${QUIZ_NOTIFICATION_TITLE:☕ Rise & Quiz!}
+    body: ${QUIZ_NOTIFICATION_BODY:Your daily local quiz just dropped. Tap in and see how well you really know your city.}
+
 portalissue:
   enabled: ${PORTALISSUE_ENABLED:true}
   cron: ${PORTALISSUE_CRON:0 0 1 * * *}

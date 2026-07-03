@@ -60,12 +60,35 @@ public class BroadcastService {
       payload.put("issueId", issueId);
     }
 
+    return sendToAllTokens(NotificationSource.ADMIN, type, null, null, title, body, payload);
+  }
+
+  /** Automated (cron-triggered) push to every active device, logged with source=SYSTEM. */
+  @Transactional
+  public NotificationResult sendSystemNotification(
+      NotificationType type, String sourceRefType, String title, String body) {
+    Map<String, String> payload = new HashMap<>();
+    payload.put("type", type.name());
+    return sendToAllTokens(
+        NotificationSource.SYSTEM, type, sourceRefType, null, title, body, payload);
+  }
+
+  private NotificationResult sendToAllTokens(
+      NotificationSource source,
+      NotificationType type,
+      String sourceRefType,
+      Long sourceRefId,
+      String title,
+      String body,
+      Map<String, String> payload) {
     List<String> tokens = userAuthSessionRepository.findAllActiveNotificationTokens();
 
     NotificationLogEntity logEntry =
         notificationLogRepository.save(
             NotificationLogEntity.builder()
-                .source(NotificationSource.ADMIN)
+                .source(source)
+                .sourceRefType(sourceRefType)
+                .sourceRefId(sourceRefId)
                 .type(type)
                 .title(title)
                 .body(body)
@@ -76,7 +99,7 @@ public class BroadcastService {
     Map<String, String> fcmData = new HashMap<>(payload);
     fcmData.put("notificationLogId", logEntry.getId().toString());
 
-    String fcmTag = type.name().toLowerCase() + "_admin";
+    String fcmTag = type.name().toLowerCase() + "_" + source.name().toLowerCase();
     int totalSuccess = 0;
     for (int i = 0; i < tokens.size(); i += FCM_BATCH_SIZE) {
       List<String> batch = tokens.subList(i, Math.min(i + FCM_BATCH_SIZE, tokens.size()));
@@ -85,7 +108,7 @@ public class BroadcastService {
       totalSuccess += result.successCount();
     }
 
-    log.info("{} sent: {} recipients, {} FCM accepted", type, tokens.size(), totalSuccess);
+    log.info("{} ({}) sent: {} recipients, {} FCM accepted", type, source, tokens.size(), totalSuccess);
 
     logEntry.setRecipientCount(tokens.size());
     logEntry.setSuccessCount(totalSuccess);
