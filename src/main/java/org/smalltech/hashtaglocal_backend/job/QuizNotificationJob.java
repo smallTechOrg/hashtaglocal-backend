@@ -35,7 +35,9 @@ public class QuizNotificationJob {
   @Value("${quiz.notification.body}")
   private String body;
 
-  @Scheduled(cron = "${quiz.notification.cron:0 30 8 * * *}", zone = "Asia/Kolkata")
+  @Scheduled(
+      cron = "${quiz.notification.cron:0 30 8 * * *}",
+      zone = "${quiz.notification.zone:Asia/Kolkata}")
   public void run() {
     log.info("Quiz notification job started (cron={})", scheduleExpression);
     broadcastService.sendSystemNotification(NotificationType.CHAT, "BULLETIN", title, body);

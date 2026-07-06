@@ -177,6 +177,8 @@ quiz:
     enabled: ${QUIZ_NOTIFICATION_ENABLED:true}
     # Daily at 8:30 AM IST — 30 min after the bulletin/weather job. Use '-' to disable.
     cron: ${QUIZ_NOTIFICATION_CRON:0 30 8 * * *}
+    # Cron above is always interpreted in this zone, regardless of where the server is deployed.
+    zone: ${QUIZ_NOTIFICATION_ZONE:Asia/Kolkata}
     title: ${QUIZ_NOTIFICATION_TITLE:☕ Rise & Quiz!}
     body: ${QUIZ_NOTIFICATION_BODY:Your daily local quiz just dropped. Tap in and see how well you really know your city.}
 
