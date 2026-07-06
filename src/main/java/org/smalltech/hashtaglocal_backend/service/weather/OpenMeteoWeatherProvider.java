@@ -6,6 +6,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpServerErrorException;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.util.UriComponentsBuilder;
 
@@ -22,6 +24,12 @@ import org.springframework.web.util.UriComponentsBuilder;
 public class OpenMeteoWeatherProvider implements WeatherProvider {
 
   public static final String SOURCE = "OPEN_METEO";
+
+  // Open-Meteo's free tier occasionally answers "the service is overloaded" (503), especially
+  // around the top of the hour when the daily bulletin cron fires — retry a couple of times
+  // with a short backoff before giving up on the locality for the day.
+  private static final int MAX_ATTEMPTS = 3;
+  private static final long RETRY_BACKOFF_MILLIS = 1000;
 
   private final RestClient restClient;
   private final ObjectMapper objectMapper;
@@ -52,19 +60,52 @@ public class OpenMeteoWeatherProvider implements WeatherProvider {
             .build()
             .toUriString();
 
+    Exception lastFailure = null;
+    for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+      try {
+        String raw = restClient.get().uri(url).retrieve().body(String.class);
+        JsonNode daily = objectMapper.readTree(raw).path("daily");
+        return WeatherSnapshot.builder()
+            .minTemp(firstValue(daily, "temperature_2m_min"))
+            .maxTemp(firstValue(daily, "temperature_2m_max"))
+            .humidity(firstValue(daily, "relative_humidity_2m_mean"))
+            .rainProbability(firstValue(daily, "precipitation_probability_max"))
+            .source(SOURCE)
+            .build();
+      } catch (HttpServerErrorException | ResourceAccessException e) {
+        lastFailure = e;
+        log.warn(
+            "Open-Meteo fetch attempt {}/{} failed for ({},{}): {}",
+            attempt,
+            MAX_ATTEMPTS,
+            lat,
+            lng,
+            e.getMessage());
+        if (attempt < MAX_ATTEMPTS) {
+          sleep(RETRY_BACKOFF_MILLIS * attempt);
+        }
+      } catch (Exception e) {
+        throw new IllegalStateException(
+            "Open-Meteo fetch failed for (" + lat + "," + lng + "): " + e.getMessage(), e);
+      }
+    }
+    throw new IllegalStateException(
+        "Open-Meteo fetch failed for ("
+            + lat
+            + ","
+            + lng
+            + ") after "
+            + MAX_ATTEMPTS
+            + " attempts: "
+            + lastFailure.getMessage(),
+        lastFailure);
+  }
+
+  private void sleep(long millis) {
     try {
-      String raw = restClient.get().uri(url).retrieve().body(String.class);
-      JsonNode daily = objectMapper.readTree(raw).path("daily");
-      return WeatherSnapshot.builder()
-          .minTemp(firstValue(daily, "temperature_2m_min"))
-          .maxTemp(firstValue(daily, "temperature_2m_max"))
-          .humidity(firstValue(daily, "relative_humidity_2m_mean"))
-          .rainProbability(firstValue(daily, "precipitation_probability_max"))
-          .source(SOURCE)
-          .build();
-    } catch (Exception e) {
-      throw new IllegalStateException(
-          "Open-Meteo fetch failed for (" + lat + "," + lng + "): " + e.getMessage(), e);
+      Thread.sleep(millis);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
     }
   }
 
