@@ -108,7 +108,8 @@ public class BroadcastService {
       totalSuccess += result.successCount();
     }
 
-    log.info("{} ({}) sent: {} recipients, {} FCM accepted", type, source, tokens.size(), totalSuccess);
+    log.info(
+        "{} ({}) sent: {} recipients, {} FCM accepted", type, source, tokens.size(), totalSuccess);
 
     logEntry.setRecipientCount(tokens.size());
     logEntry.setSuccessCount(totalSuccess);

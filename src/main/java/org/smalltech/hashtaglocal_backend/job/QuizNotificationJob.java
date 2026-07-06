@@ -10,8 +10,8 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 /**
- * Daily reminder that today's quiz is live, pushed to every active device (type=CHAT, lands on
- * the chat page — same route as any other CHAT notification). Runs independently of {@link
+ * Daily reminder that today's quiz is live, pushed to every active device (type=CHAT, lands on the
+ * chat page — same route as any other CHAT notification). Runs independently of {@link
  * BulletinWeatherJob}: content doesn't reference a specific locality/bulletin, so it doesn't wait
  * on that day's generation to finish.
  */
