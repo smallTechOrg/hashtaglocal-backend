@@ -11,6 +11,7 @@ import org.smalltech.hashtaglocal_backend.entity.Locality;
 import org.smalltech.hashtaglocal_backend.entity.Location;
 import org.smalltech.hashtaglocal_backend.entity.MediaEntity;
 import org.smalltech.hashtaglocal_backend.model.EventApprovalStatus;
+import org.smalltech.hashtaglocal_backend.model.EventPortalModel;
 import org.smalltech.hashtaglocal_backend.model.response.EventData;
 import org.smalltech.hashtaglocal_backend.repository.EventApprovalRepository;
 import org.smalltech.hashtaglocal_backend.repository.EventRepository;
@@ -40,6 +41,18 @@ public class EventService {
   @Transactional(readOnly = true)
   public List<EventEntity> getAll() {
     return eventRepository.findAll();
+  }
+
+  /**
+   * Returns all event links stored for the given portal. Used by the scraper to skip
+   * re-classification.
+   */
+  @Transactional(readOnly = true)
+  public List<String> getLinksByPortal(EventPortalModel portal) {
+    return eventRepository.findByPortal(portal).stream()
+        .map(EventEntity::getLink)
+        .filter(link -> link != null && !link.isBlank())
+        .toList();
   }
 
   /** Persists a single event and returns the saved entity (with generated id). */
