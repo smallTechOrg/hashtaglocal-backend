@@ -87,7 +87,8 @@ public class EventImportService {
         // column, and toSave is bulk-inserted in one transaction, so letting a null portal
         // through here would roll back — and silently drop — the entire import batch.
         if (EventPortalModel.fromString(dto.getPortal()) == null) {
-          log.warn("Skipping event '{}' — unrecognized portal '{}'", dto.getName(), dto.getPortal());
+          log.warn(
+              "Skipping event '{}' — unrecognized portal '{}'", dto.getName(), dto.getPortal());
           continue;
         }
         if (eventRepository.existsByNameAndStartTime(dto.getName(), dto.getStartTime())) {
