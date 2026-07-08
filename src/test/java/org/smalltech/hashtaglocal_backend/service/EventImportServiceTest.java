@@ -28,7 +28,6 @@ import org.smalltech.hashtaglocal_backend.entity.MediaEntity;
 import org.smalltech.hashtaglocal_backend.model.EventPortalModel;
 import org.smalltech.hashtaglocal_backend.model.EventTypeModel;
 import org.smalltech.hashtaglocal_backend.model.MediaTypeModel;
-import org.smalltech.hashtaglocal_backend.repository.EventApprovalRepository;
 import org.smalltech.hashtaglocal_backend.repository.EventRepository;
 
 /**
@@ -44,7 +43,6 @@ class EventImportServiceTest {
   @Mock private EventService eventService;
   @Mock private EventRepository eventRepository;
   @Mock private EventImageService eventImageService;
-  @Mock private EventApprovalRepository eventApprovalRepository;
 
   @InjectMocks private EventImportService eventImportService;
 
@@ -79,11 +77,11 @@ class EventImportServiceTest {
         .build();
   }
 
-  @SuppressWarnings("unchecked")
   private List<EventEntity> capturedSavedEvents() {
-    ArgumentCaptor<List<EventEntity>> captor = ArgumentCaptor.forClass(List.class);
-    verify(eventService).saveAll(captor.capture());
-    return captor.getValue();
+    ArgumentCaptor<EventEntity> captor = ArgumentCaptor.forClass(EventEntity.class);
+    // atLeast(0): captures every per-event save, and tolerates the zero-save cases (all skipped).
+    verify(eventService, atLeast(0)).saveWithPendingApproval(captor.capture());
+    return captor.getAllValues();
   }
 
   // ---------------------------------------------------------------------------
@@ -153,9 +151,8 @@ class EventImportServiceTest {
         List.of(dto("Test Event", "TREKANDPLOG", raw, START_TIME)));
 
     if (expected == null) {
-      // Unrecognised/null portals are skipped, not saved: portal is a NOT NULL column and the
-      // batch is bulk-inserted in one transaction, so letting a null portal through would roll
-      // back the whole import. See EventImportService#importFromScrapeResponse.
+      // Unrecognised/null portals are skipped, not saved: portal is a NOT NULL column, so letting a
+      // null portal through would fail the insert. See EventImportService#importFromScrapeResponse.
       assertTrue(
           capturedSavedEvents().isEmpty(),
           "event with unrecognised portal '" + raw + "' should be skipped, not saved");
@@ -224,7 +221,7 @@ class EventImportServiceTest {
             List.of(dto("Trek and Plog", "TREKANDPLOG", "Team everest", START_TIME)));
 
     assertEquals(0, count);
-    verify(eventService).saveAll(List.of());
+    verify(eventService, never()).saveWithPendingApproval(any());
   }
 
   @Test
@@ -280,5 +277,49 @@ class EventImportServiceTest {
     assertEquals(0, eventImportService.importFromScrapeResponse(null));
     assertEquals(0, eventImportService.importFromScrapeResponse(List.of()));
     verifyNoInteractions(eventRepository);
+  }
+
+  @Test
+  @DisplayName("Event with a blank/missing address is kept, with address normalised to null")
+  void keepsEventWithMissingAddress() {
+    when(eventRepository.existsByNameAndStartTime(any(), any())).thenReturn(false);
+    ScrapeEventDTO noAddress =
+        ScrapeEventDTO.builder()
+            .name("Trek and Plog")
+            .organisation("Org")
+            .portal("Team everest")
+            .type("TREKANDPLOG")
+            .startTime(START_TIME)
+            .address("   ") // blank — must not cause the event to be dropped
+            .link("https://example.com")
+            .image("https://example.com/image.jpg")
+            .build();
+
+    int count = eventImportService.importFromScrapeResponse(List.of(noAddress));
+
+    assertEquals(1, count, "a missing address must not drop the event");
+    assertNull(
+        capturedSavedEvents().get(0).getAddress(), "blank address should be normalised to null");
+  }
+
+  @Test
+  @DisplayName("One event failing to save does not abort the rest of the batch")
+  void oneFailingEventDoesNotAbortBatch() {
+    LocalDateTime t1 = LocalDateTime.of(2026, 2, 21, 5, 0);
+    LocalDateTime t2 = LocalDateTime.of(2026, 3, 7, 0, 0);
+    when(eventRepository.existsByNameAndStartTime(any(), any())).thenReturn(false);
+    // First per-event save blows up; the second must still be attempted and succeed.
+    when(eventService.saveWithPendingApproval(any()))
+        .thenThrow(new RuntimeException("constraint violation"))
+        .thenReturn(EventEntity.builder().build());
+
+    int count =
+        eventImportService.importFromScrapeResponse(
+            List.of(
+                dto("Bad Event", "TREKANDPLOG", "Team everest", t1),
+                dto("Good Event", "TREKANDPLOG", "Team everest", t2)));
+
+    assertEquals(1, count, "only the good event counts as imported");
+    verify(eventService, times(2)).saveWithPendingApproval(any());
   }
 }
