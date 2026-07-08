@@ -1,22 +1,17 @@
 package org.smalltech.hashtaglocal_backend.service;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.smalltech.hashtaglocal_backend.dto.ScrapeEventDTO;
-import org.smalltech.hashtaglocal_backend.entity.EventApprovalEntity;
 import org.smalltech.hashtaglocal_backend.entity.EventEntity;
 import org.smalltech.hashtaglocal_backend.entity.MediaEntity;
-import org.smalltech.hashtaglocal_backend.model.EventApprovalStatus;
 import org.smalltech.hashtaglocal_backend.model.EventPortalModel;
 import org.smalltech.hashtaglocal_backend.model.EventTypeModel;
-import org.smalltech.hashtaglocal_backend.repository.EventApprovalRepository;
 import org.smalltech.hashtaglocal_backend.repository.EventRepository;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Handles importing events from the scrape service JSON response.
@@ -52,22 +47,25 @@ public class EventImportService {
   private final EventService eventService;
   private final EventRepository eventRepository;
   private final EventImageService eventImageService;
-  private final EventApprovalRepository eventApprovalRepository;
 
   /**
    * Processes a list of events from the scrape service, deduplicates against the database, and
-   * bulk-saves all new events in a single transaction.
+   * saves each new event (with its {@code PENDING} approval row) in its own transaction.
+   *
+   * <p>Events are persisted independently, so a single bad row — a constraint violation, a failed
+   * image upload, etc. — only skips that event instead of rolling back the whole batch. A missing
+   * address does <b>not</b> drop the event: it is kept for admin review and geocoded later once an
+   * address is supplied via the ops portal.
    *
    * @param scrapeEvents raw event DTOs from the scrape service response
-   * @return the number of events actually saved (duplicates excluded)
+   * @return the number of events actually saved (duplicates and failures excluded)
    */
-  @Transactional
   public int importFromScrapeResponse(List<ScrapeEventDTO> scrapeEvents) {
     if (scrapeEvents == null || scrapeEvents.isEmpty()) {
       return 0;
     }
 
-    List<EventEntity> toSave = new ArrayList<>();
+    int imported = 0;
 
     for (ScrapeEventDTO dto : scrapeEvents) {
       try {
@@ -84,8 +82,7 @@ public class EventImportService {
           continue;
         }
         // fromString() returns null for portals it doesn't recognise. portal is a NOT NULL
-        // column, and toSave is bulk-inserted in one transaction, so letting a null portal
-        // through here would roll back — and silently drop — the entire import batch.
+        // column, so letting a null through would fail the insert for this event.
         if (EventPortalModel.fromString(dto.getPortal()) == null) {
           log.warn(
               "Skipping event '{}' — unrecognized portal '{}'", dto.getName(), dto.getPortal());
@@ -104,33 +101,21 @@ public class EventImportService {
           continue;
         }
 
-        toSave.add(toEntity(dto, media));
+        // Persist this event (plus its PENDING approval) in its own transaction. Isolating each
+        // save means one problematic event never takes the rest of the batch down with it.
+        eventService.saveWithPendingApproval(toEntity(dto, media));
+        imported++;
       } catch (Exception e) {
         log.warn("Skipping event '{}' due to error: {}", dto.getName(), e.getMessage());
       }
     }
 
-    List<EventEntity> saved = eventService.saveAll(toSave);
-
-    // Create a PENDING approval row for every newly imported event so it lands in the
-    // admin review queue before appearing on the public site.
-    List<EventApprovalEntity> approvals =
-        saved.stream()
-            .map(
-                e ->
-                    EventApprovalEntity.builder()
-                        .eventId(e.getId())
-                        .status(EventApprovalStatus.PENDING)
-                        .build())
-            .toList();
-    eventApprovalRepository.saveAll(approvals);
-
     log.info(
         "Imported {} new events ({} received, {} skipped)",
-        toSave.size(),
+        imported,
         scrapeEvents.size(),
-        scrapeEvents.size() - toSave.size());
-    return toSave.size();
+        scrapeEvents.size() - imported);
+    return imported;
   }
 
   private EventEntity toEntity(ScrapeEventDTO dto, MediaEntity media) {
@@ -141,10 +126,23 @@ public class EventImportService {
         .type(parseEventType(dto.getType()))
         .startTime(dto.getStartTime())
         .endTime(dto.getEndTime())
-        .address(dto.getAddress())
+        .address(normalizeAddress(dto.getAddress()))
         .link(stripUtmParams(dto.getLink()))
         .media(media)
         .build();
+  }
+
+  /**
+   * Normalises the scraped address: trims surrounding whitespace and collapses a blank or missing
+   * value to {@code null}. Storing null (rather than an empty string) keeps the geocoding query
+   * ({@code findByLocationIsNullAndAddressIsNotNull}) from repeatedly picking up un-geocodable
+   * events.
+   */
+  private String normalizeAddress(String address) {
+    if (address == null || address.isBlank()) {
+      return null;
+    }
+    return address.strip();
   }
 
   private String stripUtmParams(String link) {

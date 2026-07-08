@@ -79,8 +79,12 @@ public class EventEntity {
   /**
    * Raw address string copied directly from the event data source (e.g., the Excel sheet). Kept as
    * a human-readable fallback while `location_id` is still null.
+   *
+   * <p>Nullable: scraped events sometimes arrive without an address. We keep the event anyway (for
+   * admin review) rather than dropping it — geocoding skips events with a null address until an
+   * admin supplies one via the ops portal edit endpoint.
    */
-  @Column(length = 1024, nullable = false)
+  @Column(length = 1024)
   private String address;
 
   /** URL to the original event page on the source platform. */
