@@ -22,6 +22,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.smalltech.hashtaglocal_backend.dto.ScrapeEventDTO;
+import org.smalltech.hashtaglocal_backend.infra.notification.SlackNotifier;
 import org.smalltech.hashtaglocal_backend.service.EventGeocodingService;
 import org.smalltech.hashtaglocal_backend.service.EventImportService;
 import org.smalltech.hashtaglocal_backend.service.ScrapeApiClient;
@@ -42,6 +43,7 @@ class EventIngestionCronJobTest {
   @Mock private ScrapeApiClient scrapeApiClient;
   @Mock private EventImportService eventImportService;
   @Mock private EventGeocodingService eventGeocodingService;
+  @Mock private SlackNotifier slackNotifier;
 
   @InjectMocks private EventIngestionCronJob cronJob;
 

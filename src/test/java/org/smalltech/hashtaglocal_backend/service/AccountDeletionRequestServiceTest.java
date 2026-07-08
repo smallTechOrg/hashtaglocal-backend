@@ -19,6 +19,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.smalltech.hashtaglocal_backend.entity.AccountDeletionRequestEntity;
 import org.smalltech.hashtaglocal_backend.entity.UserAuthProviderEntity;
 import org.smalltech.hashtaglocal_backend.entity.UserEntity;
+import org.smalltech.hashtaglocal_backend.infra.notification.SlackNotifier;
 import org.smalltech.hashtaglocal_backend.model.AccountDeletionRequestStatus;
 import org.smalltech.hashtaglocal_backend.repository.AccountDeletionRequestRepository;
 import org.smalltech.hashtaglocal_backend.repository.UserAuthProviderRepository;
@@ -48,6 +49,8 @@ class AccountDeletionRequestServiceTest {
 
   @Mock private JavaMailSender mailSender;
 
+  @Mock private SlackNotifier slackNotifier;
+
   private AccountDeletionRequestService service;
 
   @BeforeEach
@@ -58,7 +61,8 @@ class AccountDeletionRequestServiceTest {
             userRepository,
             userAuthProviderRepository,
             userAuthSessionRepository,
-            mailSender);
+            mailSender,
+            slackNotifier);
     ReflectionTestUtils.setField(service, "adminEmail", "admin@example.com");
     ReflectionTestUtils.setField(service, "fromEmail", "noreply@example.com");
   }
