@@ -47,6 +47,9 @@ public class ScrapeApiClient {
   @Value("${events.scrape.seed-file:classpath:events-seed.json}")
   private String seedFile;
 
+  @Value("${app.self-base-url:}")
+  private String selfBaseUrl;
+
   public List<ScrapeEventDTO> fetchEvents() {
     if (scrapeUrl != null && !scrapeUrl.isBlank()) {
       return fetchFromUrl();
@@ -79,6 +82,9 @@ public class ScrapeApiClient {
 
       HttpHeaders headers = new HttpHeaders();
       headers.setContentType(MediaType.APPLICATION_JSON);
+      if (selfBaseUrl != null && !selfBaseUrl.isBlank()) {
+        headers.set("X-Backend-Url", selfBaseUrl);
+      }
       HttpEntity<ScrapeRequestDTO> request = new HttpEntity<>(body, headers);
 
       ScrapeResponseDTO response =
