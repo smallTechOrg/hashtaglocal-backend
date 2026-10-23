@@ -26,7 +26,7 @@ Push notifications are delivered via Firebase Cloud Messaging (FCM).
 | `ISSUE_DETAIL` — `VERIFIED` / `RESOLVED_BY_USER` events | ⬜ Planned |
 | Notify verifiers (not just reporter) | ⬜ Planned |
 | `NEARBY_ISSUE` | ⬜ Planned |
-| `BULLETIN` | ⬜ Planned |
+| `BULLETIN` — daily push to locality users after bulletin generation (cron) | ✅ Done |
 | `CHAT` | ⬜ Planned |
 | `BROADCAST` — ops-portal "send to everyone" (`POST /admin/notification`) | ✅ Done |
 | `PORTAL_ISSUE_CLOSED` | ⬜ Planned |
@@ -330,6 +330,44 @@ notifications:
     inactivity-days: ${ACTIVITY_REMINDER_INACTIVITY_DAYS:7}
     cron: ${ACTIVITY_REMINDER_CRON:0 0 9 * * *}   # 9 AM daily
 ```
+
+---
+
+### 4.5 `BULLETIN` ✅ Done
+
+**When:** `BulletinNotificationJob` runs daily at 8:30 AM IST, after the 8:00 AM weather run (`BulletinWeatherJob`).
+
+**Recipients:** all active devices of users whose home location is in the locality (`users.location → locations.locality_id`).
+
+**Trigger logic (cron job — `BulletinNotificationService.runCycle()`):**
+1. For every saved-user locality, check today's bulletin is ready (bulletin row with `periodic_data_id` set; a quiz-only shell does not count).
+2. If not, retry `BulletinGenerationService.generateForLocality()` for that locality.
+3. If the bulletin is ready, push to that locality's users. Localities whose generation still fails get no notification.
+4. Dedup: one push per bulletin, tracked in `notification_log` (`source_ref_type = 'BULLETIN'`, `source_ref_id = bulletin id`). Re-runs only cover what's left.
+
+**Payload**
+```json
+{
+  "type":              "BULLETIN",
+  "bulletinId":        "42",
+  "localityId":        "10",
+  "date":              "2026-10-23",
+  "notificationLogId": "123"
+}
+```
+
+| Field | Value |
+|---|---|
+| Title | "Daily Bulletin — {locality name}" |
+| Body | The bulletin's AI weather summary, truncated to 180 chars |
+
+**App behaviour:** tapping opens the Bulletin screen.
+
+**Config** (`application.yaml`): `bulletin.notification.cron` / `BULLETIN_NOTIFICATION_CRON` (default `0 30 8 * * *`, `-` disables). Disabled along with the rest of the bulletin when `BULLETIN_ENABLED=false`.
+
+**Manual trigger:** `POST /admin/bulletin/notify` — same run as the cron.
+
+**Migration:** run `scripts/migrate-notification-type-bulletin.sql` before deploying (widens the `notification_log_type_check` constraint).
 
 ---
 

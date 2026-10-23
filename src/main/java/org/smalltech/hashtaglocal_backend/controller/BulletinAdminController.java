@@ -16,6 +16,7 @@ import org.smalltech.hashtaglocal_backend.model.response.AdminLocalityOptionData
 import org.smalltech.hashtaglocal_backend.model.response.AdminQuizData;
 import org.smalltech.hashtaglocal_backend.model.response.AiPromptData;
 import org.smalltech.hashtaglocal_backend.service.BulletinGenerationService;
+import org.smalltech.hashtaglocal_backend.service.BulletinNotificationService;
 import org.smalltech.hashtaglocal_backend.service.GroqClient;
 import org.smalltech.hashtaglocal_backend.service.QuizAdminService;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -46,6 +47,7 @@ public class BulletinAdminController {
 
   private final QuizAdminService quizAdminService;
   private final BulletinGenerationService bulletinGenerationService;
+  private final BulletinNotificationService bulletinNotificationService;
 
   // ---------------------------------------------------------------- quizzes
 
@@ -145,6 +147,21 @@ public class BulletinAdminController {
     return ResponseEntity.ok(
         NewAPIResponse.<BulletinGenerationService.GenerationResult>builder()
             .data(bulletinGenerationService.generateForAllUserLocalities())
+            .build());
+  }
+
+  @PostMapping("/bulletin/notify")
+  @Operation(
+      summary = "Run the bulletin notification now",
+      description =
+          "Manually triggers the same run the 8:30 AM cron performs: retries generation for"
+              + " localities missing today's bulletin, then pushes to users of every locality whose"
+              + " bulletin is ready. Already-notified bulletins are skipped.")
+  public ResponseEntity<NewAPIResponse<BulletinNotificationService.NotificationRunResult>>
+      notifyBulletins() {
+    return ResponseEntity.ok(
+        NewAPIResponse.<BulletinNotificationService.NotificationRunResult>builder()
+            .data(bulletinNotificationService.runCycle())
             .build());
   }
 

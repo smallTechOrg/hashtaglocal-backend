@@ -165,6 +165,10 @@ bulletin:
     provider: ${BULLETIN_WEATHER_PROVIDER:open-meteo}
     open-meteo:
       url: ${BULLETIN_OPEN_METEO_URL:https://api.open-meteo.com/v1/forecast}
+  notification:
+    # Daily at 8:30 AM, after the weather run: retries localities still missing a bulletin, then
+    # pushes to users of every locality whose bulletin is ready. Use '-' to disable.
+    cron: ${BULLETIN_NOTIFICATION_CRON:0 30 8 * * *}
 
 # Groq (weather summary + quiz explanation generation)
 groq:

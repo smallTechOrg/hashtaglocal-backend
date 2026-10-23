@@ -10,6 +10,9 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface NotificationLogRepository extends JpaRepository<NotificationLogEntity, Long> {
 
+  /** Whether a notification was already sent for this triggering record (dedup for crons). */
+  boolean existsBySourceRefTypeAndSourceRefId(String sourceRefType, Long sourceRefId);
+
   @Query(
       "SELECT COALESCE(SUM(n.recipientCount), 0) FROM NotificationLogEntity n"
           + " WHERE n.createdAt BETWEEN :start AND :end")
