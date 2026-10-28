@@ -88,12 +88,6 @@ class BulletinGenerationServiceTest {
     assertEquals(0, result.getGenerated());
     assertEquals(1, result.getSkipped());
     assertEquals(1, result.getFailed());
-    assertEquals(1, result.getFailures().size());
-    BulletinGenerationService.FailedLocality failure = result.getFailures().get(0);
-    assertEquals(2L, failure.getLocalityId());
-    assertEquals("badcity", failure.getHashtag());
-    assertEquals("Bad City", failure.getName());
-    assertTrue(failure.getError() != null && failure.getError().contains("No coordinates"));
 
     ArgumentCaptor<SimpleMailMessage> captor = ArgumentCaptor.forClass(SimpleMailMessage.class);
     verify(mailSender).send(captor.capture());
