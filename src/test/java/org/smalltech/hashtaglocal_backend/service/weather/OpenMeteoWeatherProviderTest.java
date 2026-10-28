@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withTooManyRequests;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
@@ -47,6 +48,24 @@ class OpenMeteoWeatherProviderTest {
 
     assertEquals(30.0, snapshot.getMaxTemp());
     assertEquals(20.0, snapshot.getMinTemp());
+    server.verify();
+  }
+
+  @Test
+  void retriesOn429RateLimit() {
+    RestClient.Builder builder = RestClient.builder();
+    MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+
+    server.expect(method(HttpMethod.GET)).andRespond(withTooManyRequests());
+    server
+        .expect(method(HttpMethod.GET))
+        .andRespond(withSuccess(DAILY_JSON, MediaType.APPLICATION_JSON));
+
+    OpenMeteoWeatherProvider provider =
+        new OpenMeteoWeatherProvider(
+            builder, new ObjectMapper(), "https://api.open-meteo.com/v1/forecast");
+
+    assertEquals(30.0, provider.fetchDaily(12.9, 77.6).getMaxTemp());
     server.verify();
   }
 

@@ -6,6 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
@@ -72,7 +73,9 @@ public class OpenMeteoWeatherProvider implements WeatherProvider {
             .rainProbability(firstValue(daily, "precipitation_probability_max"))
             .source(SOURCE)
             .build();
-      } catch (HttpServerErrorException | ResourceAccessException e) {
+      } catch (HttpServerErrorException
+          | HttpClientErrorException.TooManyRequests
+          | ResourceAccessException e) {
         lastFailure = e;
         log.warn(
             "Open-Meteo fetch attempt {}/{} failed for ({},{}): {}",
@@ -81,8 +84,8 @@ public class OpenMeteoWeatherProvider implements WeatherProvider {
             lat,
             lng,
             e.getMessage());
-        if (attempt < MAX_ATTEMPTS) {
-          sleep(RETRY_BACKOFF_MILLIS * attempt);
+        if (attempt < MAX_ATTEMPTS && !sleep(RETRY_BACKOFF_MILLIS * attempt)) {
+          break; // interrupted (shutdown) — stop retrying
         }
       } catch (Exception e) {
         throw new IllegalStateException(
@@ -94,18 +97,19 @@ public class OpenMeteoWeatherProvider implements WeatherProvider {
             + lat
             + ","
             + lng
-            + ") after "
-            + MAX_ATTEMPTS
-            + " attempts: "
+            + ") after retries: "
             + lastFailure.getMessage(),
         lastFailure);
   }
 
-  private void sleep(long millis) {
+  /** Returns false if interrupted, with the interrupt flag restored. */
+  private boolean sleep(long millis) {
     try {
       Thread.sleep(millis);
+      return true;
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
+      return false;
     }
   }
 
