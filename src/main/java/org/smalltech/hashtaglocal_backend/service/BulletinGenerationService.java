@@ -7,6 +7,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 import lombok.Builder;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
@@ -70,7 +71,7 @@ public class BulletinGenerationService {
     int generated = 0;
     int skipped = 0;
     int failed = 0;
-    List<String> failures = new ArrayList<>();
+    List<FailedLocality> failures = new ArrayList<>();
     for (Locality locality : localities) {
       try {
         if (generateForLocality(locality, today)) {
@@ -86,7 +87,13 @@ public class BulletinGenerationService {
         break;
       } catch (Exception e) {
         failed++;
-        failures.add(locality.getHashtag() + ": " + e.getMessage());
+        failures.add(
+            FailedLocality.builder()
+                .localityId(locality.getId())
+                .hashtag(locality.getHashtag())
+                .name(locality.getName())
+                .error(e.getMessage())
+                .build());
         log.error(
             "Bulletin generation failed for locality {} ({}): {}",
             locality.getId(),
@@ -106,9 +113,10 @@ public class BulletinGenerationService {
             .generated(generated)
             .skipped(skipped)
             .failed(failed)
+            .failures(failures)
             .build();
     if (failed > 0) {
-      sendFailureAlert(result, failures);
+      sendFailureAlert(result);
     }
     return result;
   }
@@ -117,7 +125,7 @@ public class BulletinGenerationService {
    * Best-effort admin email when one or more localities fail — the run itself already succeeded for
    * everything it could, so a broken mail send here must never fail the job.
    */
-  private void sendFailureAlert(GenerationResult result, List<String> failures) {
+  private void sendFailureAlert(GenerationResult result) {
     if (alertAdminEmail == null || alertAdminEmail.isBlank()) {
       log.warn("bulletin.alert.admin-email is not configured; skipping bulletin failure email");
       return;
@@ -149,7 +157,9 @@ public class BulletinGenerationService {
               + result.getSkipped()
               + " skipped).\n\n"
               + "Failures:\n"
-              + String.join("\n", failures)
+              + result.getFailures().stream()
+                  .map(f -> f.getHashtag() + ": " + f.getError())
+                  .collect(Collectors.joining("\n"))
               + "\n\nRe-run is idempotent: POST /admin/bulletin/generate");
       mailSender.send(message);
       log.info("Bulletin failure alert emailed to {}", alertAdminEmail);
@@ -261,5 +271,16 @@ public class BulletinGenerationService {
     private int generated;
     private int skipped;
     private int failed;
+    private List<FailedLocality> failures;
+  }
+
+  /** A locality the run couldn't generate for; a same-day re-run retries it. */
+  @Data
+  @Builder
+  public static class FailedLocality {
+    private Long localityId;
+    private String hashtag;
+    private String name;
+    private String error;
   }
 }
