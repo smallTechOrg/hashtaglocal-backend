@@ -72,7 +72,7 @@ public class GroqClient {
       ObjectMapper objectMapper,
       @Value("${groq.api.key:}") String apiKey,
       @Value("${groq.api.url:https://api.groq.com/openai/v1/chat/completions}") String url,
-      @Value("${groq.api.model:llama-3.3-70b-versatile}") String model) {
+      @Value("${groq.api.model:qwen/qwen3.8-27b}") String model) {
     this.restClient = restClientBuilder.build();
     this.objectMapper = objectMapper;
     this.apiKey = apiKey;
