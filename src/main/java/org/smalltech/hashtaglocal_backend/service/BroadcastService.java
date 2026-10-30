@@ -1,6 +1,5 @@
 package org.smalltech.hashtaglocal_backend.service;
 
-import static org.smalltech.hashtaglocal_backend.config.NotificationConstants.ANALYTICS_SUFFIX_ADMIN;
 import static org.smalltech.hashtaglocal_backend.config.NotificationConstants.FCM_BATCH_SIZE;
 import static org.smalltech.hashtaglocal_backend.config.NotificationConstants.KEY_ISSUE_ID;
 import static org.smalltech.hashtaglocal_backend.config.NotificationConstants.KEY_NOTIFICATION_LOG_ID;
@@ -31,6 +30,8 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 @Slf4j
 public class BroadcastService {
+
+  private static final String ANALYTICS_SUFFIX_ADMIN = "_admin";
 
   private final UserAuthSessionRepository userAuthSessionRepository;
   private final NotificationLogRepository notificationLogRepository;

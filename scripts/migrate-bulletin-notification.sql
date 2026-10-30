@@ -7,10 +7,17 @@
 --   where type = 'AUTO_CHAT' and sub_type = 'CHAT_BULLETIN'
 --     and source_ref_type = 'BULLETIN' and source_ref_id = :bulletin_id;
 
--- Pre-check: source_ref_type is becoming an enum (ISSUE_UPDATE, BULLETIN). This must return no rows;
--- if it returns any, fix or null out those values first or the app cannot read them.
+-- source_ref_type is becoming an enum whose values name the table that source_ref_id is an id in:
+--   BULLETIN -> bulletins.id, ISSUE -> issues.id.
+-- The old 'ISSUE_UPDATE' value (an event name, whose id was always issues.id) is renamed to 'ISSUE'.
+
+-- Pre-check: this must return no rows; if it returns any, fix or null out those values first or the
+-- app cannot read them.
 --   SELECT DISTINCT source_ref_type FROM notification_log
---   WHERE source_ref_type    IS NOT NULL AND source_ref_type NOT IN ('ISSUE_UPDATE', 'BULLETIN');
+--   WHERE source_ref_type IS NOT NULL AND source_ref_type NOT IN ('ISSUE_UPDATE', 'ISSUE', 'BULLETIN');
+
+-- Step 0: rename the legacy value.
+UPDATE notification_log SET source_ref_type = 'ISSUE' WHERE source_ref_type = 'ISSUE_UPDATE';
 
 -- Step 1: new sub_type column (nullable: existing rows have no sub type).
 ALTER TABLE notification_log ADD COLUMN IF NOT EXISTS sub_type VARCHAR(100);
@@ -33,7 +40,7 @@ ALTER TABLE notification_log
 ALTER TABLE notification_log DROP CONSTRAINT IF EXISTS notification_log_source_ref_type_check;
 ALTER TABLE notification_log
   ADD CONSTRAINT notification_log_source_ref_type_check
-  CHECK (source_ref_type IS NULL OR source_ref_type IN ('ISSUE_UPDATE', 'BULLETIN'));
+  CHECK (source_ref_type IS NULL OR source_ref_type IN ('ISSUE', 'BULLETIN'));
 
 -- Step 3: duplicate-send guard, matching the access pattern. The listener inserts its claim row
 --         before any FCM call; this index makes a parallel/re-run insert fail, and it also serves
@@ -45,6 +52,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_notification_log_bulletin
 -- Rollback:
 -- DROP INDEX IF EXISTS uq_notification_log_bulletin;
 -- ALTER TABLE notification_log DROP CONSTRAINT IF EXISTS notification_log_source_ref_type_check;
+-- UPDATE notification_log SET source_ref_type = 'ISSUE_UPDATE' WHERE source_ref_type = 'ISSUE';
 -- ALTER TABLE notification_log DROP CONSTRAINT IF EXISTS notification_log_sub_type_check;
 -- ALTER TABLE notification_log DROP CONSTRAINT IF EXISTS notification_log_type_check;
 -- ALTER TABLE notification_log

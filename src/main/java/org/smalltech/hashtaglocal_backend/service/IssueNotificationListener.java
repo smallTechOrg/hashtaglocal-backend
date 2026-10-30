@@ -1,10 +1,7 @@
 package org.smalltech.hashtaglocal_backend.service;
 
-import static org.smalltech.hashtaglocal_backend.config.NotificationConstants.ANALYTICS_SUFFIX_SYSTEM;
-import static org.smalltech.hashtaglocal_backend.config.NotificationConstants.KEY_EVENT;
 import static org.smalltech.hashtaglocal_backend.config.NotificationConstants.KEY_ISSUE_ID;
 import static org.smalltech.hashtaglocal_backend.config.NotificationConstants.KEY_NOTIFICATION_LOG_ID;
-import static org.smalltech.hashtaglocal_backend.config.NotificationConstants.KEY_STATUS;
 import static org.smalltech.hashtaglocal_backend.config.NotificationConstants.KEY_TYPE;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -36,6 +33,10 @@ import org.springframework.transaction.event.TransactionalEventListener;
 @RequiredArgsConstructor
 @Slf4j
 public class IssueNotificationListener {
+
+  private static final String KEY_STATUS = "status";
+  private static final String KEY_EVENT = "event";
+  private static final String ANALYTICS_SUFFIX_SYSTEM = "_system";
 
   private static final String TITLE = "Issue is live";
   private static final String BODY = "Your report has been approved and is now open.";
@@ -79,7 +80,7 @@ public class IssueNotificationListener {
         notificationLogRepository.save(
             NotificationLogEntity.builder()
                 .source(NotificationSource.SYSTEM)
-                .sourceRefType(NotificationRefType.ISSUE_UPDATE)
+                .sourceRefType(NotificationRefType.ISSUE)
                 .sourceRefId(issueId)
                 .type(NotificationType.ISSUE_DETAIL)
                 .title(TITLE)

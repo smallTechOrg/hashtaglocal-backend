@@ -1,16 +1,8 @@
 package org.smalltech.hashtaglocal_backend.service;
 
-import static org.smalltech.hashtaglocal_backend.config.NotificationConstants.BULLETIN_ANALYTICS_LABEL;
-import static org.smalltech.hashtaglocal_backend.config.NotificationConstants.BULLETIN_FALLBACK_BODY;
-import static org.smalltech.hashtaglocal_backend.config.NotificationConstants.BULLETIN_MAX_BODY_LENGTH;
-import static org.smalltech.hashtaglocal_backend.config.NotificationConstants.BULLETIN_TITLE_PREFIX;
 import static org.smalltech.hashtaglocal_backend.config.NotificationConstants.FCM_BATCH_SIZE;
-import static org.smalltech.hashtaglocal_backend.config.NotificationConstants.KEY_BULLETIN_ID;
-import static org.smalltech.hashtaglocal_backend.config.NotificationConstants.KEY_DATE;
-import static org.smalltech.hashtaglocal_backend.config.NotificationConstants.KEY_LOCALITY_ID;
 import static org.smalltech.hashtaglocal_backend.config.NotificationConstants.KEY_NOTIFICATION_LOG_ID;
 import static org.smalltech.hashtaglocal_backend.config.NotificationConstants.KEY_TYPE;
-import static org.smalltech.hashtaglocal_backend.config.NotificationConstants.PAYLOAD_TYPE_BULLETIN;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -51,6 +43,18 @@ import org.springframework.transaction.support.TransactionTemplate;
 @RequiredArgsConstructor
 @Slf4j
 public class BulletinNotificationListener {
+
+  static final String TITLE_PREFIX = "Daily Bulletin — ";
+  static final String FALLBACK_BODY = "Today's weather update and quiz are ready.";
+  static final int MAX_BODY_LENGTH = 180;
+
+  /** FCM {@code type} the mobile app routes on (the log's own type is AUTO_CHAT). */
+  private static final String PAYLOAD_TYPE = "BULLETIN";
+
+  private static final String ANALYTICS_LABEL = "bulletin_system";
+  private static final String KEY_BULLETIN_ID = "bulletinId";
+  private static final String KEY_LOCALITY_ID = "localityId";
+  private static final String KEY_DATE = "date";
 
   private final BulletinRepository bulletinRepository;
   private final UserAuthSessionRepository userAuthSessionRepository;
@@ -97,12 +101,12 @@ public class BulletinNotificationListener {
       return;
     }
 
-    String title = BULLETIN_TITLE_PREFIX + bulletin.getLocality().getName();
+    String title = TITLE_PREFIX + bulletin.getLocality().getName();
     Object summaryText = bulletin.getSummary() != null ? bulletin.getSummary().get("text") : null;
     String body = buildBody(summaryText != null ? summaryText.toString() : null);
 
     Map<String, String> payload = new HashMap<>();
-    payload.put(KEY_TYPE, PAYLOAD_TYPE_BULLETIN);
+    payload.put(KEY_TYPE, PAYLOAD_TYPE);
     payload.put(KEY_BULLETIN_ID, bulletinId.toString());
     payload.put(KEY_LOCALITY_ID, localityId.toString());
     payload.put(KEY_DATE, bulletin.getDate().toString());
@@ -139,7 +143,7 @@ public class BulletinNotificationListener {
     for (int i = 0; i < tokens.size(); i += FCM_BATCH_SIZE) {
       List<String> batch = tokens.subList(i, Math.min(i + FCM_BATCH_SIZE, tokens.size()));
       MulticastResult result =
-          fcmSender.sendMulticast(batch, title, body, fcmData, BULLETIN_ANALYTICS_LABEL);
+          fcmSender.sendMulticast(batch, title, body, fcmData, ANALYTICS_LABEL);
       // @Modifying query needs a transaction; this method runs outside one.
       tx.executeWithoutResult(
           status ->
@@ -158,21 +162,19 @@ public class BulletinNotificationListener {
         successTotal);
   }
 
-  /**
-   * First sentence of the summary, capped at {@code BULLETIN_MAX_BODY_LENGTH} on a word boundary.
-   */
+  /** First sentence of the summary, capped at {@code MAX_BODY_LENGTH} on a word boundary. */
   static String buildBody(String text) {
     if (text == null || text.isBlank()) {
-      return BULLETIN_FALLBACK_BODY;
+      return FALLBACK_BODY;
     }
     String trimmed = text.strip();
     int end = firstSentenceEnd(trimmed);
     String sentence = end < 0 ? trimmed : trimmed.substring(0, end + 1);
-    if (sentence.length() <= BULLETIN_MAX_BODY_LENGTH) {
+    if (sentence.length() <= MAX_BODY_LENGTH) {
       return sentence;
     }
-    int cut = sentence.lastIndexOf(' ', BULLETIN_MAX_BODY_LENGTH);
-    String head = sentence.substring(0, cut > 0 ? cut : BULLETIN_MAX_BODY_LENGTH);
+    int cut = sentence.lastIndexOf(' ', MAX_BODY_LENGTH);
+    String head = sentence.substring(0, cut > 0 ? cut : MAX_BODY_LENGTH);
     int last = head.length();
     while (last > 0 && " ,;:-".indexOf(head.charAt(last - 1)) >= 0) {
       last--;
