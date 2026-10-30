@@ -1,8 +1,8 @@
 package org.smalltech.hashtaglocal_backend.config;
 
 /**
- * Values used by more than one push-notification sender, defined once so they can never drift
- * apart. Anything specific to a single sender belongs in that sender, not here.
+ * Limits shared by every push-notification sender, defined once so they can never drift apart.
+ * Anything specific to a single sender belongs in that sender, not here.
  */
 public final class NotificationConstants {
 
@@ -11,7 +11,9 @@ public final class NotificationConstants {
   /** FCM rejects multicast calls with more than 500 tokens. */
   public static final int FCM_BATCH_SIZE = 500;
 
-  // FCM data payload keys read by the mobile app and written by several senders.
-  public static final String KEY_TYPE = "type";
-  public static final String KEY_NOTIFICATION_LOG_ID = "notificationLogId";
+  /** Longest notification title we send; matches the {@code notification_log.title} column. */
+  public static final int MAX_TITLE_LENGTH = 500;
+
+  /** Longest notification body we send. Longer text is cut at a word boundary with an ellipsis. */
+  public static final int MAX_BODY_LENGTH = 180;
 }

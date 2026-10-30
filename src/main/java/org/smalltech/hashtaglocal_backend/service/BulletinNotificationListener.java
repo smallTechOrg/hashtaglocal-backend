@@ -1,8 +1,8 @@
 package org.smalltech.hashtaglocal_backend.service;
 
 import static org.smalltech.hashtaglocal_backend.config.NotificationConstants.FCM_BATCH_SIZE;
-import static org.smalltech.hashtaglocal_backend.config.NotificationConstants.KEY_NOTIFICATION_LOG_ID;
-import static org.smalltech.hashtaglocal_backend.config.NotificationConstants.KEY_TYPE;
+import static org.smalltech.hashtaglocal_backend.config.NotificationConstants.MAX_BODY_LENGTH;
+import static org.smalltech.hashtaglocal_backend.config.NotificationConstants.MAX_TITLE_LENGTH;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -46,12 +46,13 @@ public class BulletinNotificationListener {
 
   static final String TITLE_PREFIX = "Daily Bulletin — ";
   static final String FALLBACK_BODY = "Today's weather update is ready.";
-  static final int MAX_BODY_LENGTH = 180;
 
   /** FCM {@code type} the mobile app routes on (the log's own type is AUTO_CHAT). */
   private static final String PAYLOAD_TYPE = "BULLETIN";
 
   private static final String ANALYTICS_LABEL = "bulletin_system";
+  private static final String KEY_TYPE = "type";
+  private static final String KEY_NOTIFICATION_LOG_ID = "notificationLogId";
   private static final String KEY_BULLETIN_ID = "bulletinId";
   private static final String KEY_LOCALITY_ID = "localityId";
   private static final String KEY_DATE = "date";
@@ -101,7 +102,7 @@ public class BulletinNotificationListener {
       return;
     }
 
-    String title = TITLE_PREFIX + bulletin.getLocality().getName();
+    String title = buildTitle(bulletin.getLocality().getName());
     Object summaryText = bulletin.getSummary() != null ? bulletin.getSummary().get("text") : null;
     String body = buildBody(summaryText != null ? summaryText.toString() : null);
 
@@ -160,6 +161,15 @@ public class BulletinNotificationListener {
         localityId,
         tokens.size(),
         successTotal);
+  }
+
+  /** "Daily Bulletin — {locality}", cut with an ellipsis if it would exceed the title limit. */
+  static String buildTitle(String localityName) {
+    String title = TITLE_PREFIX + localityName;
+    if (title.length() <= MAX_TITLE_LENGTH) {
+      return title;
+    }
+    return title.substring(0, MAX_TITLE_LENGTH - 1) + "…";
   }
 
   /** First sentence of the summary, capped at {@code MAX_BODY_LENGTH} on a word boundary. */

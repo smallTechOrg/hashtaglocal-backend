@@ -1,8 +1,6 @@
 package org.smalltech.hashtaglocal_backend.service;
 
 import static org.smalltech.hashtaglocal_backend.config.NotificationConstants.FCM_BATCH_SIZE;
-import static org.smalltech.hashtaglocal_backend.config.NotificationConstants.KEY_NOTIFICATION_LOG_ID;
-import static org.smalltech.hashtaglocal_backend.config.NotificationConstants.KEY_TYPE;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -58,7 +56,7 @@ public class BroadcastService {
     }
 
     Map<String, String> payload = new HashMap<>();
-    payload.put(KEY_TYPE, type.name());
+    payload.put("type", type.name());
     if (type == NotificationType.ISSUE_DETAIL) {
       payload.put("issueId", issueId);
     }
@@ -77,7 +75,7 @@ public class BroadcastService {
 
     // FCM data = business payload + notificationLogId so the device can report opens back
     Map<String, String> fcmData = new HashMap<>(payload);
-    fcmData.put(KEY_NOTIFICATION_LOG_ID, logEntry.getId().toString());
+    fcmData.put("notificationLogId", logEntry.getId().toString());
 
     String fcmTag = type.name().toLowerCase() + ANALYTICS_SUFFIX_ADMIN;
     int totalSuccess = 0;

@@ -20,6 +20,7 @@ import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.smalltech.hashtaglocal_backend.config.NotificationConstants;
 import org.smalltech.hashtaglocal_backend.entity.BulletinEntity;
 import org.smalltech.hashtaglocal_backend.entity.Locality;
 import org.smalltech.hashtaglocal_backend.entity.NotificationLogEntity;
@@ -106,9 +107,24 @@ class BulletinNotificationListenerTest {
   void buildBody_longSentenceCutsOnWordWithEllipsis() {
     String body = BulletinNotificationListener.buildBody("word, ".repeat(40));
     assertTrue(body.endsWith("…"));
-    assertTrue(body.length() <= BulletinNotificationListener.MAX_BODY_LENGTH + 1);
+    assertTrue(body.length() <= NotificationConstants.MAX_BODY_LENGTH + 1);
     assertTrue(body.startsWith("word, word"));
     assertEquals("word", body.substring(body.length() - 5, body.length() - 1));
+  }
+
+  // ---- buildTitle ----
+
+  @Test
+  void buildTitle_prefixesLocalityName() {
+    assertEquals(
+        "Daily Bulletin — Koramangala", BulletinNotificationListener.buildTitle("Koramangala"));
+  }
+
+  @Test
+  void buildTitle_cutsOverlongNameToTitleLimit() {
+    String title = BulletinNotificationListener.buildTitle("x".repeat(1000));
+    assertEquals(NotificationConstants.MAX_TITLE_LENGTH, title.length());
+    assertTrue(title.endsWith("…"));
   }
 
   // ---- notifyLocality ----

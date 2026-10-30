@@ -16,6 +16,11 @@
 --   SELECT DISTINCT source_ref_type FROM notification_log
 --   WHERE source_ref_type IS NOT NULL AND source_ref_type NOT IN ('ISSUE_UPDATE', 'ISSUE', 'BULLETIN');
 
+-- All steps run in one transaction: if any statement fails (for example the pre-check found stray
+-- values and a CHECK constraint cannot be added), everything is rolled back and the table is left
+-- exactly as it was.
+BEGIN;
+
 -- Step 0: rename the legacy value.
 UPDATE notification_log SET source_ref_type = 'ISSUE' WHERE source_ref_type = 'ISSUE_UPDATE';
 
@@ -49,7 +54,9 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_notification_log_bulletin
   ON notification_log (source_ref_id)
   WHERE type = 'AUTO_CHAT' AND sub_type = 'CHAT_BULLETIN' AND source_ref_type = 'BULLETIN';
 
--- Rollback:
+COMMIT;
+
+-- Rollback (wrap in BEGIN; ... COMMIT; the same way):
 -- DROP INDEX IF EXISTS uq_notification_log_bulletin;
 -- ALTER TABLE notification_log DROP CONSTRAINT IF EXISTS notification_log_source_ref_type_check;
 -- UPDATE notification_log SET source_ref_type = 'ISSUE_UPDATE' WHERE source_ref_type = 'ISSUE';
