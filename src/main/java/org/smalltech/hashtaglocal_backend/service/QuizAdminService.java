@@ -163,11 +163,11 @@ public class QuizAdminService {
 
   // -------------------------------------------------------------- bulletins
 
-  @Transactional(readOnly = true)
   /**
    * With a date, every saved-user locality gets a row: one with no bulletin that day (e.g. the
    * weather fetch failed) comes back with id/weather/summary null instead of being left out.
    */
+  @Transactional(readOnly = true)
   public List<AdminBulletinData> listBulletins(Long localityId, LocalDate date) {
     List<AdminBulletinData> rows =
         bulletinsFor(localityId, date).stream()
