@@ -7,6 +7,7 @@ import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.smalltech.hashtaglocal_backend.dto.ScrapeEventDTO;
+import org.smalltech.hashtaglocal_backend.model.EventPortalModel;
 import org.smalltech.hashtaglocal_backend.model.NewAPIResponse;
 import org.smalltech.hashtaglocal_backend.model.response.EventData;
 import org.smalltech.hashtaglocal_backend.model.response.EventListResponseData;
@@ -16,6 +17,7 @@ import org.smalltech.hashtaglocal_backend.service.EventService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -37,6 +39,20 @@ public class EventController {
     return NewAPIResponse.<EventListResponseData>builder()
         .data(EventListResponseData.builder().events(events).build())
         .build();
+  }
+
+  @GetMapping("/api/v1/events/links")
+  @Operation(
+      summary = "Get stored event links by portal",
+      description =
+          "Returns all event links already in the database for the given portal. Used by the scraper to skip LLM classification for already-imported events.")
+  public NewAPIResponse<List<String>> getEventLinksByPortal(@RequestParam String portal) {
+    EventPortalModel portalModel = EventPortalModel.fromString(portal);
+    if (portalModel == null) {
+      return NewAPIResponse.<List<String>>builder().data(List.of()).build();
+    }
+    List<String> links = eventService.getLinksByPortal(portalModel);
+    return NewAPIResponse.<List<String>>builder().data(links).build();
   }
 
   @PostMapping("/api/v1/events/ingest")
