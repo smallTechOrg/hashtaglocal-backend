@@ -3,7 +3,6 @@ package org.smalltech.hashtaglocal_backend.integration;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyDouble;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyMap;
@@ -98,7 +97,7 @@ class BulletinNotificationIntegrationTest {
         .thenReturn(WeatherSnapshot.builder().minTemp(21.0).maxTemp(28.0).source("TEST").build());
     when(groqClient.generateWeatherSummary(
             anyString(), org.mockito.ArgumentMatchers.any(), anyList()))
-        .thenReturn(SUMMARY);
+        .thenReturn(new GroqClient.WeatherSummary(SUMMARY, false));
     when(fcmSender.sendMulticast(anyList(), anyString(), anyString(), anyMap(), anyString()))
         .thenAnswer(
             inv -> {
@@ -148,7 +147,9 @@ class BulletinNotificationIntegrationTest {
   void todaysBulletinSendsExactlyOnePush_withDocumentedAccessPattern() throws Exception {
     LocalDate today = LocalDate.now(IST);
 
-    assertTrue(generationService.generateForLocality(locality, today));
+    assertEquals(
+        BulletinGenerationService.GenerationOutcome.GENERATED,
+        generationService.generateForLocality(locality, today));
 
     BulletinEntity bulletin =
         bulletinRepository.findByLocalityIdAndDate(locality.getId(), today).orElseThrow();
