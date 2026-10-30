@@ -1,5 +1,12 @@
 package org.smalltech.hashtaglocal_backend.service;
 
+import static org.smalltech.hashtaglocal_backend.config.NotificationConstants.ANALYTICS_SUFFIX_SYSTEM;
+import static org.smalltech.hashtaglocal_backend.config.NotificationConstants.KEY_EVENT;
+import static org.smalltech.hashtaglocal_backend.config.NotificationConstants.KEY_ISSUE_ID;
+import static org.smalltech.hashtaglocal_backend.config.NotificationConstants.KEY_NOTIFICATION_LOG_ID;
+import static org.smalltech.hashtaglocal_backend.config.NotificationConstants.KEY_STATUS;
+import static org.smalltech.hashtaglocal_backend.config.NotificationConstants.KEY_TYPE;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.HashMap;
@@ -13,6 +20,7 @@ import org.smalltech.hashtaglocal_backend.event.IssueStatusChangedEvent;
 import org.smalltech.hashtaglocal_backend.infra.notification.FcmSender;
 import org.smalltech.hashtaglocal_backend.infra.notification.FcmSender.MulticastResult;
 import org.smalltech.hashtaglocal_backend.model.IssueStatusModel;
+import org.smalltech.hashtaglocal_backend.model.NotificationRefType;
 import org.smalltech.hashtaglocal_backend.model.NotificationSource;
 import org.smalltech.hashtaglocal_backend.model.NotificationType;
 import org.smalltech.hashtaglocal_backend.repository.IssueActionRepository;
@@ -62,16 +70,16 @@ public class IssueNotificationListener {
 
     Map<String, String> payload =
         Map.of(
-            "type", "ISSUE_DETAIL",
-            "issueId", issueId.toString(),
-            "status", "OPEN",
-            "event", "STATUS_CHANGE");
+            KEY_TYPE, "ISSUE_DETAIL",
+            KEY_ISSUE_ID, issueId.toString(),
+            KEY_STATUS, "OPEN",
+            KEY_EVENT, "STATUS_CHANGE");
 
     NotificationLogEntity logEntry =
         notificationLogRepository.save(
             NotificationLogEntity.builder()
                 .source(NotificationSource.SYSTEM)
-                .sourceRefType("ISSUE_UPDATE")
+                .sourceRefType(NotificationRefType.ISSUE_UPDATE)
                 .sourceRefId(issueId)
                 .type(NotificationType.ISSUE_DETAIL)
                 .title(TITLE)
@@ -81,10 +89,15 @@ public class IssueNotificationListener {
 
     // FCM data = business payload + notificationLogId so the device can report opens back
     Map<String, String> fcmData = new HashMap<>(payload);
-    fcmData.put("notificationLogId", logEntry.getId().toString());
+    fcmData.put(KEY_NOTIFICATION_LOG_ID, logEntry.getId().toString());
 
     MulticastResult result =
-        fcmSender.sendMulticast(tokens, TITLE, BODY, fcmData, "issue_detail_system");
+        fcmSender.sendMulticast(
+            tokens,
+            TITLE,
+            BODY,
+            fcmData,
+            NotificationType.ISSUE_DETAIL.name().toLowerCase() + ANALYTICS_SUFFIX_SYSTEM);
     result.staleTokens().forEach(userAuthSessionRepository::clearNotificationToken);
 
     logEntry.setRecipientCount(tokens.size());

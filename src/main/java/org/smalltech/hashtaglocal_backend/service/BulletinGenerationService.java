@@ -15,6 +15,7 @@ import org.smalltech.hashtaglocal_backend.entity.BulletinEntity;
 import org.smalltech.hashtaglocal_backend.entity.FeedPostContentEntity;
 import org.smalltech.hashtaglocal_backend.entity.Locality;
 import org.smalltech.hashtaglocal_backend.entity.PeriodicDataEntity;
+import org.smalltech.hashtaglocal_backend.event.BulletinPublishedEvent;
 import org.smalltech.hashtaglocal_backend.model.FeedPostKind;
 import org.smalltech.hashtaglocal_backend.repository.BulletinRepository;
 import org.smalltech.hashtaglocal_backend.repository.FeedPostRepository;
@@ -23,6 +24,7 @@ import org.smalltech.hashtaglocal_backend.repository.PeriodicDataRepository;
 import org.smalltech.hashtaglocal_backend.repository.UserRepository;
 import org.smalltech.hashtaglocal_backend.service.weather.WeatherProvider;
 import org.smalltech.hashtaglocal_backend.service.weather.WeatherSnapshot;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,6 +39,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 public class BulletinGenerationService {
 
+  private static final ZoneId IST = ZoneId.of("Asia/Kolkata");
   private static final String TYPE_DAILY = "DAILY";
   private static final String DATA_TYPE_WEATHER = "WEATHER";
 
@@ -48,10 +51,11 @@ public class BulletinGenerationService {
   private final WeatherProvider weatherProvider;
   private final GroqClient groqClient;
   private final FeedService feedService;
+  private final ApplicationEventPublisher eventPublisher;
 
   /** Runs the daily generation over all saved-user localities. Returns a per-run summary. */
   public GenerationResult generateForAllUserLocalities() {
-    LocalDate today = LocalDate.now(ZoneId.of("Asia/Kolkata"));
+    LocalDate today = LocalDate.now(IST);
     List<Locality> localities = userRepository.findDistinctUserLocalities();
     log.info(
         "Bulletin generation started for {} user localities (date={})", localities.size(), today);
@@ -166,6 +170,11 @@ public class BulletinGenerationService {
             .text(summaryText)
             .build();
     feedService.createSystemPost(locality, FeedPostKind.BULLETIN, content);
+
+    // Only today's bulletin is worth a push: a late repair run must not notify about an old one.
+    if (bulletin.getDate().equals(LocalDate.now(IST))) {
+      eventPublisher.publishEvent(new BulletinPublishedEvent(bulletin.getId(), locality.getId()));
+    }
   }
 
   /** Locality coordinates: boundary centroid, else any saved location inside it. */

@@ -2,6 +2,9 @@ package org.smalltech.hashtaglocal_backend.repository;
 
 import java.time.LocalDateTime;
 import org.smalltech.hashtaglocal_backend.entity.NotificationLogEntity;
+import org.smalltech.hashtaglocal_backend.model.NotificationRefType;
+import org.smalltech.hashtaglocal_backend.model.NotificationSubType;
+import org.smalltech.hashtaglocal_backend.model.NotificationType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -9,6 +12,16 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface NotificationLogRepository extends JpaRepository<NotificationLogEntity, Long> {
+
+  /**
+   * Duplicate-send guard. Mirrors the documented access pattern: {@code type = ? AND sub_type = ?
+   * AND source_ref_type = ? AND source_ref_id = ?}.
+   */
+  boolean existsByTypeAndSubTypeAndSourceRefTypeAndSourceRefId(
+      NotificationType type,
+      NotificationSubType subType,
+      NotificationRefType sourceRefType,
+      Long sourceRefId);
 
   @Query(
       "SELECT COALESCE(SUM(n.recipientCount), 0) FROM NotificationLogEntity n"

@@ -1,5 +1,11 @@
 package org.smalltech.hashtaglocal_backend.service;
 
+import static org.smalltech.hashtaglocal_backend.config.NotificationConstants.ANALYTICS_SUFFIX_ADMIN;
+import static org.smalltech.hashtaglocal_backend.config.NotificationConstants.FCM_BATCH_SIZE;
+import static org.smalltech.hashtaglocal_backend.config.NotificationConstants.KEY_ISSUE_ID;
+import static org.smalltech.hashtaglocal_backend.config.NotificationConstants.KEY_NOTIFICATION_LOG_ID;
+import static org.smalltech.hashtaglocal_backend.config.NotificationConstants.KEY_TYPE;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.HashMap;
@@ -25,9 +31,6 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 @Slf4j
 public class BroadcastService {
-
-  // FCM rejects multicast calls with more than 500 tokens.
-  private static final int FCM_BATCH_SIZE = 500;
 
   private final UserAuthSessionRepository userAuthSessionRepository;
   private final NotificationLogRepository notificationLogRepository;
@@ -55,9 +58,9 @@ public class BroadcastService {
     }
 
     Map<String, String> payload = new HashMap<>();
-    payload.put("type", type.name());
+    payload.put(KEY_TYPE, type.name());
     if (type == NotificationType.ISSUE_DETAIL) {
-      payload.put("issueId", issueId);
+      payload.put(KEY_ISSUE_ID, issueId);
     }
 
     List<String> tokens = userAuthSessionRepository.findAllActiveNotificationTokens();
@@ -74,9 +77,9 @@ public class BroadcastService {
 
     // FCM data = business payload + notificationLogId so the device can report opens back
     Map<String, String> fcmData = new HashMap<>(payload);
-    fcmData.put("notificationLogId", logEntry.getId().toString());
+    fcmData.put(KEY_NOTIFICATION_LOG_ID, logEntry.getId().toString());
 
-    String fcmTag = type.name().toLowerCase() + "_admin";
+    String fcmTag = type.name().toLowerCase() + ANALYTICS_SUFFIX_ADMIN;
     int totalSuccess = 0;
     for (int i = 0; i < tokens.size(); i += FCM_BATCH_SIZE) {
       List<String> batch = tokens.subList(i, Math.min(i + FCM_BATCH_SIZE, tokens.size()));

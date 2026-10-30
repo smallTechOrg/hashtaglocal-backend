@@ -20,6 +20,10 @@ public interface BulletinRepository extends JpaRepository<BulletinEntity, Long> 
 
   Optional<BulletinEntity> findByQuizId(Long quizId);
 
+  /** The bulletin with its locality loaded in the same query (used off the request thread). */
+  @Query("SELECT b FROM BulletinEntity b JOIN FETCH b.locality WHERE b.id = :id")
+  Optional<BulletinEntity> findByIdWithLocality(@Param("id") Long id);
+
   @Query(
       value =
           "SELECT b.summary->>'text' FROM bulletins b"
