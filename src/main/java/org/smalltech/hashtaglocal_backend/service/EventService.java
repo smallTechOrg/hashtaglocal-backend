@@ -73,6 +73,25 @@ public class EventService {
   }
 
   /**
+   * Persists a single event together with a fresh {@code PENDING} approval row in one transaction,
+   * so the event lands in the admin review queue atomically.
+   *
+   * <p>Used by the scraper import: each event is saved independently, so a single failing row (a
+   * constraint violation, a bad field, etc.) rolls back only that event instead of the whole
+   * import batch.
+   */
+  @Transactional
+  public EventEntity saveWithPendingApproval(EventEntity event) {
+    EventEntity saved = eventRepository.save(event);
+    eventApprovalRepository.save(
+        EventApprovalEntity.builder()
+            .eventId(saved.getId())
+            .status(EventApprovalStatus.PENDING)
+            .build());
+    return saved;
+  }
+
+  /**
    * Returns all {@code APPROVED} events that have a resolved location, mapped to {@link EventData}.
    *
    * <p>Events that are still {@code PENDING} or have been {@code REJECTED} are excluded. Events
