@@ -160,8 +160,9 @@ bulletin:
   enabled: ${BULLETIN_ENABLED:true}
   notification:
     # Push a "Daily Bulletin" notification when a locality's bulletin post is published.
-    # Off by default: enable per environment after the notification_log migration is applied.
-    enabled: ${BULLETIN_NOTIFICATION_ENABLED:false}
+    # On by default. Run scripts/migrate-bulletin-notification.sql BEFORE deploying, otherwise the
+    # claim insert fails and no push is sent (logged as an error). Set to false to turn it off.
+    enabled: ${BULLETIN_NOTIFICATION_ENABLED:true}
   weather:
     # Daily at 8:00 AM. Use '-' to disable.
     cron: ${BULLETIN_WEATHER_CRON:0 0 8 * * *}

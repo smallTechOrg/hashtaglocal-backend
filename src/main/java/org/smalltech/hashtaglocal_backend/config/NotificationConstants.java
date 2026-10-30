@@ -14,5 +14,4 @@ public final class NotificationConstants {
   // FCM data payload keys read by the mobile app and written by several senders.
   public static final String KEY_TYPE = "type";
   public static final String KEY_NOTIFICATION_LOG_ID = "notificationLogId";
-  public static final String KEY_ISSUE_ID = "issueId";
 }

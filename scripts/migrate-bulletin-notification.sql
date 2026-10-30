@@ -1,5 +1,5 @@
 -- Migration: notification_log schema for the daily bulletin push
--- Run on staging first, BEFORE enabling BULLETIN_NOTIFICATION_ENABLED=true.
+-- Run on staging first, BEFORE deploying this feature: BULLETIN_NOTIFICATION_ENABLED defaults to true.
 -- (ddl-auto=update never widens check constraints or creates partial indexes.)
 --
 -- Access pattern this supports:

@@ -1,9 +1,5 @@
 package org.smalltech.hashtaglocal_backend.service;
 
-import static org.smalltech.hashtaglocal_backend.config.NotificationConstants.KEY_ISSUE_ID;
-import static org.smalltech.hashtaglocal_backend.config.NotificationConstants.KEY_NOTIFICATION_LOG_ID;
-import static org.smalltech.hashtaglocal_backend.config.NotificationConstants.KEY_TYPE;
-
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.HashMap;
@@ -33,10 +29,6 @@ import org.springframework.transaction.event.TransactionalEventListener;
 @RequiredArgsConstructor
 @Slf4j
 public class IssueNotificationListener {
-
-  private static final String KEY_STATUS = "status";
-  private static final String KEY_EVENT = "event";
-  private static final String ANALYTICS_SUFFIX_SYSTEM = "_system";
 
   private static final String TITLE = "Issue is live";
   private static final String BODY = "Your report has been approved and is now open.";
@@ -71,10 +63,10 @@ public class IssueNotificationListener {
 
     Map<String, String> payload =
         Map.of(
-            KEY_TYPE, "ISSUE_DETAIL",
-            KEY_ISSUE_ID, issueId.toString(),
-            KEY_STATUS, "OPEN",
-            KEY_EVENT, "STATUS_CHANGE");
+            "type", "ISSUE_DETAIL",
+            "issueId", issueId.toString(),
+            "status", "OPEN",
+            "event", "STATUS_CHANGE");
 
     NotificationLogEntity logEntry =
         notificationLogRepository.save(
@@ -90,15 +82,10 @@ public class IssueNotificationListener {
 
     // FCM data = business payload + notificationLogId so the device can report opens back
     Map<String, String> fcmData = new HashMap<>(payload);
-    fcmData.put(KEY_NOTIFICATION_LOG_ID, logEntry.getId().toString());
+    fcmData.put("notificationLogId", logEntry.getId().toString());
 
     MulticastResult result =
-        fcmSender.sendMulticast(
-            tokens,
-            TITLE,
-            BODY,
-            fcmData,
-            NotificationType.ISSUE_DETAIL.name().toLowerCase() + ANALYTICS_SUFFIX_SYSTEM);
+        fcmSender.sendMulticast(tokens, TITLE, BODY, fcmData, "issue_detail_system");
     result.staleTokens().forEach(userAuthSessionRepository::clearNotificationToken);
 
     logEntry.setRecipientCount(tokens.size());

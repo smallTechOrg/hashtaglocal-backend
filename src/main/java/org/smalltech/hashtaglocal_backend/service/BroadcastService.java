@@ -1,7 +1,6 @@
 package org.smalltech.hashtaglocal_backend.service;
 
 import static org.smalltech.hashtaglocal_backend.config.NotificationConstants.FCM_BATCH_SIZE;
-import static org.smalltech.hashtaglocal_backend.config.NotificationConstants.KEY_ISSUE_ID;
 import static org.smalltech.hashtaglocal_backend.config.NotificationConstants.KEY_NOTIFICATION_LOG_ID;
 import static org.smalltech.hashtaglocal_backend.config.NotificationConstants.KEY_TYPE;
 
@@ -61,7 +60,7 @@ public class BroadcastService {
     Map<String, String> payload = new HashMap<>();
     payload.put(KEY_TYPE, type.name());
     if (type == NotificationType.ISSUE_DETAIL) {
-      payload.put(KEY_ISSUE_ID, issueId);
+      payload.put("issueId", issueId);
     }
 
     List<String> tokens = userAuthSessionRepository.findAllActiveNotificationTokens();
