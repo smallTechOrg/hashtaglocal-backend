@@ -1,9 +1,12 @@
 package org.smalltech.hashtaglocal_backend.service;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -160,11 +163,35 @@ public class QuizAdminService {
 
   // -------------------------------------------------------------- bulletins
 
+  /**
+   * With a date, every saved-user locality gets a row: one with no bulletin that day (e.g. the
+   * weather fetch failed) comes back with id/weather/summary null instead of being left out.
+   */
   @Transactional(readOnly = true)
   public List<AdminBulletinData> listBulletins(Long localityId, LocalDate date) {
-    return bulletinsFor(localityId, date).stream()
-        .map(this::toBulletinData)
-        .collect(Collectors.toList());
+    List<AdminBulletinData> rows =
+        bulletinsFor(localityId, date).stream()
+            .map(this::toBulletinData)
+            .collect(Collectors.toCollection(ArrayList::new));
+    if (date == null) {
+      return rows;
+    }
+    Set<Long> covered =
+        rows.stream().map(AdminBulletinData::getLocalityId).collect(Collectors.toSet());
+    userRepository.findDistinctUserLocalities().stream()
+        .filter(l -> localityId == null || l.getId().equals(localityId))
+        .filter(l -> !covered.contains(l.getId()))
+        .map(
+            l ->
+                AdminBulletinData.builder()
+                    .localityId(l.getId())
+                    .localityName(l.getName())
+                    .hashtag(l.getHashtag())
+                    .date(date)
+                    .build())
+        .forEach(rows::add);
+    rows.sort(Comparator.comparing(AdminBulletinData::getLocalityId));
+    return rows;
   }
 
   /** Edits the AI weather summary and syncs the text of the linked BULLETIN feed post. */
