@@ -45,7 +45,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 public class BulletinNotificationListener {
 
   static final String TITLE_PREFIX = "Daily Bulletin — ";
-  static final String FALLBACK_BODY = "Today's weather update and quiz are ready.";
+  static final String FALLBACK_BODY = "Today's weather update is ready.";
   static final int MAX_BODY_LENGTH = 180;
 
   /** FCM {@code type} the mobile app routes on (the log's own type is AUTO_CHAT). */
