@@ -14,16 +14,22 @@ import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.locationtech.jts.geom.Coordinate;
+import org.locationtech.jts.geom.GeometryFactory;
+import org.locationtech.jts.geom.Point;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.smalltech.hashtaglocal_backend.entity.BulletinEntity;
 import org.smalltech.hashtaglocal_backend.entity.Locality;
+import org.smalltech.hashtaglocal_backend.entity.Location;
 import org.smalltech.hashtaglocal_backend.repository.BulletinRepository;
 import org.smalltech.hashtaglocal_backend.repository.FeedPostRepository;
 import org.smalltech.hashtaglocal_backend.repository.LocationRepository;
 import org.smalltech.hashtaglocal_backend.repository.PeriodicDataRepository;
 import org.smalltech.hashtaglocal_backend.repository.UserRepository;
 import org.smalltech.hashtaglocal_backend.service.weather.WeatherProvider;
+import org.smalltech.hashtaglocal_backend.service.weather.WeatherSnapshot;
 import org.springframework.mail.MailException;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
@@ -123,6 +129,58 @@ class BulletinGenerationServiceTest {
     BulletinGenerationService.GenerationResult result = service.generateForAllUserLocalities();
 
     assertEquals(1, result.getFailed());
+  }
+
+  @Test
+  void countsAndAlertsOnFallbackSummaries() {
+    Locality locality =
+        stubGeneration("satara", new GroqClient.WeatherSummary("Today: 21°C.", true));
+    when(userRepository.findDistinctUserLocalities()).thenReturn(List.of(locality));
+
+    BulletinGenerationService.GenerationResult result = service.generateForAllUserLocalities();
+
+    assertEquals(1, result.getGenerated());
+    assertEquals(1, result.getFallbackSummaries());
+    assertEquals(0, result.getFailed());
+
+    ArgumentCaptor<SimpleMailMessage> captor = ArgumentCaptor.forClass(SimpleMailMessage.class);
+    verify(mailSender).send(captor.capture());
+    SimpleMailMessage sent = captor.getValue();
+    assertEquals(
+        "#local bulletin: 1/1 localities got the fallback summary (" + result.getDate() + ")",
+        sent.getSubject());
+    assertTrue(sent.getText() != null && sent.getText().contains("satara"));
+  }
+
+  @Test
+  void aiSummaryIsNotCountedAsFallback() {
+    Locality locality =
+        stubGeneration("satara", new GroqClient.WeatherSummary("Grab a raincoat.", false));
+    when(userRepository.findDistinctUserLocalities()).thenReturn(List.of(locality));
+
+    BulletinGenerationService.GenerationResult result = service.generateForAllUserLocalities();
+
+    assertEquals(1, result.getGenerated());
+    assertEquals(0, result.getFallbackSummaries());
+    verify(mailSender, never()).send(any(SimpleMailMessage.class));
+  }
+
+  private Locality stubGeneration(String hashtag, GroqClient.WeatherSummary summary) {
+    Locality locality = Locality.builder().id(3L).hashtag(hashtag).name("Satara").build();
+    Point point = new GeometryFactory().createPoint(new Coordinate(74.0, 17.7));
+    when(periodicDataRepository.findByLocalityIdAndDateAndDataType(eq(3L), any(), eq("WEATHER")))
+        .thenReturn(Optional.empty());
+    when(locationRepository.findFirstByLocalityId(3L))
+        .thenReturn(Optional.of(Location.builder().point(point).build()));
+    when(weatherProvider.fetchDaily(17.7, 74.0))
+        .thenReturn(WeatherSnapshot.builder().source("OPEN_METEO").build());
+    when(periodicDataRepository.save(any())).thenReturn(mockPeriodicData());
+    when(bulletinRepository.findRecentWeatherSummaries(3L, 5)).thenReturn(List.of());
+    when(groqClient.generateWeatherSummary(eq("Satara"), any(), any())).thenReturn(summary);
+    when(bulletinRepository.findByLocalityIdAndDate(eq(3L), any())).thenReturn(Optional.empty());
+    when(bulletinRepository.save(any()))
+        .thenReturn(BulletinEntity.builder().id(9L).locality(locality).build());
+    return locality;
   }
 
   private org.smalltech.hashtaglocal_backend.entity.PeriodicDataEntity mockPeriodicData() {

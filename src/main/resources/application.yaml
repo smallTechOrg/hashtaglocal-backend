@@ -168,6 +168,8 @@ groq:
     key: ${GROQ_API_KEY:}
     url: ${GROQ_API_URL:https://api.groq.com/openai/v1/chat/completions}
     model: ${GROQ_MODEL:qwen/qwen3.8-27b}
+    # Spaces every Groq call: ~450 tokens per request stays under the 7000 tokens/minute limit.
+    requests-per-minute: ${GROQ_REQUESTS_PER_MINUTE:12}
 
 portalissue:
   enabled: ${PORTALISSUE_ENABLED:true}

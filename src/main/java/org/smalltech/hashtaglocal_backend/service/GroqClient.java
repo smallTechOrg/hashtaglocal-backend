@@ -7,8 +7,10 @@ import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 import org.smalltech.hashtaglocal_backend.service.weather.WeatherSnapshot;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 
 /**
@@ -16,6 +18,9 @@ import org.springframework.web.client.RestClient;
  * engaging weather summary and the quiz explanation. Both callers treat a failure as non-fatal —
  * methods return a fallback/empty string rather than throwing, so the daily job and admin quiz save
  * never block on Groq.
+ *
+ * <p>Requests are spaced to {@code groq.api.requests-per-minute} across all callers, and a 429 that
+ * still gets through is retried after the wait Groq asks for.
  *
  * <p>Prompt templates use {@code {{placeholder}}} syntax. The ops portal exposes them read-only via
  * {@code GET /admin/ai-prompts} so the team can review what is being sent to the model.
@@ -61,23 +66,36 @@ public class GroqClient {
 
   // ─────────────────────────────────────────────────────────────────────────
 
+  // A rate-limited request is retried after Groq's retry-after wait. A wait above the cap means a
+  // longer limit (e.g. tokens per day) was hit, so give up rather than hold the caller.
+  private static final int MAX_ATTEMPTS = 5;
+  private static final long MAX_RETRY_WAIT_SECONDS = 15;
+  private static final long DEFAULT_RETRY_WAIT_SECONDS = 5;
+
   private final RestClient restClient;
   private final ObjectMapper objectMapper;
   private final String apiKey;
   private final String url;
   private final String model;
+  private final long requestIntervalMillis;
+  private long nextRequestAtMillis;
+
+  /** Weather summary text; {@code fallback} is true for the plain line used when Groq failed. */
+  public record WeatherSummary(String text, boolean fallback) {}
 
   public GroqClient(
       RestClient.Builder restClientBuilder,
       ObjectMapper objectMapper,
       @Value("${groq.api.key:}") String apiKey,
       @Value("${groq.api.url:https://api.groq.com/openai/v1/chat/completions}") String url,
-      @Value("${groq.api.model:qwen/qwen3.8-27b}") String model) {
+      @Value("${groq.api.model:qwen/qwen3.8-27b}") String model,
+      @Value("${groq.api.requests-per-minute:12}") int requestsPerMinute) {
     this.restClient = restClientBuilder.build();
     this.objectMapper = objectMapper;
     this.apiKey = apiKey;
     this.url = url;
     this.model = model;
+    this.requestIntervalMillis = requestsPerMinute > 0 ? 60_000L / requestsPerMinute : 0;
   }
 
   /**
@@ -85,7 +103,7 @@ public class GroqClient {
    * Groq is unavailable. Pass the last N summaries for this locality so the model avoids repeating
    * them when conditions are similar across consecutive days.
    */
-  public String generateWeatherSummary(
+  public WeatherSummary generateWeatherSummary(
       String localityName, WeatherSnapshot weather, List<String> recentSummaries) {
     String prompt =
         WEATHER_SUMMARY_TEMPLATE
@@ -93,7 +111,9 @@ public class GroqClient {
             .replace("{{weatherData}}", describe(weather))
             .replace("{{recentSummaries}}", formatRecentSummaries(recentSummaries));
     String summary = complete(prompt);
-    return summary != null ? summary : fallbackSummary(weather);
+    return summary != null
+        ? new WeatherSummary(summary, false)
+        : new WeatherSummary(fallbackSummary(weather), true);
   }
 
   private String formatRecentSummaries(List<String> summaries) {
@@ -138,23 +158,72 @@ public class GroqClient {
               0.7,
               "max_tokens",
               200);
-      String raw =
-          restClient
-              .post()
-              .uri(url)
-              .header("Authorization", "Bearer " + apiKey)
-              .contentType(MediaType.APPLICATION_JSON)
-              .body(body)
-              .retrieve()
-              .body(String.class);
-      JsonNode content =
-          objectMapper.readTree(raw).path("choices").path(0).path("message").path("content");
-      String text = content.asText("").trim();
-      return text.isBlank() ? null : text;
+      for (int attempt = 1; ; attempt++) {
+        awaitRequestSlot();
+        try {
+          String raw =
+              restClient
+                  .post()
+                  .uri(url)
+                  .header("Authorization", "Bearer " + apiKey)
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .body(body)
+                  .retrieve()
+                  .body(String.class);
+          JsonNode content =
+              objectMapper.readTree(raw).path("choices").path(0).path("message").path("content");
+          String text = content.asText("").trim();
+          return text.isBlank() ? null : text;
+        } catch (HttpClientErrorException.TooManyRequests e) {
+          long waitSeconds = retryWaitSeconds(e.getResponseHeaders());
+          if (attempt >= MAX_ATTEMPTS || waitSeconds > MAX_RETRY_WAIT_SECONDS) {
+            throw e;
+          }
+          log.warn(
+              "Groq rate limited (attempt {}/{}); retrying in {}s",
+              attempt,
+              MAX_ATTEMPTS,
+              waitSeconds);
+          Thread.sleep(waitSeconds * 1000);
+        }
+      }
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      log.warn("Groq completion interrupted");
+      return null;
     } catch (Exception e) {
       log.warn("Groq completion failed: {}", e.getMessage());
       return null;
     }
+  }
+
+  /**
+   * Waits for this request's turn; the slot is reserved under the lock, the sleep is outside it.
+   */
+  private void awaitRequestSlot() throws InterruptedException {
+    long delayMillis = reserveRequestSlot();
+    if (delayMillis > 0) {
+      Thread.sleep(delayMillis);
+    }
+  }
+
+  private synchronized long reserveRequestSlot() {
+    long now = System.currentTimeMillis();
+    long slot = Math.max(now, nextRequestAtMillis);
+    nextRequestAtMillis = slot + requestIntervalMillis;
+    return slot - now;
+  }
+
+  static long retryWaitSeconds(HttpHeaders headers) {
+    String retryAfter = headers != null ? headers.getFirst(HttpHeaders.RETRY_AFTER) : null;
+    if (retryAfter != null) {
+      try {
+        return Math.max(0, Long.parseLong(retryAfter.trim()));
+      } catch (NumberFormatException e) {
+        log.debug("Unparseable Retry-After header: {}", retryAfter);
+      }
+    }
+    return DEFAULT_RETRY_WAIT_SECONDS;
   }
 
   private String fallbackSummary(WeatherSnapshot w) {

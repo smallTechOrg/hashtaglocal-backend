@@ -71,12 +71,20 @@ public class BulletinGenerationService {
     int skipped = 0;
     int failed = 0;
     List<String> failures = new ArrayList<>();
+    List<String> fallbacks = new ArrayList<>();
     for (Locality locality : localities) {
       try {
-        if (generateForLocality(locality, today)) {
-          generated++;
-        } else {
-          skipped++;
+        switch (generateForLocality(locality, today)) {
+          case GENERATED -> generated++;
+          case GENERATED_WITH_FALLBACK -> {
+            generated++;
+            fallbacks.add(locality.getHashtag());
+            log.warn(
+                "Bulletin for locality {} ({}) used the fallback summary",
+                locality.getId(),
+                locality.getHashtag());
+          }
+          case SKIPPED -> skipped++;
         }
         // Gentle pacing between external API calls (same approach as LocationMetadataUpdateJob).
         Thread.sleep(100);
@@ -95,8 +103,9 @@ public class BulletinGenerationService {
       }
     }
     log.info(
-        "Bulletin generation finished: {} generated, {} skipped, {} failed",
+        "Bulletin generation finished: {} generated ({} fallback summaries), {} skipped, {} failed",
         generated,
+        fallbacks.size(),
         skipped,
         failed);
     GenerationResult result =
@@ -106,18 +115,21 @@ public class BulletinGenerationService {
             .generated(generated)
             .skipped(skipped)
             .failed(failed)
+            .fallbackSummaries(fallbacks.size())
             .build();
-    if (failed > 0) {
-      sendFailureAlert(result, failures);
+    if (failed > 0 || !fallbacks.isEmpty()) {
+      sendFailureAlert(result, failures, fallbacks);
     }
     return result;
   }
 
   /**
-   * Best-effort admin email when one or more localities fail — the run itself already succeeded for
-   * everything it could, so a broken mail send here must never fail the job.
+   * Best-effort admin email when one or more localities fail or get the fallback summary — the run
+   * itself already succeeded for everything it could, so a broken mail send here must never fail
+   * the job.
    */
-  private void sendFailureAlert(GenerationResult result, List<String> failures) {
+  private void sendFailureAlert(
+      GenerationResult result, List<String> failures, List<String> fallbacks) {
     if (alertAdminEmail == null || alertAdminEmail.isBlank()) {
       log.warn("bulletin.alert.admin-email is not configured; skipping bulletin failure email");
       return;
@@ -128,29 +140,47 @@ public class BulletinGenerationService {
         message.setFrom(alertFromEmail);
       }
       message.setTo(alertAdminEmail);
+      List<String> problems = new ArrayList<>();
+      if (!failures.isEmpty()) {
+        problems.add(failures.size() + "/" + result.getTotalLocalities() + " localities failed");
+      }
+      if (!fallbacks.isEmpty()) {
+        problems.add(
+            fallbacks.size()
+                + "/"
+                + result.getTotalLocalities()
+                + " localities got the fallback summary");
+      }
       message.setSubject(
-          "#local bulletin: "
-              + result.getFailed()
-              + "/"
-              + result.getTotalLocalities()
-              + " localities failed ("
-              + result.getDate()
-              + ")");
+          "#local bulletin: " + String.join(", ", problems) + " (" + result.getDate() + ")");
+      String failureDetail =
+          failures.isEmpty()
+              ? ""
+              : "\n\nFailures:\n"
+                  + String.join("\n", failures)
+                  + "\n\nRe-run is idempotent: POST /admin/bulletin/generate";
+      String fallbackDetail =
+          fallbacks.isEmpty()
+              ? ""
+              : "\n\nFallback summaries (Groq failed, so the plain weather line was used). A re-run"
+                  + " does not replace these; edit them in the ops portal:\n"
+                  + String.join("\n", fallbacks);
       message.setText(
           "The daily bulletin weather run for "
               + result.getDate()
               + " had "
               + result.getFailed()
-              + " failure(s) out of "
+              + " failure(s) and "
+              + result.getFallbackSummaries()
+              + " fallback summary(ies) out of "
               + result.getTotalLocalities()
               + " localities ("
               + result.getGenerated()
               + " generated, "
               + result.getSkipped()
-              + " skipped).\n\n"
-              + "Failures:\n"
-              + String.join("\n", failures)
-              + "\n\nRe-run is idempotent: POST /admin/bulletin/generate");
+              + " skipped)."
+              + failureDetail
+              + fallbackDetail);
       mailSender.send(message);
       log.info("Bulletin failure alert emailed to {}", alertAdminEmail);
     } catch (Exception e) {
@@ -158,14 +188,14 @@ public class BulletinGenerationService {
     }
   }
 
-  /** Generates one locality's bulletin for {@code date}. Returns false if already covered. */
+  /** Generates one locality's bulletin for {@code date}. Returns SKIPPED if already covered. */
   @Transactional
-  public boolean generateForLocality(Locality locality, LocalDate date) {
+  public GenerationOutcome generateForLocality(Locality locality, LocalDate date) {
     if (periodicDataRepository
         .findByLocalityIdAndDateAndDataType(locality.getId(), date, DATA_TYPE_WEATHER)
         .isPresent()) {
       ensureFeedPost(locality, date);
-      return false;
+      return GenerationOutcome.SKIPPED;
     }
 
     double[] latLng = resolveCoordinates(locality);
@@ -184,8 +214,9 @@ public class BulletinGenerationService {
 
     List<String> recentSummaries =
         bulletinRepository.findRecentWeatherSummaries(locality.getId(), 5);
-    String summaryText =
+    GroqClient.WeatherSummary weatherSummary =
         groqClient.generateWeatherSummary(locality.getName(), weather, recentSummaries);
+    String summaryText = weatherSummary.text();
     Map<String, Object> summary = new HashMap<>();
     summary.put("text", summaryText);
 
@@ -199,7 +230,9 @@ public class BulletinGenerationService {
     bulletin = bulletinRepository.save(bulletin);
 
     publishFeedPost(locality, bulletin, summaryText);
-    return true;
+    return weatherSummary.fallback()
+        ? GenerationOutcome.GENERATED_WITH_FALLBACK
+        : GenerationOutcome.GENERATED;
   }
 
   /**
@@ -253,6 +286,12 @@ public class BulletinGenerationService {
             + ")");
   }
 
+  public enum GenerationOutcome {
+    GENERATED,
+    GENERATED_WITH_FALLBACK,
+    SKIPPED
+  }
+
   @Data
   @Builder
   public static class GenerationResult {
@@ -261,5 +300,6 @@ public class BulletinGenerationService {
     private int generated;
     private int skipped;
     private int failed;
+    private int fallbackSummaries;
   }
 }
