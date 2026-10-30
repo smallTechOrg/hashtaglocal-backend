@@ -20,7 +20,7 @@
     { "raw": "ivolunteerin",       "expected": "IVOLUNTEERIN", "description": "ivolunteerin lowercase" },
     { "raw": "mybharat.gov.in",    "expected": "MYBHARATGOVIN", "description": "MyBharat domain name with dots" },
     { "raw": "Twitter",            "expected": "TWITTER",       "description": "Twitter capitalised" },
-    { "raw": "unknown-portal-xyz", "expected": null,            "description": "Unknown portal maps to null" },
-    { "raw": null,                 "expected": null,            "description": "Null portal maps to null" }
+    { "raw": "unknown-portal-xyz", "expected": null,            "description": "Unknown portal is skipped (not saved)" },
+    { "raw": null,                 "expected": null,            "description": "Null portal is skipped (not saved)" }
   ]
 }

@@ -145,13 +145,23 @@ class EventImportServiceTest {
   @MethodSource("portalMappingCases")
   @DisplayName("Portal string correctly maps to EventPortalModel")
   void mapsPortalStringToEventPortalModel(String raw, String expected, String description) {
-    when(eventRepository.existsByNameAndStartTime(any(), any())).thenReturn(false);
+    // Lenient: the dedup lookup is only reached for recognised portals; unknown/null portals are
+    // skipped earlier, so this stub goes unused in those parameterised cases.
+    lenient().when(eventRepository.existsByNameAndStartTime(any(), any())).thenReturn(false);
 
     eventImportService.importFromScrapeResponse(
         List.of(dto("Test Event", "TREKANDPLOG", raw, START_TIME)));
 
-    EventPortalModel expectedPortal = expected != null ? EventPortalModel.valueOf(expected) : null;
-    assertEquals(expectedPortal, capturedSavedEvents().get(0).getPortal());
+    if (expected == null) {
+      // Unrecognised/null portals are skipped, not saved: portal is a NOT NULL column and the
+      // batch is bulk-inserted in one transaction, so letting a null portal through would roll
+      // back the whole import. See EventImportService#importFromScrapeResponse.
+      assertTrue(
+          capturedSavedEvents().isEmpty(),
+          "event with unrecognised portal '" + raw + "' should be skipped, not saved");
+    } else {
+      assertEquals(EventPortalModel.valueOf(expected), capturedSavedEvents().get(0).getPortal());
+    }
   }
 
   // ---------------------------------------------------------------------------

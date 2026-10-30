@@ -3,6 +3,7 @@ package org.smalltech.hashtaglocal_backend.service;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.smalltech.hashtaglocal_backend.dto.ScrapeEventDTO;
@@ -36,6 +37,18 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 public class EventImportService {
 
+  // Mirrors the one-time DB cleanup: UPDATE events SET link = regexp_replace(link,
+  // '&utm_[^&]*=[^&]*', '', 'g') WHERE link LIKE '%utm_%'. Applied to every new link
+  // before saving so freshly imported rows stay consistent with the cleaned-up ones.
+  // '&utm_...' only ever matched non-first params in that cleanup; freshly scraped links can
+  // have utm as the FIRST query param (e.g. "?utm_source=fb&id=1"), so the two patterns below
+  // handle promoting the following '&' to '?' (or dropping the '?' entirely if utm was the only
+  // param) before the shared '&utm_...' pattern strips the rest.
+  private static final Pattern LEADING_UTM_PARAM_PATTERN = Pattern.compile("\\?utm_[^&]*=[^&]*&");
+  private static final Pattern SOLE_LEADING_UTM_PARAM_PATTERN =
+      Pattern.compile("\\?utm_[^&]*=[^&]*$");
+  private static final Pattern UTM_PARAM_PATTERN = Pattern.compile("&utm_[^&]*=[^&]*");
+
   private final EventService eventService;
   private final EventRepository eventRepository;
   private final EventImageService eventImageService;
@@ -68,6 +81,14 @@ public class EventImportService {
         }
         if (dto.getImage() == null || dto.getImage().isBlank()) {
           log.debug("Skipping event '{}' — image is null or blank", dto.getName());
+          continue;
+        }
+        // fromString() returns null for portals it doesn't recognise. portal is a NOT NULL
+        // column, and toSave is bulk-inserted in one transaction, so letting a null portal
+        // through here would roll back — and silently drop — the entire import batch.
+        if (EventPortalModel.fromString(dto.getPortal()) == null) {
+          log.warn(
+              "Skipping event '{}' — unrecognized portal '{}'", dto.getName(), dto.getPortal());
           continue;
         }
         if (eventRepository.existsByNameAndStartTime(dto.getName(), dto.getStartTime())) {
@@ -121,9 +142,18 @@ public class EventImportService {
         .startTime(dto.getStartTime())
         .endTime(dto.getEndTime())
         .address(dto.getAddress())
-        .link(dto.getLink())
+        .link(stripUtmParams(dto.getLink()))
         .media(media)
         .build();
+  }
+
+  private String stripUtmParams(String link) {
+    if (link == null || link.isBlank()) {
+      return link;
+    }
+    String result = LEADING_UTM_PARAM_PATTERN.matcher(link).replaceFirst("?");
+    result = SOLE_LEADING_UTM_PARAM_PATTERN.matcher(result).replaceFirst("");
+    return UTM_PARAM_PATTERN.matcher(result).replaceAll("");
   }
 
   /**
