@@ -17,10 +17,10 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
 import org.hibernate.type.SqlTypes;
-import org.smalltech.hashtaglocal_backend.model.NotificationRefType;
 import org.smalltech.hashtaglocal_backend.model.NotificationSource;
 import org.smalltech.hashtaglocal_backend.model.NotificationSubType;
 import org.smalltech.hashtaglocal_backend.model.NotificationType;
+import org.smalltech.hashtaglocal_backend.model.SourceRefType;
 
 @Entity
 @Table(name = "notification_log")
@@ -41,7 +41,7 @@ public class NotificationLogEntity {
   // Polymorphic pointer to the triggering record — no FK by design (references different tables)
   @Enumerated(EnumType.STRING)
   @Column(length = 100)
-  private NotificationRefType sourceRefType;
+  private SourceRefType sourceRefType;
 
   private Long sourceRefId;
 

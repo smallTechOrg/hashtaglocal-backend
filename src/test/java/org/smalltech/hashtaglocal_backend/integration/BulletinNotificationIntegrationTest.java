@@ -33,9 +33,9 @@ import org.smalltech.hashtaglocal_backend.entity.UserAuthSessionEntity;
 import org.smalltech.hashtaglocal_backend.entity.UserEntity;
 import org.smalltech.hashtaglocal_backend.infra.notification.FcmSender;
 import org.smalltech.hashtaglocal_backend.infra.notification.FcmSender.MulticastResult;
-import org.smalltech.hashtaglocal_backend.model.NotificationRefType;
 import org.smalltech.hashtaglocal_backend.model.NotificationSubType;
 import org.smalltech.hashtaglocal_backend.model.NotificationType;
+import org.smalltech.hashtaglocal_backend.model.SourceRefType;
 import org.smalltech.hashtaglocal_backend.repository.BulletinRepository;
 import org.smalltech.hashtaglocal_backend.repository.LocalityRepository;
 import org.smalltech.hashtaglocal_backend.repository.LocationRepository;
@@ -160,7 +160,7 @@ class BulletinNotificationIntegrationTest {
             notificationLogRepository.existsByTypeAndSubTypeAndSourceRefTypeAndSourceRefId(
                 NotificationType.AUTO_CHAT,
                 NotificationSubType.CHAT_BULLETIN,
-                NotificationRefType.BULLETIN,
+                SourceRefType.BULLETIN,
                 bulletinId));
     // ... and the counts are written once sending finishes.
     awaitTrue(() -> logRow(bulletinId).getSuccessCount() != null);
@@ -198,7 +198,7 @@ class BulletinNotificationIntegrationTest {
             notificationLogRepository.saveAndFlush(
                 NotificationLogEntity.builder()
                     .source(row.getSource())
-                    .sourceRefType(NotificationRefType.BULLETIN)
+                    .sourceRefType(SourceRefType.BULLETIN)
                     .sourceRefId(bulletinId)
                     .type(NotificationType.AUTO_CHAT)
                     .subType(NotificationSubType.CHAT_BULLETIN)
@@ -224,7 +224,7 @@ class BulletinNotificationIntegrationTest {
         notificationLogRepository.existsByTypeAndSubTypeAndSourceRefTypeAndSourceRefId(
             NotificationType.AUTO_CHAT,
             NotificationSubType.CHAT_BULLETIN,
-            NotificationRefType.BULLETIN,
+            SourceRefType.BULLETIN,
             bulletinId));
     verify(fcmSender, times(0))
         .sendMulticast(anyList(), anyString(), anyString(), anyMap(), anyString());
@@ -250,7 +250,7 @@ class BulletinNotificationIntegrationTest {
   private NotificationLogEntity logRow(Long bulletinId) {
     return notificationLogRepository.findAll().stream()
         .filter(n -> bulletinId.equals(n.getSourceRefId()))
-        .filter(n -> n.getSourceRefType() == NotificationRefType.BULLETIN)
+        .filter(n -> n.getSourceRefType() == SourceRefType.BULLETIN)
         .findFirst()
         .orElseThrow();
   }
@@ -259,7 +259,7 @@ class BulletinNotificationIntegrationTest {
     return (int)
         notificationLogRepository.findAll().stream()
             .filter(n -> bulletinId.equals(n.getSourceRefId()))
-            .filter(n -> n.getSourceRefType() == NotificationRefType.BULLETIN)
+            .filter(n -> n.getSourceRefType() == SourceRefType.BULLETIN)
             .count();
   }
 
