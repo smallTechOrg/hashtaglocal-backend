@@ -15,6 +15,7 @@ import org.smalltech.hashtaglocal_backend.infra.notification.FcmSender.Multicast
 import org.smalltech.hashtaglocal_backend.model.IssueStatusModel;
 import org.smalltech.hashtaglocal_backend.model.NotificationSource;
 import org.smalltech.hashtaglocal_backend.model.NotificationType;
+import org.smalltech.hashtaglocal_backend.model.SourceRefType;
 import org.smalltech.hashtaglocal_backend.repository.IssueActionRepository;
 import org.smalltech.hashtaglocal_backend.repository.NotificationLogRepository;
 import org.smalltech.hashtaglocal_backend.repository.UserAuthSessionRepository;
@@ -71,7 +72,7 @@ public class IssueNotificationListener {
         notificationLogRepository.save(
             NotificationLogEntity.builder()
                 .source(NotificationSource.SYSTEM)
-                .sourceRefType("ISSUE_UPDATE")
+                .sourceRefType(SourceRefType.ISSUE)
                 .sourceRefId(issueId)
                 .type(NotificationType.ISSUE_DETAIL)
                 .title(TITLE)

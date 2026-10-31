@@ -13,12 +13,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.locationtech.jts.geom.Point;
 import org.smalltech.hashtaglocal_backend.entity.BulletinEntity;
-import org.smalltech.hashtaglocal_backend.entity.FeedPostContentEntity;
 import org.smalltech.hashtaglocal_backend.entity.Locality;
 import org.smalltech.hashtaglocal_backend.entity.PeriodicDataEntity;
-import org.smalltech.hashtaglocal_backend.model.FeedPostKind;
 import org.smalltech.hashtaglocal_backend.repository.BulletinRepository;
-import org.smalltech.hashtaglocal_backend.repository.FeedPostRepository;
 import org.smalltech.hashtaglocal_backend.repository.LocationRepository;
 import org.smalltech.hashtaglocal_backend.repository.PeriodicDataRepository;
 import org.smalltech.hashtaglocal_backend.repository.UserRepository;
@@ -41,6 +38,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 public class BulletinGenerationService {
 
+  private static final ZoneId IST = ZoneId.of("Asia/Kolkata");
   private static final String TYPE_DAILY = "DAILY";
   private static final String DATA_TYPE_WEATHER = "WEATHER";
 
@@ -48,7 +46,6 @@ public class BulletinGenerationService {
   private final LocationRepository locationRepository;
   private final PeriodicDataRepository periodicDataRepository;
   private final BulletinRepository bulletinRepository;
-  private final FeedPostRepository feedPostRepository;
   private final WeatherProvider weatherProvider;
   private final GroqClient groqClient;
   private final FeedService feedService;
@@ -62,7 +59,7 @@ public class BulletinGenerationService {
 
   /** Runs the daily generation over all saved-user localities. Returns a per-run summary. */
   public GenerationResult generateForAllUserLocalities() {
-    LocalDate today = LocalDate.now(ZoneId.of("Asia/Kolkata"));
+    LocalDate today = LocalDate.now(IST);
     List<Locality> localities = userRepository.findDistinctUserLocalities();
     log.info(
         "Bulletin generation started for {} user localities (date={})", localities.size(), today);
@@ -229,7 +226,7 @@ public class BulletinGenerationService {
     bulletin.setSummary(summary);
     bulletin = bulletinRepository.save(bulletin);
 
-    publishFeedPost(locality, bulletin, summaryText);
+    feedService.publishBulletinPost(locality, bulletin, summaryText);
     return weatherSummary.fallback()
         ? GenerationOutcome.GENERATED_WITH_FALLBACK
         : GenerationOutcome.GENERATED;
@@ -243,25 +240,11 @@ public class BulletinGenerationService {
     bulletinRepository
         .findByLocalityIdAndDate(locality.getId(), date)
         .filter(b -> b.getPeriodicData() != null)
-        .filter(b -> !feedPostRepository.existsBulletinPost(b.getId()))
         .ifPresent(
             b -> {
               Object text = b.getSummary() != null ? b.getSummary().get("text") : null;
-              publishFeedPost(locality, b, text != null ? text.toString() : null);
+              feedService.publishBulletinPost(locality, b, text != null ? text.toString() : null);
             });
-  }
-
-  private void publishFeedPost(Locality locality, BulletinEntity bulletin, String summaryText) {
-    if (feedPostRepository.existsBulletinPost(bulletin.getId())) {
-      return;
-    }
-    FeedPostContentEntity content =
-        FeedPostContentEntity.builder()
-            .bulletin(bulletin)
-            .title("Daily Bulletin — " + locality.getName())
-            .text(summaryText)
-            .build();
-    feedService.createSystemPost(locality, FeedPostKind.BULLETIN, content);
   }
 
   /** Locality coordinates: boundary centroid, else any saved location inside it. */
