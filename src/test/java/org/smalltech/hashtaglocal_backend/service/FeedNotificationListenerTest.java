@@ -15,7 +15,6 @@ import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.LocalDate;
-import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -23,6 +22,7 @@ import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.smalltech.hashtaglocal_backend.config.NotificationConstants;
+import org.smalltech.hashtaglocal_backend.config.TimeConstants;
 import org.smalltech.hashtaglocal_backend.entity.BulletinEntity;
 import org.smalltech.hashtaglocal_backend.entity.Locality;
 import org.smalltech.hashtaglocal_backend.entity.NotificationLogEntity;
@@ -71,7 +71,7 @@ class FeedNotificationListenerTest {
     return BulletinEntity.builder()
         .id(7L)
         .locality(locality)
-        .date(LocalDate.now(ZoneId.of("Asia/Kolkata")))
+        .date(LocalDate.now(TimeConstants.APP_ZONE))
         .summary(Map.of("text", "Light showers expected after 5 PM. Carry an umbrella."))
         .build();
   }
@@ -169,7 +169,7 @@ class FeedNotificationListenerTest {
   @Test
   void oldBulletinSendsNothingAndWritesNoLogRow() {
     BulletinEntity old = bulletin();
-    old.setDate(LocalDate.now(ZoneId.of("Asia/Kolkata")).minusDays(1));
+    old.setDate(LocalDate.now(TimeConstants.APP_ZONE).minusDays(1));
     when(bulletinRepository.findByIdWithLocality(7L)).thenReturn(Optional.of(old));
 
     listener.notifyLocality(7L);

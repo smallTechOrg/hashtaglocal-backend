@@ -1,7 +1,8 @@
 package org.smalltech.hashtaglocal_backend.service;
 
+import static org.smalltech.hashtaglocal_backend.config.TimeConstants.APP_ZONE;
+
 import java.time.LocalDate;
-import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -38,7 +39,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 public class BulletinGenerationService {
 
-  private static final ZoneId IST = ZoneId.of("Asia/Kolkata");
   private static final String TYPE_DAILY = "DAILY";
   private static final String DATA_TYPE_WEATHER = "WEATHER";
 
@@ -59,7 +59,7 @@ public class BulletinGenerationService {
 
   /** Runs the daily generation over all saved-user localities. Returns a per-run summary. */
   public GenerationResult generateForAllUserLocalities() {
-    LocalDate today = LocalDate.now(IST);
+    LocalDate today = LocalDate.now(APP_ZONE);
     List<Locality> localities = userRepository.findDistinctUserLocalities();
     log.info(
         "Bulletin generation started for {} user localities (date={})", localities.size(), today);

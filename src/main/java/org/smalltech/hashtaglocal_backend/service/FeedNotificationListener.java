@@ -3,11 +3,11 @@ package org.smalltech.hashtaglocal_backend.service;
 import static org.smalltech.hashtaglocal_backend.config.NotificationConstants.FCM_BATCH_SIZE;
 import static org.smalltech.hashtaglocal_backend.config.NotificationConstants.MAX_BODY_LENGTH;
 import static org.smalltech.hashtaglocal_backend.config.NotificationConstants.MAX_TITLE_LENGTH;
+import static org.smalltech.hashtaglocal_backend.config.TimeConstants.APP_ZONE;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.LocalDate;
-import java.time.ZoneId;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -49,8 +49,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 @RequiredArgsConstructor
 @Slf4j
 public class FeedNotificationListener {
-
-  private static final ZoneId IST = ZoneId.of("Asia/Kolkata");
 
   static final String TITLE_PREFIX = "Daily Bulletin — ";
 
@@ -110,7 +108,7 @@ public class FeedNotificationListener {
     }
 
     // Only today's bulletin is worth a push: a late repair run must not notify about an old one.
-    if (!bulletin.getDate().equals(LocalDate.now(IST))) {
+    if (!bulletin.getDate().equals(LocalDate.now(APP_ZONE))) {
       log.info(
           "Bulletin {} is dated {}, not today — no notification", bulletinId, bulletin.getDate());
       return;

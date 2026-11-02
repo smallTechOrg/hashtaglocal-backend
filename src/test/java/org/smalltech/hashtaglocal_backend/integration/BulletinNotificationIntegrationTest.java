@@ -12,9 +12,9 @@ import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.smalltech.hashtaglocal_backend.config.TimeConstants.APP_ZONE;
 
 import java.time.LocalDate;
-import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import java.util.function.BooleanSupplier;
@@ -63,7 +63,6 @@ import org.springframework.test.context.ActiveProfiles;
 @ActiveProfiles("test")
 class BulletinNotificationIntegrationTest {
 
-  private static final ZoneId IST = ZoneId.of("Asia/Kolkata");
   private static final String SUMMARY = "Light showers expected after 5 PM. Carry an umbrella.";
 
   @Autowired private BulletinGenerationService generationService;
@@ -145,7 +144,7 @@ class BulletinNotificationIntegrationTest {
 
   @Test
   void todaysBulletinSendsExactlyOnePush_withDocumentedAccessPattern() throws Exception {
-    LocalDate today = LocalDate.now(IST);
+    LocalDate today = LocalDate.now(APP_ZONE);
 
     assertEquals(
         BulletinGenerationService.GenerationOutcome.GENERATED,
@@ -211,7 +210,7 @@ class BulletinNotificationIntegrationTest {
 
   @Test
   void oldBulletinDoesNotSendAPush() throws Exception {
-    LocalDate yesterday = LocalDate.now(IST).minusDays(1);
+    LocalDate yesterday = LocalDate.now(APP_ZONE).minusDays(1);
 
     generationService.generateForLocality(locality, yesterday);
     Thread.sleep(1500);
@@ -236,7 +235,7 @@ class BulletinNotificationIntegrationTest {
     jdbc.update(
         "UPDATE user_auth_sessions SET notification_token = NULL WHERE notification_token = ?",
         token);
-    LocalDate today = LocalDate.now(IST);
+    LocalDate today = LocalDate.now(APP_ZONE);
 
     generationService.generateForLocality(locality, today);
     Thread.sleep(1500);
