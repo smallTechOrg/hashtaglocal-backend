@@ -168,7 +168,7 @@ class BulletinNotificationIntegrationTest {
 
     NotificationLogEntity row = logRow(bulletinId);
     assertEquals("Daily Bulletin — " + locality.getName(), row.getTitle());
-    assertEquals("Light showers expected after 5 PM.", row.getBody());
+    assertEquals(SUMMARY, row.getBody());
     assertEquals(1, row.getRecipientCount());
     assertEquals(1, row.getSuccessCount());
 
@@ -176,7 +176,7 @@ class BulletinNotificationIntegrationTest {
         .sendMulticast(
             eq(List.of(token)),
             eq("Daily Bulletin — " + locality.getName()),
-            eq("Light showers expected after 5 PM."),
+            eq(SUMMARY),
             org.mockito.ArgumentMatchers.argThat(
                 data ->
                     "BULLETIN".equals(data.get("type"))

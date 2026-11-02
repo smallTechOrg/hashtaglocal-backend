@@ -87,32 +87,38 @@ class FeedNotificationListenerTest {
   }
 
   @Test
-  void buildBody_takesFirstSentence() {
+  void buildBody_keepsWholeSummaryWithinLimit() {
     assertEquals(
-        "Light showers expected after 5 PM.",
+        "Light showers expected after 5 PM. Carry an umbrella.",
         FeedNotificationListener.buildBody(
             "Light showers expected after 5 PM. Carry an umbrella."));
   }
 
   @Test
-  void buildBody_noSentenceBreakUsesWholeText() {
-    assertEquals("Sunny all day", FeedNotificationListener.buildBody("Sunny all day"));
+  void buildBody_stripsSurroundingWhitespace() {
+    assertEquals("Sunny all day", FeedNotificationListener.buildBody("  Sunny all day \n"));
   }
 
   @Test
-  void buildBody_doesNotSplitOnDecimal() {
-    assertEquals(
-        "Highs of 28.5°C today.",
-        FeedNotificationListener.buildBody("Highs of 28.5°C today. Stay hydrated."));
+  void buildBody_exactlyAtLimitIsUntouched() {
+    String text = "x".repeat(NotificationConstants.MAX_BODY_LENGTH);
+    assertEquals(text, FeedNotificationListener.buildBody(text));
   }
 
   @Test
-  void buildBody_longSentenceCutsOnWordWithEllipsis() {
+  void buildBody_longTextCutsOnWordWithEllipsis() {
     String body = FeedNotificationListener.buildBody("word, ".repeat(40));
     assertTrue(body.endsWith("…"));
-    assertTrue(body.length() <= NotificationConstants.MAX_BODY_LENGTH + 1);
+    assertTrue(body.length() <= NotificationConstants.MAX_BODY_LENGTH);
     assertTrue(body.startsWith("word, word"));
     assertEquals("word", body.substring(body.length() - 5, body.length() - 1));
+  }
+
+  @Test
+  void buildBody_longTextWithoutSpacesHardCuts() {
+    String body = FeedNotificationListener.buildBody("x".repeat(400));
+    assertTrue(body.endsWith("…"));
+    assertEquals(NotificationConstants.MAX_BODY_LENGTH, body.length());
   }
 
   // ---- buildTitle ----
@@ -239,7 +245,7 @@ class FeedNotificationListenerTest {
         .sendMulticast(
             anyList(),
             eq("Daily Bulletin — Koramangala"),
-            eq("Light showers expected after 5 PM."),
+            eq("Light showers expected after 5 PM. Carry an umbrella."),
             anyMap(),
             eq("bulletin_system"));
     verify(sessionRepository, org.mockito.Mockito.times(2)).clearNotificationToken("stale");

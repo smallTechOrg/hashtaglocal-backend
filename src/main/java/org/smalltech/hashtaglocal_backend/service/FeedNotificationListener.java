@@ -233,35 +233,26 @@ public class FeedNotificationListener {
     return title.substring(0, MAX_TITLE_LENGTH - 1) + "…";
   }
 
-  /** First sentence of the summary, capped at {@code MAX_BODY_LENGTH} on a word boundary. */
+  /**
+   * The whole summary, truncated at a word boundary with an ellipsis when it exceeds {@code
+   * MAX_BODY_LENGTH}. Deliberately not cut at the first sentence: sentences can be far too long or
+   * far too short to make a useful push body on their own.
+   */
   static String buildBody(String text) {
     if (text == null || text.isBlank()) {
       return FALLBACK_SUMMARY;
     }
     String trimmed = text.strip();
-    int end = firstSentenceEnd(trimmed);
-    String sentence = end < 0 ? trimmed : trimmed.substring(0, end + 1);
-    if (sentence.length() <= MAX_BODY_LENGTH) {
-      return sentence;
+    if (trimmed.length() <= MAX_BODY_LENGTH) {
+      return trimmed;
     }
-    int cut = sentence.lastIndexOf(' ', MAX_BODY_LENGTH);
-    String head = sentence.substring(0, cut > 0 ? cut : MAX_BODY_LENGTH);
+    int cut = trimmed.lastIndexOf(' ', MAX_BODY_LENGTH - 1);
+    String head = trimmed.substring(0, cut > 0 ? cut : MAX_BODY_LENGTH - 1);
     int last = head.length();
     while (last > 0 && " ,;:-".indexOf(head.charAt(last - 1)) >= 0) {
       last--;
     }
     return head.substring(0, last) + "…";
-  }
-
-  /** Index of the terminator ('.', '!' or '?' followed by a space) ending the first sentence. */
-  private static int firstSentenceEnd(String s) {
-    for (int i = 0; i < s.length() - 1; i++) {
-      char c = s.charAt(i);
-      if ((c == '.' || c == '!' || c == '?') && s.charAt(i + 1) == ' ') {
-        return i;
-      }
-    }
-    return -1;
   }
 
   private String toJson(Map<String, String> map) {
