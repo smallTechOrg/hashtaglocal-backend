@@ -38,6 +38,16 @@ public interface UserAuthSessionRepository extends JpaRepository<UserAuthSession
           + "WHERE s.isActive = true AND s.notificationToken IS NOT NULL")
   List<String> findAllActiveNotificationTokens();
 
+  /**
+   * Returns distinct non-null notification tokens of active sessions whose user's saved location
+   * belongs to the locality — the audience of that locality's bulletin.
+   */
+  @Query(
+      "SELECT DISTINCT s.notificationToken FROM UserAuthSessionEntity s "
+          + "WHERE s.isActive = true AND s.notificationToken IS NOT NULL "
+          + "AND s.user.location.locality.id = :localityId")
+  List<String> findActiveNotificationTokensByLocalityId(@Param("localityId") Long localityId);
+
   /** Nulls out a stale notification token reported back by FCM. */
   @Modifying
   @Query(

@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.smalltech.hashtaglocal_backend.entity.*;
 import org.smalltech.hashtaglocal_backend.event.FeedPostCreatedEvent;
+import org.smalltech.hashtaglocal_backend.event.FeedPublishedEvent;
 import org.smalltech.hashtaglocal_backend.exception.DownstreamServiceException;
 import org.smalltech.hashtaglocal_backend.model.FeedPostKind;
 import org.smalltech.hashtaglocal_backend.model.FeedPostStatus;
@@ -82,6 +83,26 @@ public class FeedService {
    * Create a system-authored post (no human author, no AI gate) — e.g. the auto issue-ref.
    * Publishes directly. See FEED_DESIGN.md §1.2 / §8.
    */
+  /**
+   * Publishes a bulletin's daily BULLETIN post to its locality's feed and announces it with a
+   * {@link FeedPublishedEvent}. Idempotent: a bulletin gets at most one post, so a re-run neither
+   * duplicates the post nor re-raises the event.
+   */
+  @Transactional
+  public void publishBulletinPost(Locality locality, BulletinEntity bulletin, String summaryText) {
+    if (feedPostRepository.existsBulletinPost(bulletin.getId())) {
+      return;
+    }
+    FeedPostContentEntity content =
+        FeedPostContentEntity.builder()
+            .bulletin(bulletin)
+            .title("Daily Bulletin — " + locality.getName())
+            .text(summaryText)
+            .build();
+    createSystemPost(locality, FeedPostKind.BULLETIN, content);
+    eventPublisher.publishEvent(new FeedPublishedEvent(bulletin));
+  }
+
   @Transactional
   public FeedPostEntity createSystemPost(
       Locality locality, FeedPostKind kind, FeedPostContentEntity content) {

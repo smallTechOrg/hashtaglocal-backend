@@ -1,5 +1,7 @@
 package org.smalltech.hashtaglocal_backend.job;
 
+import static org.smalltech.hashtaglocal_backend.config.TimeConstants.APP_ZONE_ID;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.smalltech.hashtaglocal_backend.service.BulletinGenerationService;
@@ -24,7 +26,7 @@ public class BulletinWeatherJob {
   @Value("${bulletin.weather.cron:0 0 8 * * *}")
   private String scheduleExpression;
 
-  @Scheduled(cron = "${bulletin.weather.cron:0 0 8 * * *}", zone = "Asia/Kolkata")
+  @Scheduled(cron = "${bulletin.weather.cron:0 0 8 * * *}", zone = APP_ZONE_ID)
   public void run() {
     log.info("Bulletin weather job started (cron={})", scheduleExpression);
     bulletinGenerationService.generateForAllUserLocalities();
