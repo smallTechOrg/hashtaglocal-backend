@@ -9,6 +9,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -24,7 +25,6 @@ import org.smalltech.hashtaglocal_backend.entity.BulletinEntity;
 import org.smalltech.hashtaglocal_backend.entity.Locality;
 import org.smalltech.hashtaglocal_backend.entity.Location;
 import org.smalltech.hashtaglocal_backend.repository.BulletinRepository;
-import org.smalltech.hashtaglocal_backend.repository.FeedPostRepository;
 import org.smalltech.hashtaglocal_backend.repository.LocationRepository;
 import org.smalltech.hashtaglocal_backend.repository.PeriodicDataRepository;
 import org.smalltech.hashtaglocal_backend.repository.UserRepository;
@@ -47,7 +47,6 @@ class BulletinGenerationServiceTest {
   @Mock private LocationRepository locationRepository;
   @Mock private PeriodicDataRepository periodicDataRepository;
   @Mock private BulletinRepository bulletinRepository;
-  @Mock private FeedPostRepository feedPostRepository;
   @Mock private WeatherProvider weatherProvider;
   @Mock private GroqClient groqClient;
   @Mock private FeedService feedService;
@@ -63,7 +62,6 @@ class BulletinGenerationServiceTest {
             locationRepository,
             periodicDataRepository,
             bulletinRepository,
-            feedPostRepository,
             weatherProvider,
             groqClient,
             feedService,
@@ -179,7 +177,8 @@ class BulletinGenerationServiceTest {
     when(groqClient.generateWeatherSummary(eq("Satara"), any(), any())).thenReturn(summary);
     when(bulletinRepository.findByLocalityIdAndDate(eq(3L), any())).thenReturn(Optional.empty());
     when(bulletinRepository.save(any()))
-        .thenReturn(BulletinEntity.builder().id(9L).locality(locality).build());
+        .thenReturn(
+            BulletinEntity.builder().id(9L).locality(locality).date(LocalDate.now()).build());
     return locality;
   }
 

@@ -1,5 +1,7 @@
 package org.smalltech.hashtaglocal_backend.service;
 
+import static org.smalltech.hashtaglocal_backend.config.NotificationConstants.FCM_BATCH_SIZE;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.HashMap;
@@ -26,8 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 public class BroadcastService {
 
-  // FCM rejects multicast calls with more than 500 tokens.
-  private static final int FCM_BATCH_SIZE = 500;
+  private static final String ANALYTICS_SUFFIX_ADMIN = "_admin";
 
   private final UserAuthSessionRepository userAuthSessionRepository;
   private final NotificationLogRepository notificationLogRepository;
@@ -76,7 +77,7 @@ public class BroadcastService {
     Map<String, String> fcmData = new HashMap<>(payload);
     fcmData.put("notificationLogId", logEntry.getId().toString());
 
-    String fcmTag = type.name().toLowerCase() + "_admin";
+    String fcmTag = type.name().toLowerCase() + ANALYTICS_SUFFIX_ADMIN;
     int totalSuccess = 0;
     for (int i = 0; i < tokens.size(); i += FCM_BATCH_SIZE) {
       List<String> batch = tokens.subList(i, Math.min(i + FCM_BATCH_SIZE, tokens.size()));
