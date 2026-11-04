@@ -7,7 +7,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.smalltech.hashtaglocal_backend.entity.FeedModerationEntity;
 import org.smalltech.hashtaglocal_backend.entity.FeedPostContentEntity;
 import org.smalltech.hashtaglocal_backend.entity.FeedPostEntity;
-import org.smalltech.hashtaglocal_backend.event.FeedPublishedEvent;
 import org.smalltech.hashtaglocal_backend.model.AdminModerationAction;
 import org.smalltech.hashtaglocal_backend.model.AiCategory;
 import org.smalltech.hashtaglocal_backend.model.AiVerdict;
@@ -15,8 +14,8 @@ import org.smalltech.hashtaglocal_backend.model.FeedPostStatus;
 import org.smalltech.hashtaglocal_backend.repository.FeedPostRepository;
 import org.smalltech.hashtaglocal_backend.service.FeedModerationClient;
 import org.smalltech.hashtaglocal_backend.service.FeedModerationService;
+import org.smalltech.hashtaglocal_backend.service.FeedService;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -33,7 +32,7 @@ public class FeedModerationServiceImpl implements FeedModerationService {
 
   private final FeedPostRepository feedPostRepository;
   private final FeedModerationClient moderationClient;
-  private final ApplicationEventPublisher eventPublisher;
+  private final FeedService feedService;
 
   /**
    * Self lookup (via provider to avoid a constructor cycle) so the sweeper dispatches each post
@@ -85,11 +84,6 @@ public class FeedModerationServiceImpl implements FeedModerationService {
 
   private void transition(
       FeedPostEntity post, FeedPostStatus newStatus, FeedModerationClient.ModerationResult r) {
-    post.setStatus(newStatus);
-    if (newStatus == FeedPostStatus.PUBLISHED && post.getPublishedAt() == null) {
-      post.setPublishedAt(LocalDateTime.now());
-    }
-
     FeedModerationEntity mod = post.getModeration();
     if (mod == null) {
       mod =
@@ -108,11 +102,13 @@ public class FeedModerationServiceImpl implements FeedModerationService {
       mod.setAiReason("Moderation unavailable — flagged for human review");
     }
     mod.setEvaluatedAt(LocalDateTime.now());
-    feedPostRepository.save(post);
 
-    // The post just went live (it was PENDING_AI) — announce it to the locality after commit.
+    // The post just went live (it was PENDING_AI); FeedService saves it and sends the push.
     if (newStatus == FeedPostStatus.PUBLISHED) {
-      eventPublisher.publishEvent(new FeedPublishedEvent(post.getId()));
+      feedService.markPublished(post);
+    } else {
+      post.setStatus(newStatus);
+      feedPostRepository.save(post);
     }
   }
 

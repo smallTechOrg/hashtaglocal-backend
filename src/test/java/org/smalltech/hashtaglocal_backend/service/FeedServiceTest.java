@@ -198,4 +198,35 @@ class FeedServiceTest {
     assertTrue(event.needsScrape());
     assertTrue(event.needsModeration());
   }
+
+  @Test
+  void markPublishedMakesPendingPostLiveAndAnnouncesIt() {
+    FeedPostEntity post =
+        FeedPostEntity.builder().id(42L).locality(locality).status(FeedPostStatus.FLAGGED).build();
+
+    feedService.markPublished(post);
+
+    assertEquals(FeedPostStatus.PUBLISHED, post.getStatus());
+    assertNotNull(post.getPublishedAt());
+    verify(feedPostRepository).save(post);
+    verify(eventPublisher).publishEvent(new FeedPublishedEvent(post.getId()));
+  }
+
+  @Test
+  void markPublishedOnLivePostSavesWithoutAnnouncingAgain() {
+    java.time.LocalDateTime firstPublished = java.time.LocalDateTime.of(2026, 1, 1, 9, 0);
+    FeedPostEntity post =
+        FeedPostEntity.builder()
+            .id(42L)
+            .locality(locality)
+            .status(FeedPostStatus.PUBLISHED)
+            .publishedAt(firstPublished)
+            .build();
+
+    feedService.markPublished(post);
+
+    assertEquals(firstPublished, post.getPublishedAt());
+    verify(feedPostRepository).save(post);
+    verifyNoInteractions(eventPublisher);
+  }
 }

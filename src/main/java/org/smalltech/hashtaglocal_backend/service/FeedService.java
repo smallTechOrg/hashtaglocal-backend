@@ -124,6 +124,24 @@ public class FeedService {
     return saved;
   }
 
+  /**
+   * Makes an existing post live (after AI moderation or an admin approval) and triggers a push.
+   * Every push for a post goes out from this class. A post that is already live is only saved,
+   * so it isn't pushed twice.
+   */
+  @Transactional
+  public void markPublished(FeedPostEntity post) {
+    boolean wasPublished = post.getStatus() == FeedPostStatus.PUBLISHED;
+    post.setStatus(FeedPostStatus.PUBLISHED);
+    if (post.getPublishedAt() == null) {
+      post.setPublishedAt(java.time.LocalDateTime.now());
+    }
+    feedPostRepository.save(post);
+    if (!wasPublished) {
+      eventPublisher.publishEvent(new FeedPublishedEvent(post.getId()));
+    }
+  }
+
   private Locality resolveLocality(UserEntity author, CreateFeedPostRequest req, boolean isAdmin) {
     boolean hasHashtag = req.getHashtag() != null && !req.getHashtag().isBlank();
 
