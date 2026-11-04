@@ -52,24 +52,20 @@ dependencies {
     testAnnotationProcessor("org.projectlombok:lombok")
 }
 
+// Variables from .env (if present), minus any already set in the real environment, which wins.
+val dotEnv: Map<String, String> =
+    file(".env").takeIf { it.exists() }?.readLines().orEmpty()
+        .filter { it.isNotBlank() && !it.trim().startsWith("#") }
+        .map { it.split("=", limit = 2) }
+        .filter { it.size == 2 }
+        .associate { (key, value) -> key.trim() to value.trim() }
+        .filterKeys { !System.getenv().containsKey(it) }
+
 tasks.withType<Test> {
 	useJUnitPlatform()
 
-    // Load .env (if present) so tests can read TEST_DB_* etc. Real env vars take precedence.
-    val envFile = file(".env")
-    if (envFile.exists()) {
-        envFile.readLines()
-            .filter { it.isNotBlank() && !it.trim().startsWith("#") }
-            .forEach { line ->
-                val parts = line.split("=", limit = 2)
-                if (parts.size == 2) {
-                    val key = parts[0].trim()
-                    if (!System.getenv().containsKey(key)) {
-                        environment(key, parts[1].trim())
-                    }
-                }
-            }
-    }
+    // So tests can read TEST_DB_* etc.
+    environment(dotEnv)
 }
 
 
@@ -94,24 +90,7 @@ tasks.named("check") {
 tasks.named<org.springframework.boot.gradle.tasks.run.BootRun>("bootRun") {
     // Load environment variables from system (includes shell export commands)
     environment(System.getenv())
-    
-    // Optionally load from .env file if it exists
-    val envFile = file(".env")
-    if (envFile.exists()) {
-        envFile.readLines()
-            .filter { it.isNotBlank() && !it.trim().startsWith("#") }
-            .forEach { line ->
-                val parts = line.split("=", limit = 2)
-                if (parts.size == 2) {
-                    val key = parts[0].trim()
-                    val value = parts[1].trim()
-                    // Only set if not already in system environment
-                    if (!System.getenv().containsKey(key)) {
-                        environment(key, value)
-                    }
-                }
-            }
-    }
+    environment(dotEnv)
 }
 
 
