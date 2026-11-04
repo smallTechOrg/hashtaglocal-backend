@@ -12,7 +12,9 @@ public enum SourceRefType {
   /** {@code bulletins.id} */
   BULLETIN("bulletins"),
   /** {@code issues.id} */
-  ISSUE("issues");
+  ISSUE("issues"),
+  /** {@code feed_posts.id} */
+  FEED_POST("feed_posts");
 
   private final String tableName;
 

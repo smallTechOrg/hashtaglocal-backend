@@ -16,6 +16,7 @@ import org.smalltech.hashtaglocal_backend.entity.FeedPostEntity;
 import org.smalltech.hashtaglocal_backend.entity.Locality;
 import org.smalltech.hashtaglocal_backend.entity.UserEntity;
 import org.smalltech.hashtaglocal_backend.event.FeedPostCreatedEvent;
+import org.smalltech.hashtaglocal_backend.event.FeedPublishedEvent;
 import org.smalltech.hashtaglocal_backend.exception.DownstreamServiceException;
 import org.smalltech.hashtaglocal_backend.model.FeedPostKind;
 import org.smalltech.hashtaglocal_backend.model.FeedPostStatus;
@@ -125,8 +126,9 @@ class FeedServiceTest {
 
     assertEquals(FeedPostStatus.PUBLISHED, post.getStatus());
     assertNotNull(post.getPublishedAt());
-    // Admin text post needs neither scrape nor moderation → no side-effect event.
-    verifyNoInteractions(eventPublisher);
+    // Admin text post needs neither scrape nor moderation, but is live → announced to the chat.
+    verify(eventPublisher).publishEvent(new FeedPublishedEvent(99L));
+    verifyNoMoreInteractions(eventPublisher);
   }
 
   @Test
@@ -157,7 +159,8 @@ class FeedServiceTest {
     assertEquals(locality, post.getLocality());
     // Admin is trusted → published directly even on the located path.
     assertEquals(FeedPostStatus.PUBLISHED, post.getStatus());
-    verifyNoInteractions(eventPublisher);
+    verify(eventPublisher).publishEvent(new FeedPublishedEvent(99L));
+    verifyNoMoreInteractions(eventPublisher);
   }
 
   @Test

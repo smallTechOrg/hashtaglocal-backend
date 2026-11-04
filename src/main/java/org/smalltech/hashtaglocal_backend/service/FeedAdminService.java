@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import org.smalltech.hashtaglocal_backend.entity.FeedModerationEntity;
 import org.smalltech.hashtaglocal_backend.entity.FeedPostEntity;
 import org.smalltech.hashtaglocal_backend.entity.UserEntity;
+import org.smalltech.hashtaglocal_backend.event.FeedPublishedEvent;
 import org.smalltech.hashtaglocal_backend.exception.DownstreamServiceException;
 import org.smalltech.hashtaglocal_backend.mapper.FeedPostMapper;
 import org.smalltech.hashtaglocal_backend.model.AdminModerationAction;
@@ -14,6 +15,7 @@ import org.smalltech.hashtaglocal_backend.model.response.ModerationQueueData;
 import org.smalltech.hashtaglocal_backend.repository.FeedPostRepository;
 import org.smalltech.hashtaglocal_backend.repository.UserRepository;
 import org.smalltech.hashtaglocal_backend.util.FeedCursor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -30,6 +32,7 @@ public class FeedAdminService {
   private final FeedPostRepository feedPostRepository;
   private final UserRepository userRepository;
   private final FeedPostMapper feedPostMapper;
+  private final ApplicationEventPublisher eventPublisher;
 
   @Transactional(readOnly = true)
   public ModerationQueueData queue(String verdict, String cursorToken, Integer limit) {
@@ -68,12 +71,18 @@ public class FeedAdminService {
   @Transactional
   public void approve(Long postId, Long adminUserId, String note) {
     FeedPostEntity post = requirePost(postId);
+    boolean wasPublished = post.getStatus() == FeedPostStatus.PUBLISHED;
     post.setStatus(FeedPostStatus.PUBLISHED);
     if (post.getPublishedAt() == null) {
       post.setPublishedAt(LocalDateTime.now());
     }
     recordAdminAction(post, adminUserId, AdminModerationAction.APPROVED, note);
     feedPostRepository.save(post);
+    // Send a push if this approval made the post live. A restored post that was live before
+    // won't be pushed twice, because the listener skips posts it already notified.
+    if (!wasPublished) {
+      eventPublisher.publishEvent(new FeedPublishedEvent(post.getId()));
+    }
   }
 
   @Transactional

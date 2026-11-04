@@ -1,13 +1,7 @@
 package org.smalltech.hashtaglocal_backend.event;
 
-import org.smalltech.hashtaglocal_backend.entity.BulletinEntity;
-
 /**
- * Published after a locality's feed post has been created (and committed). Today the post is a
- * BULLETIN, so the event carries the bulletin; the bulletin notification listener sends the "Daily
- * Bulletin" push in response.
- *
- * <p>The listener runs on another thread after commit, so it only reads {@code bulletin.getId()}
- * and reloads the bulletin (with its locality) itself rather than trusting this detached object.
+ * Fired when a chat post goes live, so the locality's users get a push notification. It only
+ * carries the post id; the listener loads the post itself because it runs later on another thread.
  */
-public record FeedPublishedEvent(BulletinEntity bulletin) {}
+public record FeedPublishedEvent(Long feedPostId) {}
