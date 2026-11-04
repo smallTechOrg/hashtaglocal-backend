@@ -9,11 +9,9 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.LocalDate;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.smalltech.hashtaglocal_backend.entity.BulletinEntity;
@@ -327,10 +325,23 @@ public class FeedNotificationListener {
         issue.getId(),
         resolved ? NotificationSubType.CHAT_ISSUE_RESOLVED : NotificationSubType.CHAT_ISSUE,
         post.getLocality().getId(),
-        // The update's author is the reporter (the feed post itself is authored by the system).
-        issue.getUserEntity(),
+        issueExcludedUser(post, issue, resolved),
         buildIssueMessage(post, issue, resolved),
         ISSUE_ANALYTICS_LABEL);
+  }
+
+  /**
+   * Who is left out of an issue push. A post someone shared by hand leaves out only that person. A
+   * system post on approval leaves out the reporter, who already got "Issue is live"
+   * (IssueNotificationListener). Nobody else tells the reporter about a resolution, so that push
+   * goes to them too.
+   */
+  private static UserEntity issueExcludedUser(
+      FeedPostEntity post, IssueEntity issue, boolean resolved) {
+    if (post.getAuthor() != null) {
+      return post.getAuthor();
+    }
+    return resolved ? null : issue.getUserEntity();
   }
 
   private PushMessage buildIssueMessage(FeedPostEntity post, IssueEntity issue, boolean resolved) {
@@ -404,18 +415,11 @@ public class FeedNotificationListener {
 
   /** The locality's devices, minus those of {@code excludedUser} (the post/update's author). */
   private List<String> recipients(Long localityId, UserEntity excludedUser) {
-    List<String> tokens =
-        userAuthSessionRepository.findActiveNotificationTokensByLocalityId(localityId);
-    if (excludedUser == null || tokens.isEmpty()) {
-      return tokens;
+    if (excludedUser == null) {
+      return userAuthSessionRepository.findActiveNotificationTokensByLocalityId(localityId);
     }
-    Set<String> excluded =
-        new HashSet<>(
-            userAuthSessionRepository.findActiveNotificationTokensByUserId(excludedUser.getId()));
-    if (excluded.isEmpty()) {
-      return tokens;
-    }
-    return tokens.stream().filter(t -> !excluded.contains(t)).toList();
+    return userAuthSessionRepository.findActiveNotificationTokensByLocalityIdExcludingUser(
+        localityId, excludedUser.getId());
   }
 
   private static String localityName(Locality locality) {

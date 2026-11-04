@@ -342,10 +342,8 @@ class FeedNotificationListenerTest {
     UserEntity alice = UserEntity.builder().id(3L).username("alice").build();
     when(feedPostRepository.findByIdForNotification(42L))
         .thenReturn(Optional.of(textPost(alice, "Water supply is back on 5th main")));
-    when(sessionRepository.findActiveNotificationTokensByLocalityId(1L))
-        .thenReturn(List.of("alice-phone", "t2", "t3"));
-    when(sessionRepository.findActiveNotificationTokensByUserId(3L))
-        .thenReturn(List.of("alice-phone"));
+    when(sessionRepository.findActiveNotificationTokensByLocalityIdExcludingUser(1L, 3L))
+        .thenReturn(List.of("t2", "t3"));
     stubSend();
 
     listener.notifyPost(42L);
@@ -381,10 +379,8 @@ class FeedNotificationListenerTest {
   void openedIssueIsPushedAsIssueUpdateWithoutTheReporter() {
     when(feedPostRepository.findByIdForNotification(43L))
         .thenReturn(Optional.of(issuePost(IssueStatusModel.OPEN)));
-    when(sessionRepository.findActiveNotificationTokensByLocalityId(1L))
-        .thenReturn(List.of("ravi-phone", "t2"));
-    when(sessionRepository.findActiveNotificationTokensByUserId(8L))
-        .thenReturn(List.of("ravi-phone"));
+    when(sessionRepository.findActiveNotificationTokensByLocalityIdExcludingUser(1L, 8L))
+        .thenReturn(List.of("t2"));
     stubSend();
 
     listener.notifyPost(43L);
@@ -416,23 +412,27 @@ class FeedNotificationListenerTest {
 
   @Test
   @SuppressWarnings("unchecked")
-  void resolvedIssueIsPushedAsIssueResolved() {
+  void resolvedIssueIsPushedAsIssueResolvedIncludingTheReporter() {
     when(feedPostRepository.findByIdForNotification(43L))
         .thenReturn(Optional.of(issuePost(IssueStatusModel.RESOLVED)));
-    when(sessionRepository.findActiveNotificationTokensByLocalityId(1L)).thenReturn(List.of("t2"));
+    when(sessionRepository.findActiveNotificationTokensByLocalityId(1L))
+        .thenReturn(List.of("ravi-phone", "t2"));
     stubSend();
 
     listener.notifyPost(43L);
 
+    org.mockito.ArgumentCaptor<List<String>> tokens =
+        org.mockito.ArgumentCaptor.forClass(List.class);
     org.mockito.ArgumentCaptor<Map<String, String>> data =
         org.mockito.ArgumentCaptor.forClass(Map.class);
     verify(fcmSender)
         .sendMulticast(
-            anyList(),
+            tokens.capture(),
             eq("Issue resolved in Koramangala"),
             eq("Pothole near the bus stop"),
             data.capture(),
             anyString());
+    assertEquals(List.of("ravi-phone", "t2"), tokens.getValue());
     assertEquals("RESOLVED", data.getValue().get("status"));
     org.mockito.ArgumentCaptor<NotificationLogEntity> row =
         org.mockito.ArgumentCaptor.forClass(NotificationLogEntity.class);
@@ -440,6 +440,25 @@ class FeedNotificationListenerTest {
     assertEquals(NotificationSubType.CHAT_ISSUE_RESOLVED, row.getValue().getSubType());
     assertEquals(SourceRefType.ISSUE, row.getValue().getSourceRefType());
     assertEquals(5L, row.getValue().getSourceRefId());
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void sharedIssuePostLeavesOutOnlyTheSharer() {
+    FeedPostEntity post = issuePost(IssueStatusModel.OPEN);
+    post.setAuthor(UserEntity.builder().id(9L).username("asha").build());
+    when(feedPostRepository.findByIdForNotification(43L)).thenReturn(Optional.of(post));
+    when(sessionRepository.findActiveNotificationTokensByLocalityIdExcludingUser(1L, 9L))
+        .thenReturn(List.of("ravi-phone", "t2"));
+    stubSend();
+
+    listener.notifyPost(43L);
+
+    org.mockito.ArgumentCaptor<List<String>> tokens =
+        org.mockito.ArgumentCaptor.forClass(List.class);
+    verify(fcmSender)
+        .sendMulticast(tokens.capture(), anyString(), anyString(), anyMap(), anyString());
+    assertEquals(List.of("ravi-phone", "t2"), tokens.getValue());
   }
 
   @Test
