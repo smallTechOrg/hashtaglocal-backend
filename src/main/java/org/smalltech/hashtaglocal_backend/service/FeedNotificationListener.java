@@ -277,8 +277,8 @@ public class FeedNotificationListener {
   }
 
   /**
-   * The full push text for a chat post, e.g. "alice: hello" or "ravi shared a link: {title}".
-   * Admin posts show just the text, with no name. Returns null when there is nothing to show.
+   * The full push text for a chat post, e.g. "alice: hello" or "ravi shared a link: {title}". Admin
+   * posts show just the text, with no name. Returns null when there is nothing to show.
    */
   static String buildChatText(FeedPostEntity post) {
     FeedPostContentEntity c = post.getContent();

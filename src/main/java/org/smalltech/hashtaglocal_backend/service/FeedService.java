@@ -126,8 +126,8 @@ public class FeedService {
 
   /**
    * Makes an existing post live (after AI moderation or an admin approval) and triggers a push.
-   * Every push for a post goes out from this class. A post that is already live is only saved,
-   * so it isn't pushed twice.
+   * Every push for a post goes out from this class. A post that is already live is only saved, so
+   * it isn't pushed twice.
    */
   @Transactional
   public void markPublished(FeedPostEntity post) {
