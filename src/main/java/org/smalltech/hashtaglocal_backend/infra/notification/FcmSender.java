@@ -25,6 +25,12 @@ public class FcmSender {
 
   private static final Logger log = LoggerFactory.getLogger(FcmSender.class);
 
+  /**
+   * The high-importance channel the mobile app creates (utils/notificationTray.ts). Without it,
+   * Android puts background pushes on its low-importance fallback channel: no heads-up popup.
+   */
+  private static final String ANDROID_CHANNEL_ID = "default";
+
   private final FirebaseMessaging firebaseMessaging;
 
   @Autowired
@@ -62,6 +68,7 @@ public class FcmSender {
                     .setPriority(AndroidConfig.Priority.HIGH)
                     .setNotification(
                         AndroidNotification.builder()
+                            .setChannelId(ANDROID_CHANNEL_ID)
                             .setIcon("ic_notification")
                             .setColor("#256D1B")
                             .build())
@@ -106,6 +113,7 @@ public class FcmSender {
                     .setPriority(AndroidConfig.Priority.HIGH)
                     .setNotification(
                         AndroidNotification.builder()
+                            .setChannelId(ANDROID_CHANNEL_ID)
                             .setIcon("ic_notification")
                             .setColor("#256D1B")
                             .build())
