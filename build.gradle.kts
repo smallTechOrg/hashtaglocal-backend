@@ -54,6 +54,22 @@ dependencies {
 
 tasks.withType<Test> {
 	useJUnitPlatform()
+
+    // Load .env (if present) so tests can read TEST_DB_* etc. Real env vars take precedence.
+    val envFile = file(".env")
+    if (envFile.exists()) {
+        envFile.readLines()
+            .filter { it.isNotBlank() && !it.trim().startsWith("#") }
+            .forEach { line ->
+                val parts = line.split("=", limit = 2)
+                if (parts.size == 2) {
+                    val key = parts[0].trim()
+                    if (!System.getenv().containsKey(key)) {
+                        environment(key, parts[1].trim())
+                    }
+                }
+            }
+    }
 }
 
 
