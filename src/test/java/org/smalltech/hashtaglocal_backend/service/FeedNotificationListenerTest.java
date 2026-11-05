@@ -1,7 +1,6 @@
 package org.smalltech.hashtaglocal_backend.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -21,7 +20,6 @@ import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.smalltech.hashtaglocal_backend.config.NotificationConstants;
 import org.smalltech.hashtaglocal_backend.config.TimeConstants;
 import org.smalltech.hashtaglocal_backend.entity.BulletinEntity;
 import org.smalltech.hashtaglocal_backend.entity.FeedPostContentEntity;
@@ -38,11 +36,11 @@ import org.smalltech.hashtaglocal_backend.model.IssueStatusModel;
 import org.smalltech.hashtaglocal_backend.model.NotificationSubType;
 import org.smalltech.hashtaglocal_backend.model.NotificationType;
 import org.smalltech.hashtaglocal_backend.model.SourceRefType;
-import org.smalltech.hashtaglocal_backend.model.UserRole;
 import org.smalltech.hashtaglocal_backend.repository.BulletinRepository;
 import org.smalltech.hashtaglocal_backend.repository.FeedPostRepository;
 import org.smalltech.hashtaglocal_backend.repository.NotificationLogRepository;
 import org.smalltech.hashtaglocal_backend.repository.UserAuthSessionRepository;
+import org.smalltech.hashtaglocal_backend.util.NotificationUtils;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -89,66 +87,6 @@ class FeedNotificationListenerTest {
         .date(LocalDate.now(TimeConstants.APP_ZONE))
         .summary(Map.of("text", "Light showers expected after 5 PM. Carry an umbrella."))
         .build();
-  }
-
-  // ---- buildBody ----
-
-  @Test
-  void buildBody_blankFallsBack() {
-    assertEquals(
-        FeedNotificationListener.FALLBACK_SUMMARY, FeedNotificationListener.buildBody(null));
-    assertEquals(
-        FeedNotificationListener.FALLBACK_SUMMARY, FeedNotificationListener.buildBody("  "));
-  }
-
-  @Test
-  void buildBody_keepsWholeSummaryWithinLimit() {
-    assertEquals(
-        "Light showers expected after 5 PM. Carry an umbrella.",
-        FeedNotificationListener.buildBody(
-            "Light showers expected after 5 PM. Carry an umbrella."));
-  }
-
-  @Test
-  void buildBody_stripsSurroundingWhitespace() {
-    assertEquals("Sunny all day", FeedNotificationListener.buildBody("  Sunny all day \n"));
-  }
-
-  @Test
-  void buildBody_exactlyAtLimitIsUntouched() {
-    String text = "x".repeat(NotificationConstants.MAX_BODY_LENGTH);
-    assertEquals(text, FeedNotificationListener.buildBody(text));
-  }
-
-  @Test
-  void buildBody_longTextCutsOnWordWithEllipsis() {
-    String body = FeedNotificationListener.buildBody("word, ".repeat(40));
-    assertTrue(body.endsWith("…"));
-    assertTrue(body.length() <= NotificationConstants.MAX_BODY_LENGTH);
-    assertTrue(body.startsWith("word, word"));
-    assertEquals("word", body.substring(body.length() - 5, body.length() - 1));
-  }
-
-  @Test
-  void buildBody_longTextWithoutSpacesHardCuts() {
-    String body = FeedNotificationListener.buildBody("x".repeat(400));
-    assertTrue(body.endsWith("…"));
-    assertEquals(NotificationConstants.MAX_BODY_LENGTH, body.length());
-  }
-
-  // ---- buildTitle ----
-
-  @Test
-  void buildTitle_prefixesLocalityName() {
-    assertEquals(
-        "Daily Bulletin — Koramangala", FeedNotificationListener.buildTitle("Koramangala"));
-  }
-
-  @Test
-  void buildTitle_cutsOverlongNameToTitleLimit() {
-    String title = FeedNotificationListener.buildTitle("x".repeat(1000));
-    assertEquals(NotificationConstants.MAX_TITLE_LENGTH, title.length());
-    assertTrue(title.endsWith("…"));
   }
 
   // ---- notifyLocality ----
@@ -212,7 +150,7 @@ class FeedNotificationListenerTest {
         .sendMulticast(
             anyList(),
             eq("Daily Bulletin — Koramangala"),
-            eq(FeedNotificationListener.FALLBACK_SUMMARY),
+            eq(NotificationUtils.FALLBACK_SUMMARY),
             anyMap(),
             anyString());
   }
@@ -397,7 +335,7 @@ class FeedNotificationListenerTest {
             data.capture(),
             eq("issue_update_system"));
     assertEquals(List.of("t2"), tokens.getValue());
-    assertEquals("ISSUE_UPDATE", data.getValue().get("type"));
+    assertEquals("ISSUE_DETAIL", data.getValue().get("type"));
     assertEquals("5", data.getValue().get("issueId"));
     assertEquals("OPEN", data.getValue().get("status"));
 
@@ -480,23 +418,6 @@ class FeedNotificationListenerTest {
   }
 
   @Test
-  void issueBodyIsCutAt230AndFallsBackWhenEmpty() {
-    assertEquals(
-        FeedNotificationListener.FALLBACK_ISSUE_BODY,
-        FeedNotificationListener.shorten(
-            null,
-            FeedNotificationListener.FALLBACK_ISSUE_BODY,
-            FeedNotificationListener.CHAT_MAX_BODY_LENGTH));
-    String body =
-        FeedNotificationListener.shorten(
-            "Garbage not collected on 5th Main for 3 days ".repeat(10),
-            FeedNotificationListener.FALLBACK_ISSUE_BODY,
-            FeedNotificationListener.CHAT_MAX_BODY_LENGTH);
-    assertTrue(body.length() <= 230);
-    assertTrue(body.endsWith("…"));
-  }
-
-  @Test
   void chatPostAlreadyNotifiedIsSkipped() {
     when(feedPostRepository.findByIdForNotification(42L))
         .thenReturn(Optional.of(textPost(null, "hello")));
@@ -564,72 +485,5 @@ class FeedNotificationListenerTest {
             anyString(),
             anyMap(),
             eq("bulletin_system"));
-  }
-
-  @Test
-  void chatTitleIsTheLocalityName() {
-    assertEquals("Koramangala", FeedNotificationListener.buildChatTitle(chatLocality()));
-  }
-
-  @Test
-  void adminPostSendsTextWithoutAuthorName() {
-    UserEntity admin = UserEntity.builder().id(2L).username("root").role(UserRole.ADMIN).build();
-    assertEquals(
-        "Ward office closed on Monday",
-        FeedNotificationListener.buildChatText(textPost(admin, "Ward office closed on Monday")));
-  }
-
-  @Test
-  void linkWithTitleNamesIt() {
-    FeedPostEntity post = linkPost("Metro line 3 opens next week");
-    assertEquals(
-        "ravi shared a link: Metro line 3 opens next week",
-        FeedNotificationListener.buildChatText(post));
-  }
-
-  @Test
-  void linkWithoutTitleYet() {
-    assertEquals("ravi shared a link", FeedNotificationListener.buildChatText(linkPost(null)));
-  }
-
-  @Test
-  void chatBodyIsCutAt230OnAWord() {
-    String body =
-        FeedNotificationListener.shorten(
-            "ravi: " + "power cut again ".repeat(30),
-            FeedNotificationListener.FALLBACK_CHAT_BODY,
-            FeedNotificationListener.CHAT_MAX_BODY_LENGTH);
-    assertTrue(body.length() <= 230);
-    assertTrue(body.length() > NotificationConstants.MAX_BODY_LENGTH);
-    assertTrue(body.endsWith("again…") || body.endsWith("cut…") || body.endsWith("power…"));
-  }
-
-  private FeedPostEntity linkPost(String title) {
-    FeedPostEntity post =
-        FeedPostEntity.builder()
-            .id(45L)
-            .locality(chatLocality())
-            .author(UserEntity.builder().id(8L).username("ravi").build())
-            .kind(FeedPostKind.LINK)
-            .status(FeedPostStatus.PUBLISHED)
-            .build();
-    post.setContent(
-        FeedPostContentEntity.builder()
-            .post(post)
-            .url("https://example.com/metro")
-            .title(title)
-            .build());
-    return post;
-  }
-
-  @Test
-  void authorlessPostWithoutTextFallsBack() {
-    FeedPostEntity post = textPost(null, null);
-    assertEquals(
-        FeedNotificationListener.FALLBACK_CHAT_BODY,
-        FeedNotificationListener.shorten(
-            FeedNotificationListener.buildChatText(post),
-            FeedNotificationListener.FALLBACK_CHAT_BODY,
-            FeedNotificationListener.CHAT_MAX_BODY_LENGTH));
   }
 }
