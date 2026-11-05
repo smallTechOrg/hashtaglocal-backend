@@ -2,7 +2,6 @@ package org.smalltech.hashtaglocal_backend.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
@@ -13,6 +12,7 @@ import org.smalltech.hashtaglocal_backend.event.IssueStatusChangedEvent;
 import org.smalltech.hashtaglocal_backend.infra.notification.FcmSender;
 import org.smalltech.hashtaglocal_backend.infra.notification.FcmSender.MulticastResult;
 import org.smalltech.hashtaglocal_backend.model.IssueStatusModel;
+import org.smalltech.hashtaglocal_backend.model.NotificationData;
 import org.smalltech.hashtaglocal_backend.model.NotificationSource;
 import org.smalltech.hashtaglocal_backend.model.NotificationType;
 import org.smalltech.hashtaglocal_backend.model.SourceRefType;
@@ -61,12 +61,13 @@ public class IssueNotificationListener {
       return;
     }
 
-    Map<String, String> payload =
-        Map.of(
-            "type", "ISSUE_DETAIL",
-            "issueId", issueId.toString(),
-            "status", "OPEN",
-            "event", "STATUS_CHANGE");
+    NotificationData data =
+        NotificationData.builder()
+            .type(NotificationData.Type.ISSUE_DETAIL)
+            .issueId(issueId)
+            .status(IssueStatusModel.OPEN)
+            .event(NotificationData.IssueEvent.STATUS_CHANGE)
+            .build();
 
     NotificationLogEntity logEntry =
         notificationLogRepository.save(
@@ -77,12 +78,11 @@ public class IssueNotificationListener {
                 .type(NotificationType.ISSUE_DETAIL)
                 .title(TITLE)
                 .body(BODY)
-                .payload(toJson(payload))
+                .payload(toJson(data.toMap()))
                 .build());
 
     // FCM data = business payload + notificationLogId so the device can report opens back
-    Map<String, String> fcmData = new HashMap<>(payload);
-    fcmData.put("notificationLogId", logEntry.getId().toString());
+    Map<String, String> fcmData = data.withNotificationLogId(logEntry.getId()).toMap();
 
     MulticastResult result =
         fcmSender.sendMulticast(tokens, TITLE, BODY, fcmData, "issue_detail_system");

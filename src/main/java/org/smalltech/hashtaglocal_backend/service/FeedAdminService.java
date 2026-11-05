@@ -30,6 +30,7 @@ public class FeedAdminService {
   private final FeedPostRepository feedPostRepository;
   private final UserRepository userRepository;
   private final FeedPostMapper feedPostMapper;
+  private final FeedService feedService;
 
   @Transactional(readOnly = true)
   public ModerationQueueData queue(String verdict, String cursorToken, Integer limit) {
@@ -68,12 +69,10 @@ public class FeedAdminService {
   @Transactional
   public void approve(Long postId, Long adminUserId, String note) {
     FeedPostEntity post = requirePost(postId);
-    post.setStatus(FeedPostStatus.PUBLISHED);
-    if (post.getPublishedAt() == null) {
-      post.setPublishedAt(LocalDateTime.now());
-    }
     recordAdminAction(post, adminUserId, AdminModerationAction.APPROVED, note);
-    feedPostRepository.save(post);
+    // Sends a push if this approval made the post live. A restored post that was live before
+    // won't be pushed twice, because the listener skips posts it already notified.
+    feedService.markPublished(post);
   }
 
   @Transactional

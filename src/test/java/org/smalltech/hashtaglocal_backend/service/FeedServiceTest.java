@@ -16,6 +16,7 @@ import org.smalltech.hashtaglocal_backend.entity.FeedPostEntity;
 import org.smalltech.hashtaglocal_backend.entity.Locality;
 import org.smalltech.hashtaglocal_backend.entity.UserEntity;
 import org.smalltech.hashtaglocal_backend.event.FeedPostCreatedEvent;
+import org.smalltech.hashtaglocal_backend.event.FeedPublishedEvent;
 import org.smalltech.hashtaglocal_backend.exception.DownstreamServiceException;
 import org.smalltech.hashtaglocal_backend.model.FeedPostKind;
 import org.smalltech.hashtaglocal_backend.model.FeedPostStatus;
@@ -125,8 +126,9 @@ class FeedServiceTest {
 
     assertEquals(FeedPostStatus.PUBLISHED, post.getStatus());
     assertNotNull(post.getPublishedAt());
-    // Admin text post needs neither scrape nor moderation → no side-effect event.
-    verifyNoInteractions(eventPublisher);
+    // Admin text post needs neither scrape nor moderation, but is live → announced to the chat.
+    verify(eventPublisher).publishEvent(new FeedPublishedEvent(99L));
+    verifyNoMoreInteractions(eventPublisher);
   }
 
   @Test
@@ -157,7 +159,8 @@ class FeedServiceTest {
     assertEquals(locality, post.getLocality());
     // Admin is trusted → published directly even on the located path.
     assertEquals(FeedPostStatus.PUBLISHED, post.getStatus());
-    verifyNoInteractions(eventPublisher);
+    verify(eventPublisher).publishEvent(new FeedPublishedEvent(99L));
+    verifyNoMoreInteractions(eventPublisher);
   }
 
   @Test
@@ -194,5 +197,36 @@ class FeedServiceTest {
     FeedPostCreatedEvent event = captor.getValue();
     assertTrue(event.needsScrape());
     assertTrue(event.needsModeration());
+  }
+
+  @Test
+  void markPublishedMakesPendingPostLiveAndAnnouncesIt() {
+    FeedPostEntity post =
+        FeedPostEntity.builder().id(42L).locality(locality).status(FeedPostStatus.FLAGGED).build();
+
+    feedService.markPublished(post);
+
+    assertEquals(FeedPostStatus.PUBLISHED, post.getStatus());
+    assertNotNull(post.getPublishedAt());
+    verify(feedPostRepository).save(post);
+    verify(eventPublisher).publishEvent(new FeedPublishedEvent(post.getId()));
+  }
+
+  @Test
+  void markPublishedOnLivePostSavesWithoutAnnouncingAgain() {
+    java.time.LocalDateTime firstPublished = java.time.LocalDateTime.of(2026, 1, 1, 9, 0);
+    FeedPostEntity post =
+        FeedPostEntity.builder()
+            .id(42L)
+            .locality(locality)
+            .status(FeedPostStatus.PUBLISHED)
+            .publishedAt(firstPublished)
+            .build();
+
+    feedService.markPublished(post);
+
+    assertEquals(firstPublished, post.getPublishedAt());
+    verify(feedPostRepository).save(post);
+    verifyNoInteractions(eventPublisher);
   }
 }
