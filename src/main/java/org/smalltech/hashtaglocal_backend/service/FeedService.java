@@ -76,17 +76,17 @@ public class FeedService {
       eventPublisher.publishEvent(
           new FeedPostCreatedEvent(saved.getId(), needsScrape, needsModeration));
     }
+    // Trusted (admin) posts are live right away, so announce them now. USER posts are announced
+    // once moderation (or an admin) publishes them.
+    if (saved.getStatus() == FeedPostStatus.PUBLISHED) {
+      eventPublisher.publishEvent(new FeedPublishedEvent(saved.getId()));
+    }
     return saved;
   }
 
   /**
-   * Create a system-authored post (no human author, no AI gate) — e.g. the auto issue-ref.
-   * Publishes directly. See FEED_DESIGN.md §1.2 / §8.
-   */
-  /**
-   * Publishes a bulletin's daily BULLETIN post to its locality's feed and announces it with a
-   * {@link FeedPublishedEvent}. Idempotent: a bulletin gets at most one post, so a re-run neither
-   * duplicates the post nor re-raises the event.
+   * Posts the daily bulletin to its locality's chat. Each bulletin gets only one post, so running
+   * this again does nothing.
    */
   @Transactional
   public void publishBulletinPost(Locality locality, BulletinEntity bulletin, String summaryText) {
@@ -100,9 +100,12 @@ public class FeedService {
             .text(summaryText)
             .build();
     createSystemPost(locality, FeedPostKind.BULLETIN, content);
-    eventPublisher.publishEvent(new FeedPublishedEvent(bulletin));
   }
 
+  /**
+   * Creates a post made by the system (e.g. the daily bulletin or an issue post). It skips AI
+   * moderation, goes live right away and triggers a push. See FEED_DESIGN.md §1.2 / §8.
+   */
   @Transactional
   public FeedPostEntity createSystemPost(
       Locality locality, FeedPostKind kind, FeedPostContentEntity content) {
@@ -116,32 +119,27 @@ public class FeedService {
             .build();
     content.setPost(post);
     post.setContent(content);
-    return feedPostRepository.save(post);
+    FeedPostEntity saved = feedPostRepository.save(post);
+    eventPublisher.publishEvent(new FeedPublishedEvent(saved.getId()));
+    return saved;
   }
 
   /**
-   * Create a backfilled system post whose {@code createdAt}/{@code publishedAt} are set to {@code
-   * when} (the original event time) rather than now, so historical posts sort correctly in the
-   * timeline. Used by the feed backfill for issues reported before the feed existed.
+   * Makes an existing post live (after AI moderation or an admin approval) and triggers a push.
+   * Every push for a post goes out from this class. A post that is already live is only saved, so
+   * it isn't pushed twice.
    */
   @Transactional
-  public FeedPostEntity createBackfilledSystemPost(
-      Locality locality,
-      FeedPostKind kind,
-      FeedPostContentEntity content,
-      java.time.LocalDateTime when) {
-    FeedPostEntity post =
-        FeedPostEntity.builder()
-            .locality(locality)
-            .author(null)
-            .kind(kind)
-            .status(FeedPostStatus.PUBLISHED)
-            .createdAt(when) // preserved by @PrePersist when non-null
-            .publishedAt(when)
-            .build();
-    content.setPost(post);
-    post.setContent(content);
-    return feedPostRepository.save(post);
+  public void markPublished(FeedPostEntity post) {
+    boolean wasPublished = post.getStatus() == FeedPostStatus.PUBLISHED;
+    post.setStatus(FeedPostStatus.PUBLISHED);
+    if (post.getPublishedAt() == null) {
+      post.setPublishedAt(java.time.LocalDateTime.now());
+    }
+    feedPostRepository.save(post);
+    if (!wasPublished) {
+      eventPublisher.publishEvent(new FeedPublishedEvent(post.getId()));
+    }
   }
 
   private Locality resolveLocality(UserEntity author, CreateFeedPostRequest req, boolean isAdmin) {

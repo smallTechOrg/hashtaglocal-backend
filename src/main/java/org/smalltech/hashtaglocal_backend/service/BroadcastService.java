@@ -4,7 +4,6 @@ import static org.smalltech.hashtaglocal_backend.config.NotificationConstants.FC
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import lombok.Builder;
@@ -14,6 +13,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.smalltech.hashtaglocal_backend.entity.NotificationLogEntity;
 import org.smalltech.hashtaglocal_backend.infra.notification.FcmSender;
 import org.smalltech.hashtaglocal_backend.infra.notification.FcmSender.MulticastResult;
+import org.smalltech.hashtaglocal_backend.model.NotificationData;
 import org.smalltech.hashtaglocal_backend.model.NotificationSource;
 import org.smalltech.hashtaglocal_backend.model.NotificationType;
 import org.smalltech.hashtaglocal_backend.model.request.SendNotificationRequest.NotificationBody;
@@ -55,11 +55,11 @@ public class BroadcastService {
       throw new IllegalArgumentException("issueId is required for ISSUE_DETAIL notifications");
     }
 
-    Map<String, String> payload = new HashMap<>();
-    payload.put("type", type.name());
-    if (type == NotificationType.ISSUE_DETAIL) {
-      payload.put("issueId", issueId);
-    }
+    NotificationData data =
+        NotificationData.builder()
+            .type(NotificationData.Type.valueOf(type.name()))
+            .issueId(type == NotificationType.ISSUE_DETAIL ? parseIssueId(issueId) : null)
+            .build();
 
     List<String> tokens = userAuthSessionRepository.findAllActiveNotificationTokens();
 
@@ -70,12 +70,11 @@ public class BroadcastService {
                 .type(type)
                 .title(title)
                 .body(body)
-                .payload(toJson(payload))
+                .payload(toJson(data.toMap()))
                 .build());
 
     // FCM data = business payload + notificationLogId so the device can report opens back
-    Map<String, String> fcmData = new HashMap<>(payload);
-    fcmData.put("notificationLogId", logEntry.getId().toString());
+    Map<String, String> fcmData = data.withNotificationLogId(logEntry.getId()).toMap();
 
     String fcmTag = type.name().toLowerCase() + ANALYTICS_SUFFIX_ADMIN;
     int totalSuccess = 0;
@@ -93,6 +92,15 @@ public class BroadcastService {
     notificationLogRepository.save(logEntry);
 
     return NotificationResult.builder().notificationDelivered(totalSuccess).build();
+  }
+
+  /** The app opens the issue page by numeric id, so anything else can't be routed. */
+  private static Long parseIssueId(String issueId) {
+    try {
+      return Long.valueOf(issueId.strip());
+    } catch (NumberFormatException e) {
+      throw new IllegalArgumentException("issueId must be a number: " + issueId);
+    }
   }
 
   private String toJson(Map<String, String> map) {

@@ -1,32 +1,38 @@
 package org.smalltech.hashtaglocal_backend.service;
 
 import static org.smalltech.hashtaglocal_backend.config.NotificationConstants.FCM_BATCH_SIZE;
-import static org.smalltech.hashtaglocal_backend.config.NotificationConstants.MAX_BODY_LENGTH;
-import static org.smalltech.hashtaglocal_backend.config.NotificationConstants.MAX_TITLE_LENGTH;
 import static org.smalltech.hashtaglocal_backend.config.TimeConstants.APP_ZONE;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.LocalDate;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.smalltech.hashtaglocal_backend.entity.BulletinEntity;
+import org.smalltech.hashtaglocal_backend.entity.FeedPostEntity;
+import org.smalltech.hashtaglocal_backend.entity.IssueEntity;
 import org.smalltech.hashtaglocal_backend.entity.NotificationLogEntity;
+import org.smalltech.hashtaglocal_backend.entity.UserEntity;
 import org.smalltech.hashtaglocal_backend.event.FeedPublishedEvent;
 import org.smalltech.hashtaglocal_backend.infra.notification.FcmSender;
 import org.smalltech.hashtaglocal_backend.infra.notification.FcmSender.MulticastResult;
+import org.smalltech.hashtaglocal_backend.model.FeedPostKind;
+import org.smalltech.hashtaglocal_backend.model.FeedPostStatus;
+import org.smalltech.hashtaglocal_backend.model.IssueStatusModel;
 import org.smalltech.hashtaglocal_backend.model.NotificationSource;
 import org.smalltech.hashtaglocal_backend.model.NotificationSubType;
 import org.smalltech.hashtaglocal_backend.model.NotificationType;
 import org.smalltech.hashtaglocal_backend.model.SourceRefType;
 import org.smalltech.hashtaglocal_backend.repository.BulletinRepository;
+import org.smalltech.hashtaglocal_backend.repository.FeedPostRepository;
 import org.smalltech.hashtaglocal_backend.repository.NotificationLogRepository;
 import org.smalltech.hashtaglocal_backend.repository.UserAuthSessionRepository;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.smalltech.hashtaglocal_backend.util.NotificationUtils;
+import org.smalltech.hashtaglocal_backend.util.NotificationUtils.PushMessage;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
@@ -36,38 +42,21 @@ import org.springframework.transaction.event.TransactionalEventListener;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * Sends a push to a locality's users when a post is published to its feed ({@link
- * FeedPublishedEvent}). Today only BULLETIN posts are handled, as the "Daily Bulletin" push; other
- * feed post kinds can be added here.
- *
- * <p>At-most-once: the {@code notification_log} claim row is committed (and protected by a unique
- * index on the bulletin id) BEFORE any FCM call, so a re-run or a concurrent run can never send
- * twice — at the cost of not retrying a send that failed part-way.
+ * Sends a push to a locality's users when a chat post goes live: a "Daily Bulletin" push for
+ * bulletins, an "issue opened/resolved" push for issue posts, and a normal chat push for the rest.
+ * Each push is logged before sending, so it goes out at most once; the author is never notified.
+ * The title, body and data of each push are built by {@link NotificationUtils}.
  */
 @Component
-@ConditionalOnProperty(name = "bulletin.notification.enabled", havingValue = "true")
 @RequiredArgsConstructor
 @Slf4j
 public class FeedNotificationListener {
 
-  static final String TITLE_PREFIX = "Daily Bulletin — ";
-
-  /**
-   * Used only when the bulletin exists but has no summary text (e.g. an admin-created row). A
-   * missing bulletin gets no push at all — see {@link #notifyLocality}.
-   */
-  static final String FALLBACK_SUMMARY = "Today's weather update is ready.";
-
-  /** FCM {@code type} the mobile app routes on (the log's own type is AUTO_CHAT). */
-  private static final String PAYLOAD_TYPE = "BULLETIN";
-
   private static final String ANALYTICS_LABEL = "bulletin_system";
-  private static final String KEY_TYPE = "type";
-  private static final String KEY_NOTIFICATION_LOG_ID = "notificationLogId";
-  private static final String KEY_BULLETIN_ID = "bulletinId";
-  private static final String KEY_LOCALITY_ID = "localityId";
-  private static final String KEY_DATE = "date";
+  private static final String CHAT_ANALYTICS_LABEL = "chat_system";
+  private static final String ISSUE_ANALYTICS_LABEL = "issue_update_system";
 
+  private final FeedPostRepository feedPostRepository;
   private final BulletinRepository bulletinRepository;
   private final UserAuthSessionRepository userAuthSessionRepository;
   private final NotificationLogRepository notificationLogRepository;
@@ -75,26 +64,67 @@ public class FeedNotificationListener {
   private final ObjectMapper objectMapper;
   private final PlatformTransactionManager transactionManager;
 
+  @Value("${bulletin.notification.enabled:false}")
+  private boolean bulletinNotificationEnabled;
+
+  @Value("${feed.notification.enabled:false}")
+  private boolean chatNotificationEnabled;
+
   // fallbackExecution: the generation cron may publish outside a transaction.
   @Async
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
   public void onFeedPublished(FeedPublishedEvent event) {
     try {
-      notifyLocality(event.bulletin().getId());
+      notifyPost(event.feedPostId());
     } catch (Exception e) {
-      log.error(
-          "Bulletin notification failed for bulletin {}: {}",
-          event.bulletin().getId(),
-          e.getMessage(),
-          e);
+      log.error("Feed notification failed for post {}: {}", event.feedPostId(), e.getMessage(), e);
     }
   }
 
-  /** What is pushed: the visible title and body plus the data the app routes on. */
-  private record PushMessage(String title, String body, Map<String, String> payload) {}
+  /** Routes a just-published feed post to the bulletin push or the generic chat push. */
+  void notifyPost(Long feedPostId) {
+    FeedPostEntity post = feedPostRepository.findByIdForNotification(feedPostId).orElse(null);
+    if (post == null) {
+      // Should never happen: the event is only published after the post is committed.
+      log.error("Feed post {} not found — NO notification sent; investigate", feedPostId);
+      return;
+    }
+    // Hidden/deleted between publish and now (e.g. an issue rejected right after approval).
+    if (post.getStatus() != FeedPostStatus.PUBLISHED) {
+      log.info(
+          "Feed post {} is {} — no longer public, no notification", feedPostId, post.getStatus());
+      return;
+    }
+
+    if (post.getKind() == FeedPostKind.BULLETIN) {
+      if (!bulletinNotificationEnabled) {
+        return;
+      }
+      BulletinEntity bulletin = post.getContent() != null ? post.getContent().getBulletin() : null;
+      if (bulletin == null) {
+        log.error("BULLETIN post {} has no bulletin — NO notification sent", feedPostId);
+        return;
+      }
+      notifyLocality(bulletin.getId());
+      return;
+    }
+
+    if (!chatNotificationEnabled) {
+      return;
+    }
+    if (post.getKind() == FeedPostKind.ISSUE_REF) {
+      notifyIssuePost(post);
+    } else {
+      notifyChatPost(post);
+    }
+  }
+
+  // ---------------------------------------------------------------------------------------------
+  // Bulletin push
+  // ---------------------------------------------------------------------------------------------
 
   void notifyLocality(Long bulletinId) {
-    if (alreadyNotified(bulletinId)) {
+    if (alreadyNotified(NotificationSubType.CHAT_BULLETIN, SourceRefType.BULLETIN, bulletinId)) {
       log.debug("Bulletin {} already notified — skipping", bulletinId);
       return;
     }
@@ -121,19 +151,18 @@ public class FeedNotificationListener {
       return;
     }
 
-    PushMessage message = buildMessage(bulletin);
+    PushMessage message = NotificationUtils.buildBulletinMessage(bulletin);
 
-    NotificationLogEntity claim = claim(bulletinId, message).orElse(null);
+    NotificationLogEntity claim =
+        claim(SourceRefType.BULLETIN, bulletinId, NotificationSubType.CHAT_BULLETIN, message)
+            .orElse(null);
     if (claim == null) {
       log.info("Bulletin {} already claimed by another run — nothing sent", bulletinId);
       return;
     }
 
-    int delivered = send(tokens, message, claim.getId());
-
-    claim.setRecipientCount(tokens.size());
-    claim.setSuccessCount(delivered);
-    notificationLogRepository.save(claim);
+    int delivered = send(tokens, message, claim.getId(), ANALYTICS_LABEL);
+    recordCounts(claim, tokens.size(), delivered);
     log.info(
         "Bulletin {} notified locality {}: {} recipients, {} delivered",
         bulletinId,
@@ -142,35 +171,130 @@ public class FeedNotificationListener {
         delivered);
   }
 
-  /** The duplicate-send guard, in the shape of the documented access pattern. */
-  private boolean alreadyNotified(Long bulletinId) {
-    return notificationLogRepository.existsByTypeAndSubTypeAndSourceRefTypeAndSourceRefId(
-        NotificationType.AUTO_CHAT,
-        NotificationSubType.CHAT_BULLETIN,
-        SourceRefType.BULLETIN,
-        bulletinId);
+  // ---------------------------------------------------------------------------------------------
+  // Chat push (every non-bulletin post)
+  // ---------------------------------------------------------------------------------------------
+
+  void notifyChatPost(FeedPostEntity post) {
+    deliver(
+        SourceRefType.FEED_POST,
+        post.getId(),
+        NotificationSubType.CHAT_POST,
+        post.getLocality().getId(),
+        post.getAuthor(),
+        NotificationUtils.buildChatMessage(post),
+        CHAT_ANALYTICS_LABEL);
   }
 
-  private PushMessage buildMessage(BulletinEntity bulletin) {
-    Object summaryText = bulletin.getSummary() != null ? bulletin.getSummary().get("text") : null;
+  // ---------------------------------------------------------------------------------------------
+  // Issue update push (ISSUE_REF posts)
+  // ---------------------------------------------------------------------------------------------
 
-    Map<String, String> payload = new HashMap<>();
-    payload.put(KEY_TYPE, PAYLOAD_TYPE);
-    payload.put(KEY_BULLETIN_ID, bulletin.getId().toString());
-    payload.put(KEY_LOCALITY_ID, bulletin.getLocality().getId().toString());
-    payload.put(KEY_DATE, bulletin.getDate().toString());
+  /**
+   * "New issue in …" while the issue is open, "Issue resolved in …" once it is resolved. Logged
+   * against the issue (not the post), so regenerating the issue's feed post never pushes again.
+   */
+  void notifyIssuePost(FeedPostEntity post) {
+    IssueEntity issue = post.getContent() != null ? post.getContent().getIssue() : null;
+    if (issue == null) {
+      log.error("ISSUE_REF post {} has no issue — NO notification sent", post.getId());
+      return;
+    }
+    boolean resolved = issue.getStatus() == IssueStatusModel.RESOLVED;
+    deliver(
+        SourceRefType.ISSUE,
+        issue.getId(),
+        resolved ? NotificationSubType.CHAT_ISSUE_RESOLVED : NotificationSubType.CHAT_ISSUE,
+        post.getLocality().getId(),
+        issueExcludedUser(post, issue, resolved),
+        NotificationUtils.buildIssueMessage(post, issue, resolved),
+        ISSUE_ANALYTICS_LABEL);
+  }
 
-    return new PushMessage(
-        buildTitle(bulletin.getLocality().getName()),
-        buildBody(summaryText != null ? summaryText.toString() : null),
-        payload);
+  /**
+   * Who is left out of an issue push. A post someone shared by hand leaves out only that person. A
+   * system post on approval leaves out the reporter, who already got "Issue is live"
+   * (IssueNotificationListener). Nobody else tells the reporter about a resolution, so that push
+   * goes to them too.
+   */
+  private static UserEntity issueExcludedUser(
+      FeedPostEntity post, IssueEntity issue, boolean resolved) {
+    if (post.getAuthor() != null) {
+      return post.getAuthor();
+    }
+    return resolved ? null : issue.getUserEntity();
+  }
+
+  // ---------------------------------------------------------------------------------------------
+  // Shared: dedupe, recipients, claim, send
+  // ---------------------------------------------------------------------------------------------
+
+  /** Dedupe → recipients → claim → send → record, for one chat or issue push. */
+  private void deliver(
+      SourceRefType sourceRefType,
+      Long sourceRefId,
+      NotificationSubType subType,
+      Long localityId,
+      UserEntity excludedUser,
+      PushMessage message,
+      String analyticsLabel) {
+    if (alreadyNotified(subType, sourceRefType, sourceRefId)) {
+      log.debug("{} {} {} already notified — skipping", subType, sourceRefType, sourceRefId);
+      return;
+    }
+
+    List<String> tokens = recipients(localityId, excludedUser);
+    if (tokens.isEmpty()) {
+      return;
+    }
+
+    NotificationLogEntity claim = claim(sourceRefType, sourceRefId, subType, message).orElse(null);
+    if (claim == null) {
+      log.info(
+          "{} {} {} already claimed by another run — nothing sent",
+          subType,
+          sourceRefType,
+          sourceRefId);
+      return;
+    }
+
+    int delivered = send(tokens, message, claim.getId(), analyticsLabel);
+    recordCounts(claim, tokens.size(), delivered);
+    log.info(
+        "{} {} {} notified locality {}: {} recipients, {} delivered",
+        subType,
+        sourceRefType,
+        sourceRefId,
+        localityId,
+        tokens.size(),
+        delivered);
+  }
+
+  /** The locality's devices, minus those of {@code excludedUser} (the post/update's author). */
+  private List<String> recipients(Long localityId, UserEntity excludedUser) {
+    if (excludedUser == null) {
+      return userAuthSessionRepository.findActiveNotificationTokensByLocalityId(localityId);
+    }
+    return userAuthSessionRepository.findActiveNotificationTokensByLocalityIdExcludingUser(
+        localityId, excludedUser.getId());
+  }
+
+  /** The duplicate-send guard, in the shape of the documented access pattern. */
+  private boolean alreadyNotified(
+      NotificationSubType subType, SourceRefType sourceRefType, Long sourceRefId) {
+    return notificationLogRepository.existsByTypeAndSubTypeAndSourceRefTypeAndSourceRefId(
+        NotificationType.AUTO_CHAT, subType, sourceRefType, sourceRefId);
   }
 
   /**
    * Inserts the log row in its own committed transaction BEFORE anything is sent; the unique index
-   * rejects a parallel duplicate here. Empty means another run already claimed this bulletin.
+   * rejects a parallel duplicate here. Empty means another run already claimed this source.
    */
-  private Optional<NotificationLogEntity> claim(Long bulletinId, PushMessage message) {
+  private Optional<NotificationLogEntity> claim(
+      SourceRefType sourceRefType,
+      Long sourceRefId,
+      NotificationSubType subType,
+      PushMessage message) {
     try {
       return Optional.ofNullable(
           transactionTemplate()
@@ -179,13 +303,13 @@ public class FeedNotificationListener {
                       notificationLogRepository.saveAndFlush(
                           NotificationLogEntity.builder()
                               .source(NotificationSource.SYSTEM)
-                              .sourceRefType(SourceRefType.BULLETIN)
-                              .sourceRefId(bulletinId)
+                              .sourceRefType(sourceRefType)
+                              .sourceRefId(sourceRefId)
                               .type(NotificationType.AUTO_CHAT)
-                              .subType(NotificationSubType.CHAT_BULLETIN)
+                              .subType(subType)
                               .title(message.title())
                               .body(message.body())
-                              .payload(toJson(message.payload()))
+                              .payload(toJson(message.data().toMap()))
                               .build())));
     } catch (DataIntegrityViolationException e) {
       return Optional.empty();
@@ -195,20 +319,26 @@ public class FeedNotificationListener {
   /**
    * Sends in FCM-sized batches, clears tokens FCM reports as stale, returns the delivered count.
    */
-  private int send(List<String> tokens, PushMessage message, Long notificationLogId) {
+  private int send(
+      List<String> tokens, PushMessage message, Long notificationLogId, String analyticsLabel) {
     // FCM data = business payload + notificationLogId so the device can report opens back
-    Map<String, String> fcmData = new HashMap<>(message.payload());
-    fcmData.put(KEY_NOTIFICATION_LOG_ID, notificationLogId.toString());
+    Map<String, String> fcmData = message.data().withNotificationLogId(notificationLogId).toMap();
 
     int delivered = 0;
     for (int i = 0; i < tokens.size(); i += FCM_BATCH_SIZE) {
       List<String> batch = tokens.subList(i, Math.min(i + FCM_BATCH_SIZE, tokens.size()));
       MulticastResult result =
-          fcmSender.sendMulticast(batch, message.title(), message.body(), fcmData, ANALYTICS_LABEL);
+          fcmSender.sendMulticast(batch, message.title(), message.body(), fcmData, analyticsLabel);
       clearStaleTokens(result.staleTokens());
       delivered += result.successCount();
     }
     return delivered;
+  }
+
+  private void recordCounts(NotificationLogEntity claim, int recipients, int delivered) {
+    claim.setRecipientCount(recipients);
+    claim.setSuccessCount(delivered);
+    notificationLogRepository.save(claim);
   }
 
   /** The @Modifying query needs a transaction, and the send path runs outside one. */
@@ -220,37 +350,6 @@ public class FeedNotificationListener {
 
   private TransactionTemplate transactionTemplate() {
     return new TransactionTemplate(transactionManager);
-  }
-
-  /** "Daily Bulletin — {locality}", cut with an ellipsis if it would exceed the title limit. */
-  static String buildTitle(String localityName) {
-    String title = TITLE_PREFIX + localityName;
-    if (title.length() <= MAX_TITLE_LENGTH) {
-      return title;
-    }
-    return title.substring(0, MAX_TITLE_LENGTH - 1) + "…";
-  }
-
-  /**
-   * The whole summary, truncated at a word boundary with an ellipsis when it exceeds {@code
-   * MAX_BODY_LENGTH}. Deliberately not cut at the first sentence: sentences can be far too long or
-   * far too short to make a useful push body on their own.
-   */
-  static String buildBody(String text) {
-    if (text == null || text.isBlank()) {
-      return FALLBACK_SUMMARY;
-    }
-    String trimmed = text.strip();
-    if (trimmed.length() <= MAX_BODY_LENGTH) {
-      return trimmed;
-    }
-    int cut = trimmed.lastIndexOf(' ', MAX_BODY_LENGTH - 1);
-    String head = trimmed.substring(0, cut > 0 ? cut : MAX_BODY_LENGTH - 1);
-    int last = head.length();
-    while (last > 0 && " ,;:-".indexOf(head.charAt(last - 1)) >= 0) {
-      last--;
-    }
-    return head.substring(0, last) + "…";
   }
 
   private String toJson(Map<String, String> map) {

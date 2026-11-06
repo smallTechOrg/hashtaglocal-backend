@@ -154,6 +154,10 @@ feed:
   auto-issue-ref:
     # Auto-post an ISSUE_REF to the feed when a new issue is created (FEED_DESIGN.md §1.2)
     enabled: ${FEED_AUTO_ISSUE_REF_ENABLED:true}
+  notification:
+    # Send a push to the locality for every new chat post (bulletins use their own switch).
+    # Run scripts/migrate-chat-post-notification.sql before deploying, or no chat push is sent.
+    enabled: ${FEED_NOTIFICATION_ENABLED:true}
 
 # City bulletin: daily weather (cron, saved-user localities only) + manual quizzes + Groq texts
 bulletin:

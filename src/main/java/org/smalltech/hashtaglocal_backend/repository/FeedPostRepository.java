@@ -2,6 +2,7 @@ package org.smalltech.hashtaglocal_backend.repository;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import org.smalltech.hashtaglocal_backend.entity.FeedPostEntity;
 import org.smalltech.hashtaglocal_backend.model.FeedPostStatus;
 import org.springframework.data.domain.Pageable;
@@ -170,6 +171,23 @@ public interface FeedPostRepository extends JpaRepository<FeedPostEntity, Long> 
           + "WHERE p.kind = org.smalltech.hashtaglocal_backend.model.FeedPostKind.BULLETIN "
           + "AND p.content.bulletin.id = :bulletinId")
   boolean existsBulletinPost(@Param("bulletinId") Long bulletinId);
+
+  /**
+   * Loads a post with everything its push notification needs, in one query. The notification
+   * listener runs outside a transaction, so nothing can be loaded later.
+   */
+  @Query(
+      "SELECT p FROM FeedPostEntity p "
+          + "JOIN FETCH p.locality "
+          + "LEFT JOIN FETCH p.author "
+          + "LEFT JOIN FETCH p.content c "
+          + "LEFT JOIN FETCH c.issue i "
+          + "LEFT JOIN FETCH i.userEntity "
+          + "LEFT JOIN FETCH c.event "
+          + "LEFT JOIN FETCH c.media "
+          + "LEFT JOIN FETCH c.bulletin "
+          + "WHERE p.id = :id")
+  Optional<FeedPostEntity> findByIdForNotification(@Param("id") Long id);
 
   /** The BULLETIN post for a bulletin, if any — used to sync edited summaries into the feed. */
   @Query(
