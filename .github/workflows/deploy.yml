@@ -84,11 +84,8 @@ jobs:
       # through Direct VPC egress. Set VPC_NETWORK to "none" to turn this off.
       VPC_NETWORK: ${{ vars.VPC_NETWORK || 'default' }}
       VPC_SUBNET: ${{ vars.VPC_SUBNET || vars.VPC_NETWORK || 'default' }}
-      # Per-environment settings: *_PRODUCTION for main, *_STAGING for staging.
-      APP_SELF_BASE_URL: ${{ github.ref_name == 'main' && vars.APP_SELF_BASE_URL_PRODUCTION || vars.APP_SELF_BASE_URL_STAGING }}
-      APP_FORWARDED_PREFIX: ${{ github.ref_name == 'main' && (vars.APP_FORWARDED_PREFIX_PRODUCTION || '/local') || (vars.APP_FORWARDED_PREFIX_STAGING || '/localstaging') }}
-      EVENTS_SCRAPE_URL: ${{ github.ref_name == 'main' && vars.EVENTS_SCRAPE_URL_PRODUCTION || vars.EVENTS_SCRAPE_URL_STAGING }}
-      PORTALISSUE_SCRAPE_URL: ${{ github.ref_name == 'main' && vars.PORTALISSUE_SCRAPE_URL_PRODUCTION || vars.PORTALISSUE_SCRAPE_URL_STAGING }}
+      # Every repository variable, read by name in the environment step below.
+      VARS_JSON: ${{ toJSON(vars) }}
     steps:
       - uses: actions/checkout@v4
 
@@ -105,7 +102,19 @@ jobs:
           echo "RUNTIME_SA=hashtaglocal-backend-run@${PROJECT_ID}.iam.gserviceaccount.com" >> "$GITHUB_ENV"
           # Secrets that differ between the two databases carry the environment
           # as a suffix, e.g. HASHTAGLOCAL_DB_PASSWORD_STAGING.
-          echo "SECRET_SUFFIX=$([ "$IS_PROD" = "true" ] && echo PRODUCTION || echo STAGING)" >> "$GITHUB_ENV"
+          suffix=$([ "$IS_PROD" = "true" ] && echo PRODUCTION || echo STAGING)
+          echo "SECRET_SUFFIX=$suffix" >> "$GITHUB_ENV"
+          # Secret Manager secret -> env var, or -> file for the two key files.
+          # DB secrets differ per environment (suffix); the rest are shared.
+          map="SPRING_DATASOURCE_URL=HASHTAGLOCAL_DB_URL_${suffix}:latest"
+          map+=",SPRING_DATASOURCE_USERNAME=HASHTAGLOCAL_DB_USERNAME_${suffix}:latest"
+          map+=",SPRING_DATASOURCE_PASSWORD=HASHTAGLOCAL_DB_PASSWORD_${suffix}:latest"
+          for s in GOOGLE_MAPS_API_KEY GROQ_API_KEY GEMINI_API_KEY SPRING_MAIL_PASSWORD GOOGLE_OAUTH_CLIENT_SECRET PORTALISSUE_AUTH_USERNAME PORTALISSUE_AUTH_PASSWORD; do
+            map+=",${s}=${s}:latest"
+          done
+          map+=",/secrets/gcs/gcs-key.json=HASHTAGLOCAL_GCS_KEY:latest"
+          map+=",/secrets/firebase/firebase-key.json=HASHTAGLOCAL_FIREBASE_KEY:latest"
+          echo "SECRET_MAP=$map" >> "$GITHUB_ENV"
 
       - name: Build and push image
         run: |
@@ -113,53 +122,81 @@ jobs:
           docker build -t "$IMAGE" .
           docker push "$IMAGE"
 
+      - name: Check the secrets exist
+        # Fail here, with the names, instead of inside gcloud run deploy.
+        run: |
+          missing=()
+          for entry in $(echo "$SECRET_MAP" | tr ',' ' '); do
+            secret="${entry#*=}"; secret="${secret%:latest}"
+            gcloud secrets versions describe latest --secret "$secret" >/dev/null 2>&1 || missing+=("$secret")
+          done
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "::error::Secret Manager has no usable version of: ${missing[*]}"
+            exit 1
+          fi
+
       - name: Write service environment
         # Plain settings. Secrets come from Secret Manager (--set-secrets below).
         run: |
           env_file="$RUNNER_TEMP/env.yaml"
           : > "$env_file"
-          add() { printf '%s: "%s"\n' "$1" "$2" >> "$env_file"; }
-          # Only written when set, so an unset variable keeps the app default.
-          add_if() { [ -z "$2" ] || add "$1" "$2"; }
+          add() { printf '%s: %s\n' "$1" "$(jq -nr --arg v "$2" '$v|@json')" >> "$env_file"; }
 
+          # Fixed for Cloud Run.
           add GOOGLE_APPLICATION_CREDENTIALS "/secrets/gcs/gcs-key.json"
           add FIREBASE_CREDENTIALS_PATH "/secrets/firebase/firebase-key.json"
           # Cloud Logging collects stdout; a log file would only fill memory.
           add LOGGING_FILE_NAME ""
           add LOGGING_LEVEL_ORG_SMALLTECH_HASHTAGLOCAL_BACKEND "INFO"
           add SPRING_JPA_SHOW_SQL "false"
-          add APP_FORWARDED_PREFIX "$APP_FORWARDED_PREFIX"
-          add_if APP_SELF_BASE_URL "$APP_SELF_BASE_URL"
-          add_if EVENTS_SCRAPE_URL "$EVENTS_SCRAPE_URL"
-          add_if PORTALISSUE_SCRAPE_URL "$PORTALISSUE_SCRAPE_URL"
-          add_if PORTALISSUE_REPORT_SCRAPE_URL "$PORTALISSUE_SCRAPE_URL"
-          add_if GOOGLE_STORAGE_BUCKET_NAME "${{ vars.GOOGLE_STORAGE_BUCKET_NAME }}"
-          add_if GCS_PROJECT_ID "$PROJECT_ID"
-          add_if ACCOUNT_DELETION_ADMIN_EMAIL "${{ vars.ACCOUNT_DELETION_ADMIN_EMAIL }}"
-          add_if ACCOUNT_DELETION_FROM_EMAIL "${{ vars.ACCOUNT_DELETION_FROM_EMAIL }}"
-          add_if SPRING_MAIL_HOST "${{ vars.SPRING_MAIL_HOST }}"
-          add_if SPRING_MAIL_PORT "${{ vars.SPRING_MAIL_PORT }}"
-          add_if SPRING_MAIL_USERNAME "${{ vars.SPRING_MAIL_USERNAME }}"
-          add_if SPRING_MAIL_SMTP_FROM "${{ vars.SPRING_MAIL_SMTP_FROM }}"
-          add_if SPRING_MAIL_SMTP_LOCALHOST "${{ vars.SPRING_MAIL_SMTP_LOCALHOST }}"
+          add GCS_PROJECT_ID "$PROJECT_ID"
+          # Database migrations (src/main/resources/db/migration) run at startup.
+          add FLYWAY_ENABLED "true"
+
+          # Settings read from repository variables. For each NAME the variable
+          # NAME_STAGING / NAME_PRODUCTION wins over NAME, and a name with no
+          # variable keeps the app's own default from application.yaml.
+          var() { echo "$VARS_JSON" | jq -r --arg a "${1}_${SECRET_SUFFIX}" --arg b "$1" '.[$a] // .[$b] // empty'; }
+          for name in \
+            APP_SELF_BASE_URL APP_FORWARDED_PREFIX \
+            EVENTS_SCRAPE_URL EVENTS_SCRAPE_CRON \
+            PORTALISSUE_ENABLED PORTALISSUE_CRON PORTALISSUE_SCRAPE_URL PORTALISSUE_REPORT_SCRAPE_URL \
+            PORTALISSUE_REPORT_CONNECT_TIMEOUT_SECONDS PORTALISSUE_REPORT_READ_TIMEOUT_SECONDS \
+            GOOGLE_STORAGE_BUCKET_NAME GOOGLE_OAUTH_CLIENT_ID GOOGLE_OAUTH_REDIRECT_URI \
+            APPLE_BUNDLE_ID GEONAMES_USERNAME \
+            AUTH_ACCESS_TOKEN_EXPIRY_SECONDS AUTH_REFRESH_TOKEN_EXPIRY_SECONDS AUTH_SESSION_CLEANUP_CRON \
+            ACCOUNT_DELETION_ADMIN_EMAIL ACCOUNT_DELETION_FROM_EMAIL \
+            SPRING_MAIL_HOST SPRING_MAIL_PORT SPRING_MAIL_USERNAME SPRING_MAIL_SMTP_AUTH \
+            SPRING_MAIL_SMTP_STARTTLS_ENABLE SPRING_MAIL_SMTP_FROM SPRING_MAIL_SMTP_LOCALHOST \
+            FEED_MODERATION_ENABLED FEED_MODERATION_MODEL FEED_MODERATION_ENDPOINT FEED_MODERATION_SWEEPER_DELAY_MS \
+            FEED_SCRAPE_TIMEOUT_MS FEED_SCRAPE_MAX_BODY_BYTES FEED_SCRAPE_MAX_IMAGE_BYTES \
+            FEED_AUTO_ISSUE_REF_ENABLED FEED_NOTIFICATION_ENABLED \
+            BULLETIN_ENABLED BULLETIN_NOTIFICATION_ENABLED BULLETIN_WEATHER_CRON \
+            BULLETIN_WEATHER_PROVIDER BULLETIN_OPEN_METEO_URL \
+            GROQ_API_URL GROQ_MODEL GROQ_REQUESTS_PER_MINUTE \
+            FLYWAY_BASELINE_VERSION; do
+            value="$(var "$name")"
+            [ -z "$value" ] || add "$name" "$value"
+          done
+          # Defaults that suit the shared load balancer's routes.
+          grep -q '^APP_FORWARDED_PREFIX:' "$env_file" \
+            || add APP_FORWARDED_PREFIX "$([ "$IS_PROD" = "true" ] && echo /local || echo /localstaging)"
+          # PORTALISSUE_REPORT_SCRAPE_URL follows PORTALISSUE_SCRAPE_URL unless set.
+          if ! grep -q '^PORTALISSUE_REPORT_SCRAPE_URL:' "$env_file" && [ -n "$(var PORTALISSUE_SCRAPE_URL)" ]; then
+            add PORTALISSUE_REPORT_SCRAPE_URL "$(var PORTALISSUE_SCRAPE_URL)"
+          fi
+
+          # Anything else: one KEY=VALUE per line in the variable EXTRA_ENV
+          # (or EXTRA_ENV_STAGING / EXTRA_ENV_PRODUCTION).
+          extra="$(var EXTRA_ENV)"
+          while IFS= read -r line; do
+            case "$line" in ''|'#'*) continue ;; esac
+            add "${line%%=*}" "${line#*=}"
+          done <<< "$extra"
           cat "$env_file"
 
       - name: Deploy to Cloud Run (no traffic yet)
         run: |
-          # Secret Manager secret -> env var, or -> file for the two key files.
-          # DB secrets differ per environment (suffix); the rest are shared.
-          secrets="SPRING_DATASOURCE_URL=HASHTAGLOCAL_DB_URL_${SECRET_SUFFIX}:latest"
-          secrets+=",SPRING_DATASOURCE_USERNAME=HASHTAGLOCAL_DB_USERNAME_${SECRET_SUFFIX}:latest"
-          secrets+=",SPRING_DATASOURCE_PASSWORD=HASHTAGLOCAL_DB_PASSWORD_${SECRET_SUFFIX}:latest"
-          secrets+=",GOOGLE_MAPS_API_KEY=GOOGLE_MAPS_API_KEY:latest"
-          secrets+=",GROQ_API_KEY=GROQ_API_KEY:latest"
-          secrets+=",GEMINI_API_KEY=GEMINI_API_KEY:latest"
-          secrets+=",SPRING_MAIL_PASSWORD=SPRING_MAIL_PASSWORD:latest"
-          secrets+=",PORTALISSUE_AUTH_USERNAME=PORTALISSUE_AUTH_USERNAME:latest"
-          secrets+=",PORTALISSUE_AUTH_PASSWORD=PORTALISSUE_AUTH_PASSWORD:latest"
-          secrets+=",/secrets/gcs/gcs-key.json=HASHTAGLOCAL_GCS_KEY:latest"
-          secrets+=",/secrets/firebase/firebase-key.json=HASHTAGLOCAL_FIREBASE_KEY:latest"
-
           args=(
             --image "$IMAGE"
             --region "$REGION"
@@ -175,7 +212,7 @@ jobs:
             --min-instances "$MIN_INSTANCES"
             --max-instances "$MAX_INSTANCES"
             --env-vars-file "$RUNNER_TEMP/env.yaml"
-            --set-secrets "$secrets"
+            --set-secrets "$SECRET_MAP"
             --labels "app=hashtaglocal-backend,env=${APP_ENV},commit=${GITHUB_SHA::12}"
             --quiet
           )

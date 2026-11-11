@@ -20,6 +20,19 @@ revision with no traffic, smoke-tests it, then promotes it.
 
 Re-run by hand: Actions → *Deploy to Cloud Run* → *Run workflow*, pick the branch.
 
+## Migrations
+
+Schema changes run **automatically at startup**: Flyway (`FLYWAY_ENABLED=true` on Cloud Run) applies the
+new files in `src/main/resources/db/migration` (`V2__...sql`, `V3__...sql`, ...) before the app serves
+traffic. If one fails, the revision does not start, the smoke test fails and users stay on the old revision.
+No more running `scripts/migrate-*.sql` by hand for new changes. See the README in that folder for the rules.
+
+**Before the first deploy of each environment**, check that every existing `scripts/migrate-*.sql` is already
+applied to that database. The first start baselines the database at version 1 (`FLYWAY_BASELINE_VERSION`),
+which marks all of them as done and never runs them. Hibernate (`ddl-auto: update`) still creates new
+tables and columns; migrations are for constraints, indexes, back-fills, renames and drops.
+Local dev and tests leave Flyway off.
+
 ## Things that differ from the VM
 
 - **In-process jobs.** The app schedules its own jobs (event scrape every 5 min,
@@ -49,7 +62,7 @@ Re-run by hand: Actions → *Deploy to Cloud Run* → *Run workflow*, pick the b
    | file `/secrets/gcs/gcs-key.json` | `HASHTAGLOCAL_GCS_KEY` |
    | file `/secrets/firebase/firebase-key.json` | `HASHTAGLOCAL_FIREBASE_KEY` |
    | `GOOGLE_MAPS_API_KEY`, `GROQ_API_KEY`, `GEMINI_API_KEY` | same name |
-   | `SPRING_MAIL_PASSWORD` | `SPRING_MAIL_PASSWORD` |
+   | `SPRING_MAIL_PASSWORD`, `GOOGLE_OAUTH_CLIENT_SECRET` | same name |
    | `PORTALISSUE_AUTH_USERNAME`, `PORTALISSUE_AUTH_PASSWORD` | same name |
 
    The JDBC URL secret is the full URL, e.g. `jdbc:postgresql://10.110.112.7:5432/hashtaglocal`.
@@ -72,13 +85,33 @@ Re-run by hand: Actions → *Deploy to Cloud Run* → *Run workflow*, pick the b
    |---|---|---|
    | Secret | `GCP_PROJECT` | project id |
    | Secret | `GCP_SA_KEY` | JSON key of the deploy account |
-   | Variable | `GOOGLE_STORAGE_BUCKET_NAME` | the media bucket |
-   | Variable | `APP_SELF_BASE_URL_STAGING` / `_PRODUCTION` | this backend's public URL, sent to the scraper |
-   | Variable | `EVENTS_SCRAPE_URL_STAGING` / `_PRODUCTION` | optional, app default is the staging scraper |
-   | Variable | `PORTALISSUE_SCRAPE_URL_STAGING` / `_PRODUCTION` | optional, as above |
-   | Variable | `APP_FORWARDED_PREFIX_STAGING` / `_PRODUCTION` | default `/localstaging` and `/local` |
-   | Variable | `ACCOUNT_DELETION_ADMIN_EMAIL`, `ACCOUNT_DELETION_FROM_EMAIL`, `SPRING_MAIL_*` | optional mail settings |
-   | Variable | `GCP_REGION`, `VPC_NETWORK`, `VPC_SUBNET`, `CLOUD_RUN_*` | optional, see the workflow |
+   | Variable | any setting in the list below | plain app setting |
+   | Variable | `EXTRA_ENV` | anything else, one `KEY=VALUE` per line (`#` for comments) |
+   | Variable | `GCP_REGION`, `VPC_NETWORK`, `VPC_SUBNET`, `CLOUD_RUN_MIN_INSTANCES`, `CLOUD_RUN_MAX_INSTANCES`, `CLOUD_RUN_CONCURRENCY` | deployment settings, see the workflow |
+
+   **App settings read from variables.** Each name is the same as the environment variable in
+   `application.yaml`. For each, `NAME_STAGING` / `NAME_PRODUCTION` wins over `NAME`; a name with
+   no variable keeps the app default. `APP_FORWARDED_PREFIX` defaults to `/local` (production) and
+   `/localstaging` (staging).
+
+   `APP_SELF_BASE_URL`, `APP_FORWARDED_PREFIX`, `EVENTS_SCRAPE_URL`, `EVENTS_SCRAPE_CRON`,
+   `PORTALISSUE_ENABLED`, `PORTALISSUE_CRON`, `PORTALISSUE_SCRAPE_URL`, `PORTALISSUE_REPORT_SCRAPE_URL`
+   (defaults to `PORTALISSUE_SCRAPE_URL`), `PORTALISSUE_REPORT_CONNECT_TIMEOUT_SECONDS`,
+   `PORTALISSUE_REPORT_READ_TIMEOUT_SECONDS`, `GOOGLE_STORAGE_BUCKET_NAME`, `GOOGLE_OAUTH_CLIENT_ID`,
+   `GOOGLE_OAUTH_REDIRECT_URI`, `APPLE_BUNDLE_ID`, `GEONAMES_USERNAME`,
+   `AUTH_ACCESS_TOKEN_EXPIRY_SECONDS`, `AUTH_REFRESH_TOKEN_EXPIRY_SECONDS`, `AUTH_SESSION_CLEANUP_CRON`,
+   `ACCOUNT_DELETION_ADMIN_EMAIL`, `ACCOUNT_DELETION_FROM_EMAIL`, `SPRING_MAIL_HOST`, `SPRING_MAIL_PORT`,
+   `SPRING_MAIL_USERNAME`, `SPRING_MAIL_SMTP_AUTH`, `SPRING_MAIL_SMTP_STARTTLS_ENABLE`,
+   `SPRING_MAIL_SMTP_FROM`, `SPRING_MAIL_SMTP_LOCALHOST`, `FEED_MODERATION_ENABLED`,
+   `FEED_MODERATION_MODEL`, `FEED_MODERATION_ENDPOINT`, `FEED_MODERATION_SWEEPER_DELAY_MS`,
+   `FEED_SCRAPE_TIMEOUT_MS`, `FEED_SCRAPE_MAX_BODY_BYTES`, `FEED_SCRAPE_MAX_IMAGE_BYTES`,
+   `FEED_AUTO_ISSUE_REF_ENABLED`, `FEED_NOTIFICATION_ENABLED`, `BULLETIN_ENABLED`,
+   `BULLETIN_NOTIFICATION_ENABLED`, `BULLETIN_WEATHER_CRON`, `BULLETIN_WEATHER_PROVIDER`,
+   `BULLETIN_OPEN_METEO_URL`, `GROQ_API_URL`, `GROQ_MODEL`, `GROQ_REQUESTS_PER_MINUTE`,
+   `FLYWAY_BASELINE_VERSION`.
+
+   Note `AUTH_ACCESS_TOKEN_EXPIRY_SECONDS` / `AUTH_REFRESH_TOKEN_EXPIRY_SECONDS` default to 10 and 30
+   seconds in `application.yaml`. Set real values here or every user is logged out almost at once.
 
    To gate production behind an approval, move the two secrets into a
    `deploy-production` environment with required reviewers and add
@@ -106,8 +139,9 @@ gcloud run services update-traffic hashtaglocal-backend --region us-central1 \
 |---|---|
 | test | A real test failure, run `./gradlew test` locally |
 | Build and push image | Artifact Registry repo missing (run `gcp_setup.sh`) |
-| Deploy to Cloud Run | `run.admin` / *act as* missing, or a secret missing or unreadable by the runtime account |
-| Smoke test | Revision starts but `/actuator/health` is not 200: usually the database is not reachable from Cloud Run, or a bad DB secret. The step prints the health body; the revision's logs show the stack trace |
+| Check the secrets exist | Names the Secret Manager secrets that have no version |
+| Deploy to Cloud Run | `run.admin` / *act as* missing, or a secret unreadable by the runtime account |
+| Smoke test | Revision starts but `/actuator/health` is not 200: usually the database is not reachable from Cloud Run, a bad DB secret, or a failed migration. The step prints the health body; the revision's logs show the stack trace |
 
 **Run the image locally**
 ```bash
