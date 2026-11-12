@@ -9,6 +9,7 @@ on:
     branches:
       - main
       - staging
+      - ci/cloud-run-deploy
   workflow_dispatch:   # re-run a deploy of the selected branch by hand
 
 # One deploy per branch at a time, in push order. Never cancel one half way.
