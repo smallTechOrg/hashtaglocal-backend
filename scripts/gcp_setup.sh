@@ -20,6 +20,7 @@ REGION="${REGION:-us-central1}"
 DEPLOY_SA="${DEPLOY_SA:?set DEPLOY_SA to the GitHub deploy service account email}"
 AR_REPOSITORY="hashtaglocal-backend"
 RUNTIME_SA="hashtaglocal-backend-run@${PROJECT_ID}.iam.gserviceaccount.com"
+SCHEDULER_SA="hashtaglocal-scheduler@${PROJECT_ID}.iam.gserviceaccount.com"
 
 gcloud config set project "$PROJECT_ID" >/dev/null
 
@@ -27,6 +28,7 @@ echo "== Enabling APIs"
 gcloud services enable \
   run.googleapis.com \
   artifactregistry.googleapis.com \
+  cloudscheduler.googleapis.com \
   iamcredentials.googleapis.com
 
 echo "== Artifact Registry repository ${AR_REPOSITORY} (${REGION})"
@@ -48,26 +50,36 @@ EOF
 gcloud artifacts repositories set-cleanup-policies "$AR_REPOSITORY" \
   --location "$REGION" --policy "$POLICY_FILE" >/dev/null
 
-echo "== Runtime service account (no roles: the app uses its own key files)"
-gcloud iam service-accounts describe "$RUNTIME_SA" >/dev/null 2>&1 \
-  || gcloud iam service-accounts create "${RUNTIME_SA%%@*}" \
-       --display-name "Hashtag Local backend (Cloud Run runtime)"
+create_sa() {
+  local email="$1" display="$2"
+  gcloud iam service-accounts describe "$email" >/dev/null 2>&1 \
+    || gcloud iam service-accounts create "${email%%@*}" --display-name "$display"
+}
+
+echo "== Service accounts (no roles: the app uses its own key files and trusts the scheduler by email)"
+create_sa "$RUNTIME_SA" "Hashtag Local backend (Cloud Run runtime)"
+create_sa "$SCHEDULER_SA" "Hashtag Local backend (Cloud Scheduler invoker)"
 
 echo "== Deploy account (${DEPLOY_SA}) can build and deploy"
-for role in roles/run.admin roles/artifactregistry.writer; do
+for role in roles/run.admin roles/artifactregistry.writer roles/cloudscheduler.admin; do
   gcloud projects add-iam-policy-binding "$PROJECT_ID" \
     --member "serviceAccount:${DEPLOY_SA}" --role "$role" --condition None >/dev/null
 done
-# Deploying a service as RUNTIME_SA needs "act as" on that account.
-gcloud iam service-accounts add-iam-policy-binding "$RUNTIME_SA" \
-  --member "serviceAccount:${DEPLOY_SA}" \
-  --role roles/iam.serviceAccountUser >/dev/null
+# Deploying a service as RUNTIME_SA, and a scheduler job that signs tokens as
+# SCHEDULER_SA, both need "act as" on that account.
+for sa in "$RUNTIME_SA" "$SCHEDULER_SA"; do
+  gcloud iam service-accounts add-iam-policy-binding "$sa" \
+    --member "serviceAccount:${DEPLOY_SA}" \
+    --role roles/iam.serviceAccountUser >/dev/null
+done
 
 cat <<EOF
 
 Done. Next:
   1. Add the GCP_PROJECT and GCP_SA_KEY variables and the app variables to the
      GitHub repository (infra/cloud-run.md).
-  2. Merge to staging and check the service URL in the job summary.
-  3. Point the load balancer at the Cloud Run services (infra/cloud-run.md).
+  2. Set the variable CLOUD_SCHEDULER_ENABLED=true when the background jobs
+     should run (until then they stay paused; see infra/cloud-run.md).
+  3. Merge to staging and check the service URL in the job summary.
+  4. Point the load balancer at the Cloud Run services (infra/cloud-run.md).
 EOF

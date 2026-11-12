@@ -33,14 +33,53 @@ which marks all of them as done and never runs them. Hibernate (`ddl-auto: updat
 tables and columns; migrations are for constraints, indexes, back-fills, renames and drops.
 Local dev and tests leave Flyway off.
 
+## Background jobs
+
+Same pattern as `chatbot0`. On a VM the app ran five `@Scheduled` jobs on its own timer. Cloud Run
+instances have no reliable background CPU and may be several, so there the timer is off
+(`SCHEDULER_ENABLED=false`) and Cloud Scheduler calls the app instead:
+
+```
+Cloud Scheduler --(cron, OIDC token)--> POST /jobs/{name} --> the job runs inside the request
+```
+
+| Scheduler job (`<service>-<name>`) | Endpoint | Cron variable (Spring cron) | Default | Off when |
+|---|---|---|---|---|
+| `event-ingestion` | `/jobs/event-ingestion` | `EVENTS_SCRAPE_CRON` | `0 */5 * * * *` | cron is `-` |
+| `bulletin-weather` | `/jobs/bulletin-weather` | `BULLETIN_WEATHER_CRON` | `0 0 8 * * *` | `BULLETIN_ENABLED=false` |
+| `portal-issue-tracking` | `/jobs/portal-issue-tracking` | `PORTALISSUE_CRON` | `0 0 1 * * *` | `PORTALISSUE_ENABLED=false` |
+| `session-cleanup` | `/jobs/session-cleanup` | `AUTH_SESSION_CLEANUP_CRON` | `0 0 3 * * *` | cron is `-` |
+| `feed-moderation-sweep` | `/jobs/feed-moderation-sweep` | `FEED_MODERATION_SWEEP_CRON` | `0 * * * * *` | cron is `-` |
+
+- **The schedule lives in the repo.** Every deploy creates or updates the scheduler jobs. The cron comes
+  from the variable above (so existing values keep working: the seconds field is dropped for Cloud
+  Scheduler), in `Asia/Kolkata`. `-` or `*_ENABLED=false` switches a job off.
+- **Paused by default.** The jobs run only when the variable `CLOUD_SCHEDULER_ENABLED` (or
+  `CLOUD_SCHEDULER_ENABLED_STAGING` / `_PRODUCTION`) is `true`. Each deploy pauses or resumes them to
+  match and fails if it cannot, so pausing by hand in the console is undone by the next deploy.
+  **Leave it off while a VM still runs the same jobs against the same database**, or every job runs
+  twice (duplicate event imports, duplicate push notifications).
+- **Auth.** The service is public, so the endpoint checks the caller itself (`JobInvokerVerifier`): a
+  Google-signed OIDC token with audience `<service>-jobs` from the service account
+  `hashtaglocal-scheduler@`. Anything else gets 401. With either setting unset every call is refused.
+- **One run at a time.** Each run holds a PostgreSQL advisory lock for that job, so a manual run or a
+  second instance cannot overlap it; an overlapping call answers 409 and does nothing.
+- **Responses:** 200 finished (or the job is switched off in this environment), 401 caller not allowed,
+  404 unknown job, 409 already running, 500 the run failed, 503 database unreachable.
+
+Run one now, without waiting for its cron:
+
+```bash
+gcloud scheduler jobs run hashtaglocal-backend-staging-session-cleanup --location us-central1
+```
+
 ## Things that differ from the VM
 
-- **In-process jobs.** The app schedules its own jobs (event scrape every 5 min,
-  weather bulletin 08:00, session cleanup 03:00, feed moderation sweeper). Cloud Run
-  would starve them, so the service runs with `--no-cpu-throttling`,
-  `min-instances=1` and **`max-instances=1`**. With more than one instance every
-  job runs once per instance. Change it only with `CLOUD_RUN_MAX_INSTANCES`
-  after moving the jobs to Cloud Scheduler.
+- **Background jobs** run from Cloud Scheduler, not from the app's own timer (see
+  [Background jobs](#background-jobs)). The service keeps `--no-cpu-throttling` and
+  `min-instances=1` because the feed push notifications are `@Async` and finish after
+  the response. `max-instances` is 1 by default (`CLOUD_RUN_MAX_INSTANCES`); more is safe
+  for the jobs, but every instance opens up to 10 database connections.
 - **Configuration and credentials** are all GitHub repository variables (no Secret Manager).
   The two key files are stored as JSON text in `GCS_KEY_JSON` and `FIREBASE_KEY_JSON`; the
   container's `docker-entrypoint.sh` writes them to `/tmp/keys/` at start. Nothing is baked into the image.
@@ -84,8 +123,9 @@ Local dev and tests leave Flyway off.
    ./scripts/gcp_setup.sh
    ```
    Enables the APIs, creates the `hashtaglocal-backend` image repository and the
-   `hashtaglocal-backend-run@` runtime account (no roles), and gives the deploy account
-   `run.admin`, `artifactregistry.writer` and *act as* on the runtime account. Safe to run again.
+   `hashtaglocal-backend-run@` runtime account and the `hashtaglocal-scheduler@` invoker account (neither
+   has any roles), enables the Cloud Scheduler API, and gives the deploy account `run.admin`,
+   `artifactregistry.writer`, `cloudscheduler.admin` and *act as* on both accounts. Safe to run again.
 
 3. **GitHub** repository settings:
 
@@ -96,6 +136,7 @@ Local dev and tests leave Flyway off.
    | Variable | the required and optional credentials above | see step 1 |
    | Variable | any setting in the list below | plain app setting |
    | Variable | `EXTRA_ENV` | anything else, one `KEY=VALUE` per line (`#` for comments) |
+   | Variable | `CLOUD_SCHEDULER_ENABLED` (or `_STAGING` / `_PRODUCTION`) | `true` to let the background jobs run; paused otherwise |
    | Variable | `GCP_REGION`, `VPC_NETWORK`, `VPC_SUBNET`, `CLOUD_RUN_MIN_INSTANCES`, `CLOUD_RUN_MAX_INSTANCES`, `CLOUD_RUN_CONCURRENCY` | deployment settings, see the workflow |
 
    **App settings read from variables.** Each name is the same as the environment variable in
@@ -117,7 +158,7 @@ Local dev and tests leave Flyway off.
    `FEED_AUTO_ISSUE_REF_ENABLED`, `FEED_NOTIFICATION_ENABLED`, `BULLETIN_ENABLED`,
    `BULLETIN_NOTIFICATION_ENABLED`, `BULLETIN_WEATHER_CRON`, `BULLETIN_WEATHER_PROVIDER`,
    `BULLETIN_OPEN_METEO_URL`, `GROQ_API_URL`, `GROQ_MODEL`, `GROQ_REQUESTS_PER_MINUTE`,
-   `FLYWAY_BASELINE_VERSION`.
+   `FLYWAY_BASELINE_VERSION`, `FEED_MODERATION_SWEEP_CRON`.
 
    Note `AUTH_ACCESS_TOKEN_EXPIRY_SECONDS` / `AUTH_REFRESH_TOKEN_EXPIRY_SECONDS` default to 10 and 30
    seconds in `application.yaml`. Set real values here or every user is logged out almost at once.
