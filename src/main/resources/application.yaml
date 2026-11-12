@@ -14,15 +14,20 @@ spring:
     hibernate:
       ddl-auto: update
     show-sql: true
-    defer-datasource-initialization: true
     properties:
       hibernate:
         format_sql: true
         dialect: org.hibernate.dialect.PostgreSQLDialect
 
-  sql:
-    init:
-      mode: always
+  # Versioned migrations in db/migration, run before Hibernate. Off by default so local dev and
+  # tests keep using ddl-auto; the Cloud Run deploy turns it on (FLYWAY_ENABLED=true).
+  # An existing database with no Flyway history is baselined at FLYWAY_BASELINE_VERSION: it is
+  # treated as already having every migration up to and including that version.
+  flyway:
+    enabled: ${FLYWAY_ENABLED:false}
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    baseline-version: ${FLYWAY_BASELINE_VERSION:1}
   # Added: SMTP settings for sending admin notification emails on account deletion requests
   mail:
     host: ${SPRING_MAIL_HOST:}
@@ -48,6 +53,15 @@ logging:
     rollingpolicy:
       max-file-size: 10MB
       max-history: 10
+
+# Background jobs. In-process @Scheduled jobs run unless SCHEDULER_ENABLED=false (Cloud Run), where
+# Cloud Scheduler calls POST /jobs/{name} instead. A call must carry a Google OIDC token with this
+# audience from one of the allowed service accounts (comma-separated); empty refuses every call.
+jobs:
+  in-process-scheduler: ${SCHEDULER_ENABLED:true}
+  oidc:
+    audience: ${JOBS_OIDC_AUDIENCE:}
+    allowed-invokers: ${JOBS_ALLOWED_INVOKERS:}
 
 # Application-specific custom configuration
 app:

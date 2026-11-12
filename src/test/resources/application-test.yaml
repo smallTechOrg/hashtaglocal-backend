@@ -1,4 +1,6 @@
 spring:
+  flyway:
+    enabled: false
   datasource:
     # Values come from .env (loaded by the Gradle test task) or real environment variables.
     url: ${TEST_DB_URL:jdbc:postgresql://localhost:5432/hashtaglocaltest}

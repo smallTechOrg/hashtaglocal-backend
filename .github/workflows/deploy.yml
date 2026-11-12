@@ -1,0 +1,369 @@
+name: Deploy to Cloud Run
+
+# staging branch -> hashtaglocal-backend-staging, main -> hashtaglocal-backend.
+# Any other branch listed under `on.push` deploys to staging.
+# Details: infra/cloud-run.md.
+
+on:
+  push:
+    branches:
+      - main
+      - staging
+      - ci/cloud-run-deploy
+  workflow_dispatch:   # re-run a deploy of the selected branch by hand
+
+# One deploy per branch at a time, in push order. Never cancel one half way.
+concurrency:
+  group: deploy-${{ github.ref_name }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  PROJECT_ID: ${{ vars.GCP_PROJECT }}
+  REGION: ${{ vars.GCP_REGION || 'us-central1' }}
+  AR_REPOSITORY: hashtaglocal-backend
+  IMAGE_NAME: hashtaglocal-backend
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgis/postgis:16-3.5
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: hashtaglocaltest
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      TEST_DB_URL: jdbc:postgresql://localhost:5432/hashtaglocaltest
+      TEST_DB_USERNAME: postgres
+      TEST_DB_PASSWORD: postgres
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: gradle
+
+      # GcsConfig reads a service-account key file at startup. The tests mock
+      # the storage calls, so a throwaway key is enough.
+      - name: Create throwaway GCS key for the tests
+        run: |
+          openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out "$RUNNER_TEMP/test.pem"
+          jq -n --rawfile key "$RUNNER_TEMP/test.pem" '{
+            type: "service_account", project_id: "test",
+            private_key_id: "test", private_key: $key,
+            client_email: "test@test.iam.gserviceaccount.com", client_id: "1",
+            token_uri: "https://oauth2.googleapis.com/token"
+          }' > "$RUNNER_TEMP/gcs-key.json"
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/gcs-key.json" >> "$GITHUB_ENV"
+
+      - run: ./gradlew --no-daemon test
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      id-token: write   # for the keyless Google login
+    env:
+      IS_PROD: ${{ github.ref_name == 'main' }}
+      APP_ENV: ${{ github.ref_name == 'main' && 'production' || 'staging' }}
+      SERVICE: ${{ github.ref_name == 'main' && 'hashtaglocal-backend' || 'hashtaglocal-backend-staging' }}
+      # The background jobs run from Cloud Scheduler (POST /jobs/{name}), one run
+      # at a time across instances (advisory lock), so more than one instance is
+      # safe; each opens up to 10 database connections, so keep it small. The
+      # feed push notifications are @Async and may be delayed: the organisation
+      # policy requires request-based billing, so CPU is throttled between requests.
+      MIN_INSTANCES: ${{ vars.CLOUD_RUN_MIN_INSTANCES || '0' }}
+      MAX_INSTANCES: ${{ vars.CLOUD_RUN_MAX_INSTANCES || '1' }}
+      CONCURRENCY: ${{ vars.CLOUD_RUN_CONCURRENCY || '40' }}
+      # The database (Cloud SQL) has a private IP, so the service reaches it
+      # through Direct VPC egress. Set VPC_NETWORK to "none" to turn this off.
+      VPC_NETWORK: ${{ vars.VPC_NETWORK || 'default' }}
+      VPC_SUBNET: ${{ vars.VPC_SUBNET || vars.VPC_NETWORK || 'default' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # Keyless login (Workload Identity Federation): GitHub's OIDC token is
+      # exchanged for short-lived Google credentials, so no deploy key is stored
+      # anywhere. The provider only accepts this repository on main, staging and
+      # the temporary test branch.
+      - uses: google-github-actions/auth@v2
+        with:
+          project_id: ${{ vars.GCP_PROJECT }}
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOYER_SA }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Resolve names
+        run: |
+          echo "IMAGE=${REGION}-docker.pkg.dev/${PROJECT_ID}/${AR_REPOSITORY}/${IMAGE_NAME}:${GITHUB_SHA}" >> "$GITHUB_ENV"
+          echo "RUNTIME_SA=hashtaglocal-backend-run@${PROJECT_ID}.iam.gserviceaccount.com" >> "$GITHUB_ENV"
+          echo "SCHEDULER_SA=hashtaglocal-scheduler@${PROJECT_ID}.iam.gserviceaccount.com" >> "$GITHUB_ENV"
+          # Audience of the OIDC token Cloud Scheduler sends: a fixed string per
+          # service, so it is known before the service URL exists.
+          echo "JOBS_AUDIENCE=${SERVICE}-jobs" >> "$GITHUB_ENV"
+          # Settings that differ between the two environments carry the
+          # environment as a suffix, e.g. SPRING_DATASOURCE_PASSWORD_STAGING.
+          echo "SECRET_SUFFIX=$([ "$IS_PROD" = "true" ] && echo PRODUCTION || echo STAGING)" >> "$GITHUB_ENV"
+
+      - name: Build and push image
+        run: |
+          gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
+          docker build -t "$IMAGE" .
+          docker push "$IMAGE"
+
+      - name: Write service environment
+        # Everything comes from GitHub repository variables (no Secret Manager).
+        # KNOWN AND ACCEPTED: GitHub prints a step's env block, and variables are
+        # not masked, so the values appear in this step's log (the repository is
+        # public, so the log is too). Later steps mask them. Only the two steps
+        # that read the variables get VARS_JSON, to keep the copies few.
+        env:
+          VARS_JSON: ${{ toJSON(vars) }}
+        run: |
+          env_file="$RUNNER_TEMP/env.yaml"
+          : > "$env_file"
+          add() { printf '%s: %s\n' "$1" "$(jq -nr --arg v "$2" '$v|@json')" >> "$env_file"; }
+          # NAME_STAGING / NAME_PRODUCTION wins over NAME.
+          var() { echo "$VARS_JSON" | jq -r --arg a "${1}_${SECRET_SUFFIX}" --arg b "$1" '.[$a] // .[$b] // empty'; }
+
+          # Sensitive: masked in the logs, and the deploy fails if a required one is missing.
+          missing=()
+          for name in SPRING_DATASOURCE_URL SPRING_DATASOURCE_USERNAME SPRING_DATASOURCE_PASSWORD GCS_KEY_JSON; do
+            [ -n "$(var "$name")" ] || missing+=("$name")
+          done
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "::error::Missing required repository variables (or the _${SECRET_SUFFIX} form): ${missing[*]}"
+            exit 1
+          fi
+          for name in SPRING_DATASOURCE_URL SPRING_DATASOURCE_USERNAME SPRING_DATASOURCE_PASSWORD GOOGLE_MAPS_API_KEY GROQ_API_KEY GEMINI_API_KEY SPRING_MAIL_PASSWORD GOOGLE_OAUTH_CLIENT_SECRET PORTALISSUE_AUTH_USERNAME PORTALISSUE_AUTH_PASSWORD; do
+            value="$(var "$name")"
+            [ -z "$value" ] || { echo "::add-mask::$value"; add "$name" "$value"; }
+          done
+          # The two key files travel as JSON text; the container writes them to
+          # files at start (docker-entrypoint.sh). Firebase is optional: without
+          # it push notifications are off.
+          for name in GCS_KEY_JSON FIREBASE_KEY_JSON; do
+            value="$(var "$name")"
+            [ -z "$value" ] && continue
+            # Mask each line and the private key, since GitHub masks per line.
+            while IFS= read -r line; do [ "${#line}" -lt 8 ] || echo "::add-mask::$line"; done <<< "$value"
+            add "$name" "$value"
+          done
+
+          # Fixed for Cloud Run.
+          add GOOGLE_APPLICATION_CREDENTIALS "/tmp/keys/gcs-key.json"
+          add FIREBASE_CREDENTIALS_PATH "/tmp/keys/firebase-key.json"
+          # Cloud Logging collects stdout; a log file would only fill memory.
+          add LOGGING_FILE_NAME ""
+          add LOGGING_LEVEL_ORG_SMALLTECH_HASHTAGLOCAL_BACKEND "INFO"
+          add SPRING_JPA_SHOW_SQL "false"
+          add GCS_PROJECT_ID "$PROJECT_ID"
+          # Database migrations (src/main/resources/db/migration) run at startup.
+          add FLYWAY_ENABLED "true"
+          # Jobs are triggered by Cloud Scheduler, not by the in-process timer.
+          add SCHEDULER_ENABLED "false"
+          add JOBS_OIDC_AUDIENCE "$JOBS_AUDIENCE"
+          add JOBS_ALLOWED_INVOKERS "$SCHEDULER_SA"
+
+          # Plain settings. A name with no variable keeps the app's own default
+          # from application.yaml.
+          for name in \
+            APP_SELF_BASE_URL APP_FORWARDED_PREFIX \
+            EVENTS_SCRAPE_URL EVENTS_SCRAPE_CRON \
+            PORTALISSUE_ENABLED PORTALISSUE_CRON PORTALISSUE_SCRAPE_URL PORTALISSUE_REPORT_SCRAPE_URL \
+            PORTALISSUE_REPORT_CONNECT_TIMEOUT_SECONDS PORTALISSUE_REPORT_READ_TIMEOUT_SECONDS \
+            GOOGLE_STORAGE_BUCKET_NAME GOOGLE_OAUTH_CLIENT_ID GOOGLE_OAUTH_REDIRECT_URI \
+            APPLE_BUNDLE_ID GEONAMES_USERNAME \
+            AUTH_ACCESS_TOKEN_EXPIRY_SECONDS AUTH_REFRESH_TOKEN_EXPIRY_SECONDS AUTH_SESSION_CLEANUP_CRON \
+            ACCOUNT_DELETION_ADMIN_EMAIL ACCOUNT_DELETION_FROM_EMAIL \
+            SPRING_MAIL_HOST SPRING_MAIL_PORT SPRING_MAIL_USERNAME SPRING_MAIL_SMTP_AUTH \
+            SPRING_MAIL_SMTP_STARTTLS_ENABLE SPRING_MAIL_SMTP_FROM SPRING_MAIL_SMTP_LOCALHOST \
+            FEED_MODERATION_ENABLED FEED_MODERATION_MODEL FEED_MODERATION_ENDPOINT FEED_MODERATION_SWEEPER_DELAY_MS \
+            FEED_SCRAPE_TIMEOUT_MS FEED_SCRAPE_MAX_BODY_BYTES FEED_SCRAPE_MAX_IMAGE_BYTES \
+            FEED_AUTO_ISSUE_REF_ENABLED FEED_NOTIFICATION_ENABLED \
+            BULLETIN_ENABLED BULLETIN_NOTIFICATION_ENABLED BULLETIN_WEATHER_CRON \
+            BULLETIN_WEATHER_PROVIDER BULLETIN_OPEN_METEO_URL \
+            GROQ_API_URL GROQ_MODEL GROQ_REQUESTS_PER_MINUTE \
+            FLYWAY_BASELINE_VERSION; do
+            value="$(var "$name")"
+            [ -z "$value" ] || add "$name" "$value"
+          done
+          # Defaults that suit the shared load balancer's routes.
+          grep -q '^APP_FORWARDED_PREFIX:' "$env_file" \
+            || add APP_FORWARDED_PREFIX "$([ "$IS_PROD" = "true" ] && echo /local || echo /localstaging)"
+          # PORTALISSUE_REPORT_SCRAPE_URL follows PORTALISSUE_SCRAPE_URL unless set.
+          if ! grep -q '^PORTALISSUE_REPORT_SCRAPE_URL:' "$env_file" && [ -n "$(var PORTALISSUE_SCRAPE_URL)" ]; then
+            add PORTALISSUE_REPORT_SCRAPE_URL "$(var PORTALISSUE_SCRAPE_URL)"
+          fi
+
+          # Anything else: one KEY=VALUE per line in the variable EXTRA_ENV
+          # (or EXTRA_ENV_STAGING / EXTRA_ENV_PRODUCTION).
+          extra="$(var EXTRA_ENV)"
+          while IFS= read -r line; do
+            case "$line" in ''|'#'*) continue ;; esac
+            add "${line%%=*}" "${line#*=}"
+          done <<< "$extra"
+          # Names only: the values include passwords.
+          echo "Service environment variables set:"
+          cut -d: -f1 "$env_file" | sort
+
+      - name: Deploy to Cloud Run (no traffic yet)
+        run: |
+          args=(
+            --image "$IMAGE"
+            --region "$REGION"
+            --service-account "$RUNTIME_SA"
+            --allow-unauthenticated
+            --port 8080
+            --cpu 1
+            --memory 1Gi
+            --concurrency "$CONCURRENCY"
+            --timeout 900
+            --cpu-boost
+            --min-instances "$MIN_INSTANCES"
+            --max-instances "$MAX_INSTANCES"
+            --env-vars-file "$RUNNER_TEMP/env.yaml"
+            --labels "app=hashtaglocal-backend,env=${APP_ENV},commit=${GITHUB_SHA::12}"
+            --quiet
+          )
+          # Reach the database's private IP through Direct VPC egress. Only
+          # private ranges go through the VPC; Groq, Gemini and GCS go out directly.
+          if [ "$VPC_NETWORK" != "none" ]; then
+            args+=(--network "$VPC_NETWORK" --subnet "$VPC_SUBNET" --vpc-egress private-ranges-only)
+          fi
+
+          if gcloud run services describe "$SERVICE" --region "$REGION" >/dev/null 2>&1; then
+            # Existing service: start the new revision without traffic and
+            # give it the "candidate" URL, so it is checked before users see it.
+            gcloud run deploy "$SERVICE" "${args[@]}" --no-traffic --tag candidate
+            echo "FIRST_DEPLOY=false" >> "$GITHUB_ENV"
+          else
+            # First deploy: nothing to protect yet, --no-traffic is not allowed.
+            gcloud run deploy "$SERVICE" "${args[@]}"
+            echo "FIRST_DEPLOY=true" >> "$GITHUB_ENV"
+          fi
+
+      - name: Smoke test the new revision
+        run: |
+          if [ "$FIRST_DEPLOY" = "true" ]; then
+            URL=$(gcloud run services describe "$SERVICE" --region "$REGION" --format='value(status.url)')
+          else
+            URL=$(gcloud run services describe "$SERVICE" --region "$REGION" --format=json \
+              | jq -r '.status.traffic[] | select(.tag == "candidate") | .url')
+          fi
+          echo "Checking $URL/actuator/health"
+          # Spring Boot takes a while to start: allow about 3 minutes.
+          for i in $(seq 1 30); do
+            CODE=$(curl -s -o /tmp/health.json -w '%{http_code}' --max-time 15 "$URL/actuator/health" || true)
+            echo "attempt $i: HTTP $CODE $(head -c 300 /tmp/health.json 2>/dev/null)"
+            if [ "$CODE" = "200" ]; then exit 0; fi
+            sleep 6
+          done
+          echo "::error::New revision did not report a healthy database. Traffic was not moved."
+          exit 1
+
+      - name: Send traffic to the new revision
+        if: env.FIRST_DEPLOY == 'false'
+        run: gcloud run services update-traffic "$SERVICE" --region "$REGION" --to-latest --quiet
+
+      - name: Create or update the Cloud Scheduler jobs
+        # One scheduler job per background job, calling POST /jobs/{name} with an
+        # OIDC token the app checks. The schedule lives here, not in the console.
+        # Each job's cron is the same variable the app used (a Spring cron: the
+        # seconds field is dropped); "-" or a *_ENABLED=false variable switches
+        # the job off. Jobs stay paused until CLOUD_SCHEDULER_ENABLED=true, so
+        # they never run alongside a VM that still runs its own copy.
+        env:
+          VARS_JSON: ${{ toJSON(vars) }}
+        run: |
+          URL=$(gcloud run services describe "$SERVICE" --region "$REGION" --format='value(status.url)')
+          var() { echo "$VARS_JSON" | jq -r --arg a "${1}_${SECRET_SUFFIX}" --arg b "$1" '.[$a] // .[$b] // empty'; }
+          to_unix() { local f; read -ra f <<< "$1"; if [ "${#f[@]}" -eq 6 ]; then unset 'f[0]'; fi; echo "${f[*]}"; }
+          job_state() { gcloud scheduler jobs describe "$1" --location "$REGION" --format='value(state)' 2>/dev/null || true; }
+
+          # endpoint | cron variable | default (Spring cron) | enabled variable
+          jobs=(
+            "event-ingestion|EVENTS_SCRAPE_CRON|0 */5 * * * *|"
+            "bulletin-weather|BULLETIN_WEATHER_CRON|0 0 8 * * *|BULLETIN_ENABLED"
+            "portal-issue-tracking|PORTALISSUE_CRON|0 0 1 * * *|PORTALISSUE_ENABLED"
+            "session-cleanup|AUTH_SESSION_CLEANUP_CRON|0 0 3 * * *|"
+            "feed-moderation-sweep|FEED_MODERATION_SWEEP_CRON|0 * * * * *|"
+          )
+          all_enabled="$(var CLOUD_SCHEDULER_ENABLED)"
+          failed=0
+          for entry in "${jobs[@]}"; do
+            IFS='|' read -r endpoint cron_var default flag_var <<< "$entry"
+            cron="$(var "$cron_var")"; cron="${cron:-$default}"
+            flag=""; [ -z "$flag_var" ] || flag="$(var "$flag_var")"
+            job="${SERVICE}-${endpoint}"
+
+            want=PAUSED
+            schedule="0 0 1 1 *"   # a date that cannot fire soon, for a switched-off job
+            if [ "$cron" != "-" ]; then
+              schedule="$(to_unix "$cron")"
+              if [ "$all_enabled" = "true" ] && [ "$flag" != "false" ]; then want=ENABLED; fi
+            fi
+
+            args=(
+              --location "$REGION"
+              --time-zone "Asia/Kolkata"
+              --uri "${URL}/jobs/${endpoint}"
+              --http-method POST
+              --oidc-service-account-email "$SCHEDULER_SA"
+              --oidc-token-audience "$JOBS_AUDIENCE"
+              --attempt-deadline 900s
+              --description "${endpoint} for ${SERVICE} (managed by GitHub Actions)"
+              --quiet
+            )
+            if [ -z "$(job_state "$job")" ]; then
+              # A created job starts ENABLED: create it on a schedule that cannot
+              # fire soon and pause it at once, until the state below is decided.
+              gcloud scheduler jobs create http "$job" "${args[@]}" --schedule "0 0 1 1 *"
+              gcloud scheduler jobs pause "$job" --location "$REGION" --quiet
+            fi
+            gcloud scheduler jobs update http "$job" "${args[@]}" --schedule "$schedule"
+
+            # No "|| true": a pause or resume that fails must fail the deploy.
+            if [ "$want" = "ENABLED" ]; then
+              [ "$(job_state "$job")" = "ENABLED" ] || gcloud scheduler jobs resume "$job" --location "$REGION" --quiet
+            else
+              [ "$(job_state "$job")" = "PAUSED" ] || gcloud scheduler jobs pause "$job" --location "$REGION" --quiet
+            fi
+            state="$(job_state "$job")"
+            echo "${job}: ${state} (${schedule})"
+            echo "| ${endpoint} | ${schedule} | ${state} |" >> "$RUNNER_TEMP/scheduler_rows"
+            if [ "$state" != "$want" ]; then
+              echo "::error::${job} is ${state}, expected ${want}."
+              failed=1
+            fi
+          done
+          [ "$failed" = "0" ] || exit 1
+          if [ "$all_enabled" != "true" ]; then
+            echo "::warning::The scheduler jobs are paused. Set the repository variable CLOUD_SCHEDULER_ENABLED_${SECRET_SUFFIX} (or CLOUD_SCHEDULER_ENABLED) to true to run them."
+          fi
+
+      - name: Summary
+        run: |
+          URL=$(gcloud run services describe "$SERVICE" --region "$REGION" --format='value(status.url)')
+          {
+            echo "### Deployed ${SERVICE}"
+            echo "- URL: ${URL}"
+            echo "- Image: \`${IMAGE}\`"
+            echo "- Environment: ${APP_ENV}"
+            echo ""
+            echo "| Job | Schedule (Asia/Kolkata) | State |"
+            echo "|---|---|---|"
+            cat "$RUNNER_TEMP/scheduler_rows" 2>/dev/null || true
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -72,3 +72,16 @@ To run all the test cases, use this command:
 ```declarative
 ./gradlew test
 ```
+## Deployment
+
+The app runs on Google Cloud Run. Pushing to `main` deploys production and pushing to `staging` deploys
+staging, through `.github/workflows/deploy.yml`: test, build the image, deploy a no-traffic revision,
+smoke-test `/actuator/health`, then move traffic. All settings and credentials are GitHub repository
+variables (`NAME`, with `NAME_STAGING` / `NAME_PRODUCTION` overrides); see [infra/cloud-run.md](infra/cloud-run.md).
+
+- **Background jobs** (event ingestion, weather bulletin, portal issues, session cleanup, feed moderation)
+  run from Cloud Scheduler calling `POST /jobs/{name}`, not from in-process timers
+  (`SCHEDULER_ENABLED=false` on Cloud Run). Locally the `@Scheduled` timers still run as before.
+- **Migrations** use Flyway (`src/main/resources/db/migration`, enabled with `FLYWAY_ENABLED=true`, which the
+  deploy sets). See the [migration rules](src/main/resources/db/migration/README.md).
+- The older VM-based deployment is described in [infra/deployment.md](infra/deployment.md).
