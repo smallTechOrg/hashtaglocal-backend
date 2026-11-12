@@ -83,7 +83,7 @@ jobs:
       # safe; each opens up to 10 database connections, so keep it small. The
       # feed push notifications are @Async and may be delayed: the organisation
       # policy requires request-based billing, so CPU is throttled between requests.
-      MIN_INSTANCES: ${{ vars.CLOUD_RUN_MIN_INSTANCES || '1' }}
+      MIN_INSTANCES: ${{ vars.CLOUD_RUN_MIN_INSTANCES || '0' }}
       MAX_INSTANCES: ${{ vars.CLOUD_RUN_MAX_INSTANCES || '1' }}
       CONCURRENCY: ${{ vars.CLOUD_RUN_CONCURRENCY || '40' }}
       # The database (Cloud SQL) has a private IP, so the service reaches it
