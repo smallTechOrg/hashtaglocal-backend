@@ -118,21 +118,22 @@ gcloud scheduler jobs run hashtaglocal-backend-staging-session-cleanup --locatio
 
 2. **GCP** (as project Owner):
    ```bash
-   PROJECT_ID=<project> REGION=us-central1 \
-   DEPLOY_SA=github-deployer@<project>.iam.gserviceaccount.com \
-   ./scripts/gcp_setup.sh
+   PROJECT_ID=<project> REGION=us-central1 ./scripts/gcp_setup.sh
    ```
-   Enables the APIs, creates the `hashtaglocal-backend` image repository and the
-   `hashtaglocal-backend-run@` runtime account and the `hashtaglocal-scheduler@` invoker account (neither
-   has any roles), enables the Cloud Scheduler API, and gives the deploy account `run.admin`,
-   `artifactregistry.writer`, `cloudscheduler.admin` and *act as* on both accounts. Safe to run again.
+   Enables the APIs, creates the `hashtaglocal-backend` image repository and three service accounts:
+   `hashtaglocal-backend-run@` (runtime) and `hashtaglocal-scheduler@` (Cloud Scheduler invoker), neither
+   with any roles, and `hashtaglocal-deployer@` (`run.admin`, `artifactregistry.writer`,
+   `cloudscheduler.admin`, `compute.networkUser`, and *act as* on the other two). It also adds a
+   Workload Identity provider so GitHub can sign in as the deployer **without a stored key**, only for
+   this repository and the branches `main`, `staging` and `ci/cloud-run-deploy` (the last one is for the
+   test deploys; drop it from `BRANCHES` when merged). Safe to run again.
 
 3. **GitHub** repository settings:
 
    | Kind | Name | Notes |
    |---|---|---|
    | Variable | `GCP_PROJECT` | project id |
-   | Variable | `GCP_SA_KEY` | the whole JSON key of the deploy account (masked in the workflow logs) |
+   | Variable | `GCP_WORKLOAD_IDENTITY_PROVIDER`, `GCP_DEPLOYER_SA` | printed by `gcp_setup.sh`; GitHub signs in to Google keylessly (no deploy key is stored) |
    | Variable | the required and optional credentials above | see step 1 |
    | Variable | any setting in the list below | plain app setting |
    | Variable | `EXTRA_ENV` | anything else, one `KEY=VALUE` per line (`#` for comments) |

@@ -70,6 +70,9 @@ jobs:
   deploy:
     needs: test
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      id-token: write   # for the keyless Google login
     env:
       IS_PROD: ${{ github.ref_name == 'main' }}
       APP_ENV: ${{ github.ref_name == 'main' && 'production' || 'staging' }}
@@ -86,23 +89,18 @@ jobs:
       # through Direct VPC egress. Set VPC_NETWORK to "none" to turn this off.
       VPC_NETWORK: ${{ vars.VPC_NETWORK || 'default' }}
       VPC_SUBNET: ${{ vars.VPC_SUBNET || vars.VPC_NETWORK || 'default' }}
-      # Every repository variable, read by name in the environment step below.
-      VARS_JSON: ${{ toJSON(vars) }}
     steps:
       - uses: actions/checkout@v4
 
-      # GCP_SA_KEY is a repository variable, which GitHub does not mask: mask it
-      # (line by line) before anything can print it.
-      - name: Mask the deploy key
-        env:
-          GCP_SA_KEY: ${{ vars.GCP_SA_KEY }}
-        run: |
-          while IFS= read -r line; do [ "${#line}" -lt 8 ] || echo "::add-mask::$line"; done <<< "$GCP_SA_KEY"
-
+      # Keyless login (Workload Identity Federation): GitHub's OIDC token is
+      # exchanged for short-lived Google credentials, so no deploy key is stored
+      # anywhere. The provider only accepts this repository on main, staging and
+      # the temporary test branch (scripts/gcp_setup.sh).
       - uses: google-github-actions/auth@v2
         with:
           project_id: ${{ vars.GCP_PROJECT }}
-          credentials_json: ${{ vars.GCP_SA_KEY }}
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOYER_SA }}
 
       - uses: google-github-actions/setup-gcloud@v2
 
@@ -126,7 +124,12 @@ jobs:
 
       - name: Write service environment
         # Everything comes from GitHub repository variables (no Secret Manager).
-        # Variables are not masked by GitHub, so sensitive values are masked here.
+        # KNOWN AND ACCEPTED: GitHub prints a step's env block, and variables are
+        # not masked, so the values appear in this step's log (the repository is
+        # public, so the log is too). Later steps mask them. Only the two steps
+        # that read the variables get VARS_JSON, to keep the copies few.
+        env:
+          VARS_JSON: ${{ toJSON(vars) }}
         run: |
           env_file="$RUNNER_TEMP/env.yaml"
           : > "$env_file"
@@ -281,6 +284,8 @@ jobs:
         # seconds field is dropped); "-" or a *_ENABLED=false variable switches
         # the job off. Jobs stay paused until CLOUD_SCHEDULER_ENABLED=true, so
         # they never run alongside a VM that still runs its own copy.
+        env:
+          VARS_JSON: ${{ toJSON(vars) }}
         run: |
           URL=$(gcloud run services describe "$SERVICE" --region "$REGION" --format='value(status.url)')
           var() { echo "$VARS_JSON" | jq -r --arg a "${1}_${SECRET_SUFFIX}" --arg b "$1" '.[$a] // .[$b] // empty'; }
