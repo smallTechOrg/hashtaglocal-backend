@@ -2,7 +2,7 @@ name: Deploy to Cloud Run
 
 # staging branch -> hashtaglocal-backend-staging, main -> hashtaglocal-backend.
 # Any other branch listed under `on.push` deploys to staging.
-# One-time GCP setup: scripts/gcp_setup.sh. Details: infra/cloud-run.md.
+# Details: infra/cloud-run.md.
 
 on:
   push:
@@ -96,7 +96,7 @@ jobs:
       # Keyless login (Workload Identity Federation): GitHub's OIDC token is
       # exchanged for short-lived Google credentials, so no deploy key is stored
       # anywhere. The provider only accepts this repository on main, staging and
-      # the temporary test branch (scripts/gcp_setup.sh).
+      # the temporary test branch.
       - uses: google-github-actions/auth@v2
         with:
           project_id: ${{ vars.GCP_PROJECT }}
