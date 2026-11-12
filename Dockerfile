@@ -22,11 +22,14 @@ WORKDIR /app
 # Run as an unprivileged user.
 RUN useradd --system --uid 10001 app
 COPY --from=build --chown=app /app.jar app.jar
+COPY --chown=app docker-entrypoint.sh /app/docker-entrypoint.sh
+RUN chmod 755 /app/docker-entrypoint.sh
 USER app
 
 # Cloud Run sets PORT (8080 by default); Spring Boot's server.port default matches.
 ENV PORT=8080
 EXPOSE 8080
 
-# Size the heap from the container's memory limit.
-ENTRYPOINT ["java", "-XX:MaxRAMPercentage=75", "-XX:+ExitOnOutOfMemoryError", "-jar", "app.jar"]
+# Writes the key files from the environment, then starts the JVM (heap sized
+# from the container's memory limit).
+ENTRYPOINT ["/app/docker-entrypoint.sh"]

@@ -41,8 +41,9 @@ Local dev and tests leave Flyway off.
   `min-instances=1` and **`max-instances=1`**. With more than one instance every
   job runs once per instance. Change it only with `CLOUD_RUN_MAX_INSTANCES`
   after moving the jobs to Cloud Scheduler.
-- **Key files** (`gcs-key.json`, `firebase-key.json`) are Secret Manager secrets
-  mounted as files at `/secrets/gcs/` and `/secrets/firebase/`. Nothing is baked into the image.
+- **Configuration and credentials** are all GitHub repository variables (no Secret Manager).
+  The two key files are stored as JSON text in `GCS_KEY_JSON` and `FIREBASE_KEY_JSON`; the
+  container's `docker-entrypoint.sh` writes them to `/tmp/keys/` at start. Nothing is baked into the image.
 - **Logs** go to stdout (Cloud Logging); the log file is turned off.
 - **Database** is reached through Direct VPC egress on the `default` network
   (private ranges only), because Cloud SQL has a private IP.
@@ -54,19 +55,27 @@ Local dev and tests leave Flyway off.
 
 ## One-time setup
 
-1. **Secrets** in Secret Manager (all must exist before step 2):
+1. **GitHub repository variables** (Settings → Secrets and variables → Actions → *Variables*).
+   This is a deliberate choice: every app setting and credential is a variable, none is in Secret Manager.
+   Variables are plaintext to anyone with access to the repository and to the Cloud Run service, so keep
+   both restricted. The workflow masks the sensitive ones in its logs and never prints values.
 
-   | Env var in the app | Secret |
+   Required, per environment (`NAME_STAGING` for `staging`, `NAME_PRODUCTION` for `main`; a plain `NAME`
+   is used by both). The deploy fails and names the missing ones:
+
+   | Variable | Value |
    |---|---|
-   | `SPRING_DATASOURCE_URL` / `_USERNAME` / `_PASSWORD` | `HASHTAGLOCAL_DB_URL_<ENV>` / `HASHTAGLOCAL_DB_USERNAME_<ENV>` / `HASHTAGLOCAL_DB_PASSWORD_<ENV>` (`<ENV>` = `STAGING` or `PRODUCTION`) |
-   | file `/secrets/gcs/gcs-key.json` | `HASHTAGLOCAL_GCS_KEY` |
-   | file `/secrets/firebase/firebase-key.json` | `HASHTAGLOCAL_FIREBASE_KEY` |
-   | `GOOGLE_MAPS_API_KEY`, `GROQ_API_KEY`, `GEMINI_API_KEY` | same name |
-   | `SPRING_MAIL_PASSWORD`, `GOOGLE_OAUTH_CLIENT_SECRET` | same name |
-   | `PORTALISSUE_AUTH_USERNAME`, `PORTALISSUE_AUTH_PASSWORD` | same name |
+   | `SPRING_DATASOURCE_URL_<ENV>` | full JDBC URL, e.g. `jdbc:postgresql://10.110.112.7:5432/hashtaglocal` |
+   | `SPRING_DATASOURCE_USERNAME_<ENV>` | database user |
+   | `SPRING_DATASOURCE_PASSWORD_<ENV>` | the raw password, not URL-encoded |
+   | `GCS_KEY_JSON` | the whole contents of `gcs-key.json` |
 
-   The JDBC URL secret is the full URL, e.g. `jdbc:postgresql://10.110.112.7:5432/hashtaglocal`.
-   The password is the raw one, not URL-encoded.
+   Optional credentials (the app default is empty or off): `FIREBASE_KEY_JSON` (the whole `firebase-key.json`;
+   without it push notifications are off), `GOOGLE_MAPS_API_KEY`, `GROQ_API_KEY`, `GEMINI_API_KEY`,
+   `SPRING_MAIL_PASSWORD`, `GOOGLE_OAUTH_CLIENT_SECRET`, `PORTALISSUE_AUTH_USERNAME`, `PORTALISSUE_AUTH_PASSWORD`.
+   A missing `GEMINI_API_KEY` means feed posts go to human review instead of auto-publishing.
+
+   Everything else is listed under *GitHub settings* below.
 
 2. **GCP** (as project Owner):
    ```bash
@@ -75,9 +84,8 @@ Local dev and tests leave Flyway off.
    ./scripts/gcp_setup.sh
    ```
    Enables the APIs, creates the `hashtaglocal-backend` image repository and the
-   `hashtaglocal-backend-run@` runtime account (can read those secrets, nothing else),
-   and gives the deploy account `run.admin`, `artifactregistry.writer` and *act as*
-   on the runtime account. Safe to run again.
+   `hashtaglocal-backend-run@` runtime account (no roles), and gives the deploy account
+   `run.admin`, `artifactregistry.writer` and *act as* on the runtime account. Safe to run again.
 
 3. **GitHub** repository settings:
 
@@ -85,6 +93,7 @@ Local dev and tests leave Flyway off.
    |---|---|---|
    | Secret | `GCP_PROJECT` | project id |
    | Secret | `GCP_SA_KEY` | JSON key of the deploy account |
+   | Variable | the required and optional credentials above | see step 1 |
    | Variable | any setting in the list below | plain app setting |
    | Variable | `EXTRA_ENV` | anything else, one `KEY=VALUE` per line (`#` for comments) |
    | Variable | `GCP_REGION`, `VPC_NETWORK`, `VPC_SUBNET`, `CLOUD_RUN_MIN_INSTANCES`, `CLOUD_RUN_MAX_INSTANCES`, `CLOUD_RUN_CONCURRENCY` | deployment settings, see the workflow |
@@ -139,19 +148,13 @@ gcloud run services update-traffic hashtaglocal-backend --region us-central1 \
 |---|---|
 | test | A real test failure, run `./gradlew test` locally |
 | Build and push image | Artifact Registry repo missing (run `gcp_setup.sh`) |
-| Check the secrets exist | Names the Secret Manager secrets that have no version |
-| Deploy to Cloud Run | `run.admin` / *act as* missing, or a secret unreadable by the runtime account |
+| Write service environment | Names the required repository variables that are missing |
+| Deploy to Cloud Run | `run.admin` / *act as* missing, or the runtime service account is missing |
 | Smoke test | Revision starts but `/actuator/health` is not 200: usually the database is not reachable from Cloud Run, a bad DB secret, or a failed migration. The step prints the health body; the revision's logs show the stack trace |
 
 **Run the image locally**
 ```bash
 docker build -t hashtaglocal-backend .
-docker run --rm -p 8080:8080 \
-  -e SPRING_DATASOURCE_URL=jdbc:postgresql://host.docker.internal:5432/hashtaglocal \
-  -e SPRING_DATASOURCE_USERNAME=postgres -e SPRING_DATASOURCE_PASSWORD=... \
-  -e LOGGING_FILE_NAME= \
-  -v "$PWD/gcs-key.json:/secrets/gcs/gcs-key.json:ro" \
-  -e GOOGLE_APPLICATION_CREDENTIALS=/secrets/gcs/gcs-key.json \
-  hashtaglocal-backend
+docker run --rm -p 8080:8080   -e SPRING_DATASOURCE_URL=jdbc:postgresql://host.docker.internal:5432/hashtaglocal   -e SPRING_DATASOURCE_USERNAME=postgres -e SPRING_DATASOURCE_PASSWORD=...   -e LOGGING_FILE_NAME=   -e GOOGLE_APPLICATION_CREDENTIALS=/tmp/keys/gcs-key.json   -e GCS_KEY_JSON="$(cat gcs-key.json)"   hashtaglocal-backend
 curl localhost:8080/actuator/health
 ```

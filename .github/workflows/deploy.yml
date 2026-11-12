@@ -100,21 +100,9 @@ jobs:
         run: |
           echo "IMAGE=${REGION}-docker.pkg.dev/${PROJECT_ID}/${AR_REPOSITORY}/${IMAGE_NAME}:${GITHUB_SHA}" >> "$GITHUB_ENV"
           echo "RUNTIME_SA=hashtaglocal-backend-run@${PROJECT_ID}.iam.gserviceaccount.com" >> "$GITHUB_ENV"
-          # Secrets that differ between the two databases carry the environment
-          # as a suffix, e.g. HASHTAGLOCAL_DB_PASSWORD_STAGING.
-          suffix=$([ "$IS_PROD" = "true" ] && echo PRODUCTION || echo STAGING)
-          echo "SECRET_SUFFIX=$suffix" >> "$GITHUB_ENV"
-          # Secret Manager secret -> env var, or -> file for the two key files.
-          # DB secrets differ per environment (suffix); the rest are shared.
-          map="SPRING_DATASOURCE_URL=HASHTAGLOCAL_DB_URL_${suffix}:latest"
-          map+=",SPRING_DATASOURCE_USERNAME=HASHTAGLOCAL_DB_USERNAME_${suffix}:latest"
-          map+=",SPRING_DATASOURCE_PASSWORD=HASHTAGLOCAL_DB_PASSWORD_${suffix}:latest"
-          for s in GOOGLE_MAPS_API_KEY GROQ_API_KEY GEMINI_API_KEY SPRING_MAIL_PASSWORD GOOGLE_OAUTH_CLIENT_SECRET PORTALISSUE_AUTH_USERNAME PORTALISSUE_AUTH_PASSWORD; do
-            map+=",${s}=${s}:latest"
-          done
-          map+=",/secrets/gcs/gcs-key.json=HASHTAGLOCAL_GCS_KEY:latest"
-          map+=",/secrets/firebase/firebase-key.json=HASHTAGLOCAL_FIREBASE_KEY:latest"
-          echo "SECRET_MAP=$map" >> "$GITHUB_ENV"
+          # Settings that differ between the two environments carry the
+          # environment as a suffix, e.g. SPRING_DATASOURCE_PASSWORD_STAGING.
+          echo "SECRET_SUFFIX=$([ "$IS_PROD" = "true" ] && echo PRODUCTION || echo STAGING)" >> "$GITHUB_ENV"
 
       - name: Build and push image
         run: |
@@ -122,29 +110,43 @@ jobs:
           docker build -t "$IMAGE" .
           docker push "$IMAGE"
 
-      - name: Check the secrets exist
-        # Fail here, with the names, instead of inside gcloud run deploy.
-        run: |
-          missing=()
-          for entry in $(echo "$SECRET_MAP" | tr ',' ' '); do
-            secret="${entry#*=}"; secret="${secret%:latest}"
-            gcloud secrets versions describe latest --secret "$secret" >/dev/null 2>&1 || missing+=("$secret")
-          done
-          if [ "${#missing[@]}" -gt 0 ]; then
-            echo "::error::Secret Manager has no usable version of: ${missing[*]}"
-            exit 1
-          fi
-
       - name: Write service environment
-        # Plain settings. Secrets come from Secret Manager (--set-secrets below).
+        # Everything comes from GitHub repository variables (no Secret Manager).
+        # Variables are not masked by GitHub, so sensitive values are masked here.
         run: |
           env_file="$RUNNER_TEMP/env.yaml"
           : > "$env_file"
           add() { printf '%s: %s\n' "$1" "$(jq -nr --arg v "$2" '$v|@json')" >> "$env_file"; }
+          # NAME_STAGING / NAME_PRODUCTION wins over NAME.
+          var() { echo "$VARS_JSON" | jq -r --arg a "${1}_${SECRET_SUFFIX}" --arg b "$1" '.[$a] // .[$b] // empty'; }
+
+          # Sensitive: masked in the logs, and the deploy fails if a required one is missing.
+          missing=()
+          for name in SPRING_DATASOURCE_URL SPRING_DATASOURCE_USERNAME SPRING_DATASOURCE_PASSWORD GCS_KEY_JSON; do
+            [ -n "$(var "$name")" ] || missing+=("$name")
+          done
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "::error::Missing required repository variables (or the _${SECRET_SUFFIX} form): ${missing[*]}"
+            exit 1
+          fi
+          for name in SPRING_DATASOURCE_URL SPRING_DATASOURCE_USERNAME SPRING_DATASOURCE_PASSWORD GOOGLE_MAPS_API_KEY GROQ_API_KEY GEMINI_API_KEY SPRING_MAIL_PASSWORD GOOGLE_OAUTH_CLIENT_SECRET PORTALISSUE_AUTH_USERNAME PORTALISSUE_AUTH_PASSWORD; do
+            value="$(var "$name")"
+            [ -z "$value" ] || { echo "::add-mask::$value"; add "$name" "$value"; }
+          done
+          # The two key files travel as JSON text; the container writes them to
+          # files at start (docker-entrypoint.sh). Firebase is optional: without
+          # it push notifications are off.
+          for name in GCS_KEY_JSON FIREBASE_KEY_JSON; do
+            value="$(var "$name")"
+            [ -z "$value" ] && continue
+            # Mask each line and the private key, since GitHub masks per line.
+            while IFS= read -r line; do [ "${#line}" -lt 8 ] || echo "::add-mask::$line"; done <<< "$value"
+            add "$name" "$value"
+          done
 
           # Fixed for Cloud Run.
-          add GOOGLE_APPLICATION_CREDENTIALS "/secrets/gcs/gcs-key.json"
-          add FIREBASE_CREDENTIALS_PATH "/secrets/firebase/firebase-key.json"
+          add GOOGLE_APPLICATION_CREDENTIALS "/tmp/keys/gcs-key.json"
+          add FIREBASE_CREDENTIALS_PATH "/tmp/keys/firebase-key.json"
           # Cloud Logging collects stdout; a log file would only fill memory.
           add LOGGING_FILE_NAME ""
           add LOGGING_LEVEL_ORG_SMALLTECH_HASHTAGLOCAL_BACKEND "INFO"
@@ -153,10 +155,8 @@ jobs:
           # Database migrations (src/main/resources/db/migration) run at startup.
           add FLYWAY_ENABLED "true"
 
-          # Settings read from repository variables. For each NAME the variable
-          # NAME_STAGING / NAME_PRODUCTION wins over NAME, and a name with no
-          # variable keeps the app's own default from application.yaml.
-          var() { echo "$VARS_JSON" | jq -r --arg a "${1}_${SECRET_SUFFIX}" --arg b "$1" '.[$a] // .[$b] // empty'; }
+          # Plain settings. A name with no variable keeps the app's own default
+          # from application.yaml.
           for name in \
             APP_SELF_BASE_URL APP_FORWARDED_PREFIX \
             EVENTS_SCRAPE_URL EVENTS_SCRAPE_CRON \
@@ -193,7 +193,9 @@ jobs:
             case "$line" in ''|'#'*) continue ;; esac
             add "${line%%=*}" "${line#*=}"
           done <<< "$extra"
-          cat "$env_file"
+          # Names only: the values include passwords.
+          echo "Service environment variables set:"
+          cut -d: -f1 "$env_file" | sort
 
       - name: Deploy to Cloud Run (no traffic yet)
         run: |
@@ -212,7 +214,6 @@ jobs:
             --min-instances "$MIN_INSTANCES"
             --max-instances "$MAX_INSTANCES"
             --env-vars-file "$RUNNER_TEMP/env.yaml"
-            --set-secrets "$SECRET_MAP"
             --labels "app=hashtaglocal-backend,env=${APP_ENV},commit=${GITHUB_SHA::12}"
             --quiet
           )
