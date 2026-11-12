@@ -116,24 +116,23 @@ gcloud scheduler jobs run hashtaglocal-backend-staging-session-cleanup --locatio
 
    Everything else is listed under *GitHub settings* below.
 
-2. **GCP** (as project Owner):
-   ```bash
-   PROJECT_ID=<project> REGION=us-central1 ./scripts/gcp_setup.sh
-   ```
-   Enables the APIs, creates the `hashtaglocal-backend` image repository and three service accounts:
-   `hashtaglocal-backend-run@` (runtime) and `hashtaglocal-scheduler@` (Cloud Scheduler invoker), neither
-   with any roles, and `hashtaglocal-deployer@` (`run.admin`, `artifactregistry.writer`,
-   `cloudscheduler.admin`, `compute.networkUser`, and *act as* on the other two). It also adds a
-   Workload Identity provider so GitHub can sign in as the deployer **without a stored key**, only for
-   this repository and the branches `main`, `staging` and `ci/cloud-run-deploy` (the last one is for the
-   test deploys; drop it from `BRANCHES` when merged). Safe to run again.
+2. **GCP** (one time, as project Owner). Already done for `ai-agent-boilerplate0`:
+   - Enable the Cloud Run, Artifact Registry, Cloud Scheduler and IAM Credentials APIs.
+   - Create the Artifact Registry repository `hashtaglocal-backend`.
+   - Create the service accounts `hashtaglocal-backend-run@` (runtime) and `hashtaglocal-scheduler@`
+     (Cloud Scheduler invoker), with no roles.
+   - Give the shared `github-deployer@` the roles `run.admin`, `artifactregistry.writer`,
+     `cloudscheduler.admin` and `compute.networkUser`, and *act as* on the two accounts above.
+   - Add a Workload Identity provider `hashtaglocal-github` to the `github` pool, limited to this
+     repository and the branches `main` and `staging`, and let that repository impersonate
+     `github-deployer@` (`roles/iam.workloadIdentityUser`). No deploy key is stored.
 
 3. **GitHub** repository settings:
 
    | Kind | Name | Notes |
    |---|---|---|
    | Variable | `GCP_PROJECT` | project id |
-   | Variable | `GCP_WORKLOAD_IDENTITY_PROVIDER`, `GCP_DEPLOYER_SA` | printed by `gcp_setup.sh`; GitHub signs in to Google keylessly (no deploy key is stored) |
+   | Variable | `GCP_WORKLOAD_IDENTITY_PROVIDER`, `GCP_DEPLOYER_SA` | GitHub signs in to Google keylessly (no deploy key is stored) |
    | Variable | the required and optional credentials above | see step 1 |
    | Variable | any setting in the list below | plain app setting |
    | Variable | `EXTRA_ENV` | anything else, one `KEY=VALUE` per line (`#` for comments) |
@@ -189,7 +188,7 @@ gcloud run services update-traffic hashtaglocal-backend --region us-central1 \
 | Step | Usual cause |
 |---|---|
 | test | A real test failure, run `./gradlew test` locally |
-| Build and push image | Artifact Registry repo missing (run `gcp_setup.sh`) |
+| Build and push image | Artifact Registry repo missing |
 | Write service environment | Names the required repository variables that are missing |
 | Deploy to Cloud Run | `run.admin` / *act as* missing, or the runtime service account is missing |
 | Smoke test | Revision starts but `/actuator/health` is not 200: usually the database is not reachable from Cloud Run, a bad DB secret, or a failed migration. The step prints the health body; the revision's logs show the stack trace |
