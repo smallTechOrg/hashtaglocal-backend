@@ -1,7 +1,7 @@
 name: Deploy to Cloud Run
 
 # staging branch -> hashtaglocal-backend-staging, main -> hashtaglocal-backend.
-# Any other branch listed under `on.push` (currently ci/cloud-run-deploy) deploys to staging.
+# Any other branch listed under `on.push` deploys to staging.
 # One-time GCP setup: scripts/gcp_setup.sh. Details: infra/cloud-run.md.
 
 on:
@@ -9,7 +9,6 @@ on:
     branches:
       - main
       - staging
-      - ci/cloud-run-deploy   # TEMPORARY: test deploys to staging from this branch. Remove before merging.
   workflow_dispatch:   # re-run a deploy of the selected branch by hand
 
 # One deploy per branch at a time, in push order. Never cancel one half way.
@@ -78,8 +77,8 @@ jobs:
       # The background jobs run from Cloud Scheduler (POST /jobs/{name}), one run
       # at a time across instances (advisory lock), so more than one instance is
       # safe; each opens up to 10 database connections, so keep it small. The
-      # feed push notifications are @Async and finish after the response, which
-      # is why CPU stays allocated (--no-cpu-throttling below).
+      # feed push notifications are @Async and may be delayed: the organisation
+      # policy requires request-based billing, so CPU is throttled between requests.
       MIN_INSTANCES: ${{ vars.CLOUD_RUN_MIN_INSTANCES || '1' }}
       MAX_INSTANCES: ${{ vars.CLOUD_RUN_MAX_INSTANCES || '1' }}
       CONCURRENCY: ${{ vars.CLOUD_RUN_CONCURRENCY || '40' }}
@@ -229,7 +228,6 @@ jobs:
             --concurrency "$CONCURRENCY"
             --timeout 900
             --cpu-boost
-            --no-cpu-throttling
             --min-instances "$MIN_INSTANCES"
             --max-instances "$MAX_INSTANCES"
             --env-vars-file "$RUNNER_TEMP/env.yaml"
