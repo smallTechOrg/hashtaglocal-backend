@@ -1,6 +1,7 @@
 name: Deploy to Cloud Run
 
 # staging branch -> hashtaglocal-backend-staging, main -> hashtaglocal-backend.
+# Any other branch listed under `on.push` (currently ci/cloud-run-deploy) deploys to staging.
 # One-time GCP setup: scripts/gcp_setup.sh. Details: infra/cloud-run.md.
 
 on:
@@ -8,6 +9,7 @@ on:
     branches:
       - main
       - staging
+      - ci/cloud-run-deploy   # TEMPORARY: test deploys to staging from this branch. Remove before merging.
   workflow_dispatch:   # re-run a deploy of the selected branch by hand
 
 # One deploy per branch at a time, in push order. Never cancel one half way.
