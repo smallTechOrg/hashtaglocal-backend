@@ -21,7 +21,7 @@ permissions:
   contents: read
 
 env:
-  PROJECT_ID: ${{ secrets.GCP_PROJECT }}
+  PROJECT_ID: ${{ vars.GCP_PROJECT }}
   REGION: ${{ vars.GCP_REGION || 'us-central1' }}
   AR_REPOSITORY: hashtaglocal-backend
   IMAGE_NAME: hashtaglocal-backend
@@ -91,10 +91,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # GCP_SA_KEY is a repository variable, which GitHub does not mask: mask it
+      # (line by line) before anything can print it.
+      - name: Mask the deploy key
+        env:
+          GCP_SA_KEY: ${{ vars.GCP_SA_KEY }}
+        run: |
+          while IFS= read -r line; do [ "${#line}" -lt 8 ] || echo "::add-mask::$line"; done <<< "$GCP_SA_KEY"
+
       - uses: google-github-actions/auth@v2
         with:
-          project_id: ${{ secrets.GCP_PROJECT }}
-          credentials_json: ${{ secrets.GCP_SA_KEY }}
+          project_id: ${{ vars.GCP_PROJECT }}
+          credentials_json: ${{ vars.GCP_SA_KEY }}
 
       - uses: google-github-actions/setup-gcloud@v2
 

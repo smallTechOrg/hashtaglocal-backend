@@ -91,8 +91,8 @@ Local dev and tests leave Flyway off.
 
    | Kind | Name | Notes |
    |---|---|---|
-   | Secret | `GCP_PROJECT` | project id |
-   | Secret | `GCP_SA_KEY` | JSON key of the deploy account |
+   | Variable | `GCP_PROJECT` | project id |
+   | Variable | `GCP_SA_KEY` | the whole JSON key of the deploy account (masked in the workflow logs) |
    | Variable | the required and optional credentials above | see step 1 |
    | Variable | any setting in the list below | plain app setting |
    | Variable | `EXTRA_ENV` | anything else, one `KEY=VALUE` per line (`#` for comments) |
@@ -122,7 +122,7 @@ Local dev and tests leave Flyway off.
    Note `AUTH_ACCESS_TOKEN_EXPIRY_SECONDS` / `AUTH_REFRESH_TOKEN_EXPIRY_SECONDS` default to 10 and 30
    seconds in `application.yaml`. Set real values here or every user is logged out almost at once.
 
-   To gate production behind an approval, move the two secrets into a
+   To gate production behind an approval, move the two variables into a
    `deploy-production` environment with required reviewers and add
    `environment:` to the deploy job.
 
