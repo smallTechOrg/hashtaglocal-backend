@@ -94,6 +94,54 @@ class AuthRefreshServiceTest {
     verify(tokenService).refreshExpiryEpochSeconds();
   }
 
+  private UserAuthSessionEntity sessionWithActiveAccessToken() {
+    UserAuthSessionEntity session =
+        createActiveSession(ACCESS_TOKEN, FUTURE_TIME, REFRESH_TOKEN, FUTURE_TIME);
+    when(userAuthSessionRepository.findByRefreshToken(REFRESH_TOKEN))
+        .thenReturn(Optional.of(session));
+    when(tokenService.nowEpochSeconds()).thenReturn(CURRENT_TIME);
+    return session;
+  }
+
+  @Test
+  void testRefreshTokens_WithAppVersion_StoresItOnSession() {
+    UserAuthSessionEntity session = sessionWithActiveAccessToken();
+
+    authRefreshService.refreshTokens(REFRESH_TOKEN, null, null, "1.2.3");
+
+    assertEquals("1.2.3", session.getAppVersion());
+  }
+
+  @Test
+  void testRefreshTokens_WithNewerAppVersion_OverwritesOldOne() {
+    UserAuthSessionEntity session = sessionWithActiveAccessToken();
+    session.setAppVersion("1.0.0");
+
+    authRefreshService.refreshTokens(REFRESH_TOKEN, null, null, "1.2.3");
+
+    assertEquals("1.2.3", session.getAppVersion());
+  }
+
+  @Test
+  void testRefreshTokens_WithBlankOrMissingAppVersion_KeepsExistingValue() {
+    UserAuthSessionEntity session = sessionWithActiveAccessToken();
+    session.setAppVersion("1.0.0");
+
+    authRefreshService.refreshTokens(REFRESH_TOKEN, null, null, null);
+    authRefreshService.refreshTokens(REFRESH_TOKEN, null, null, "   ");
+
+    assertEquals("1.0.0", session.getAppVersion());
+  }
+
+  @Test
+  void testRefreshTokens_WithOversizedAppVersion_IsIgnored() {
+    UserAuthSessionEntity session = sessionWithActiveAccessToken();
+
+    authRefreshService.refreshTokens(REFRESH_TOKEN, null, null, "9".repeat(51));
+
+    assertNull(session.getAppVersion());
+  }
+
   @Test
   void testRefreshTokens_WithValidRefreshToken_AndActiveAccessToken_ShouldReturnExistingTokens() {
     // Arrange

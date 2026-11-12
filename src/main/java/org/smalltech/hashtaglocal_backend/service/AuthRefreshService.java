@@ -3,7 +3,6 @@ package org.smalltech.hashtaglocal_backend.service;
 import jakarta.transaction.Transactional;
 import java.util.Optional;
 import org.smalltech.hashtaglocal_backend.entity.UserAuthSessionEntity;
-import org.smalltech.hashtaglocal_backend.entity.UserEntity;
 import org.smalltech.hashtaglocal_backend.model.TokenResponse;
 import org.smalltech.hashtaglocal_backend.model.response.AuthTokenResponseData;
 import org.smalltech.hashtaglocal_backend.repository.UserAuthSessionRepository;
@@ -61,13 +60,14 @@ public class AuthRefreshService {
     if (deviceId != null && session.getDeviceId() == null) {
       session.setDeviceId(deviceId);
     }
-    // Keep the user's latest app version current. The user entity is managed in this
+    // Keep the session's latest app version current. The session entity is managed in this
     // transaction, so the change is flushed on commit; only written when it actually changed.
-    if (appVersion != null && !appVersion.isBlank()) {
-      UserEntity user = session.getUser();
-      if (user != null && !appVersion.equals(user.getAppVersion())) {
-        user.setAppVersion(appVersion);
-      }
+    // Versions longer than the column are ignored so metadata can never break a refresh.
+    if (appVersion != null
+        && !appVersion.isBlank()
+        && appVersion.length() <= 50
+        && !appVersion.equals(session.getAppVersion())) {
+      session.setAppVersion(appVersion);
     }
 
     Long accessExpiry = session.getAccessTokenExpiryTs();

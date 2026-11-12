@@ -55,10 +55,6 @@ public class UserEntity {
   @Builder.Default
   private int karmaPending = 0;
 
-  /** Latest mobile app version this user was seen on (updated on token refresh). */
-  @Column(length = 50)
-  private String appVersion;
-
   @CreationTimestamp
   @Column(nullable = false, updatable = false)
   private LocalDateTime createdAt;
