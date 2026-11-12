@@ -3,6 +3,7 @@ package org.smalltech.hashtaglocal_backend.service;
 import jakarta.transaction.Transactional;
 import java.util.Optional;
 import org.smalltech.hashtaglocal_backend.entity.UserAuthSessionEntity;
+import org.smalltech.hashtaglocal_backend.entity.UserEntity;
 import org.smalltech.hashtaglocal_backend.model.TokenResponse;
 import org.smalltech.hashtaglocal_backend.model.response.AuthTokenResponseData;
 import org.smalltech.hashtaglocal_backend.repository.UserAuthSessionRepository;
@@ -22,7 +23,7 @@ public class AuthRefreshService {
   }
 
   public AuthTokenResponseData refreshTokens(
-      String refreshToken, String notificationToken, String deviceId) {
+      String refreshToken, String notificationToken, String deviceId, String appVersion) {
 
     System.out.println("Attempting to refresh tokens");
 
@@ -59,6 +60,14 @@ public class AuthRefreshService {
     // Backfill device_id for sessions created before it was tracked (e.g. Google OAuth sessions).
     if (deviceId != null && session.getDeviceId() == null) {
       session.setDeviceId(deviceId);
+    }
+    // Keep the user's latest app version current. The user entity is managed in this
+    // transaction, so the change is flushed on commit; only written when it actually changed.
+    if (appVersion != null && !appVersion.isBlank()) {
+      UserEntity user = session.getUser();
+      if (user != null && !appVersion.equals(user.getAppVersion())) {
+        user.setAppVersion(appVersion);
+      }
     }
 
     Long accessExpiry = session.getAccessTokenExpiryTs();

@@ -118,7 +118,10 @@ public class AuthController {
 
     AuthTokenResponseData tokenData =
         authRefreshService.refreshTokens(
-            request.getRefreshToken(), request.getNotificationToken(), request.getDeviceId());
+            request.getRefreshToken(),
+            request.getNotificationToken(),
+            request.getDeviceId(),
+            request.getAppVersion());
 
     return ResponseEntity.ok(
         NewAPIResponse.<AuthTokenResponseData>builder().data(tokenData).build());
