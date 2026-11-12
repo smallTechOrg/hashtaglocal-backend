@@ -26,6 +26,12 @@ public class AccessTokenAuthFilter extends OncePerRequestFilter {
     this.userAuthSessionRepository = userAuthSessionRepository;
   }
 
+  /** Job calls carry a Google OIDC token, checked by JobInvokerVerifier, not a user session. */
+  @Override
+  protected boolean shouldNotFilter(HttpServletRequest request) {
+    return request.getServletPath().startsWith("/jobs/");
+  }
+
   @Override
   protected void doFilterInternal(
       HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)

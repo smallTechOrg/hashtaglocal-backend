@@ -75,10 +75,11 @@ jobs:
       IS_PROD: ${{ github.ref_name == 'main' }}
       APP_ENV: ${{ github.ref_name == 'main' && 'production' || 'staging' }}
       SERVICE: ${{ github.ref_name == 'main' && 'hashtaglocal-backend' || 'hashtaglocal-backend-staging' }}
-      # The app runs @Scheduled jobs in-process (event scrape, bulletin,
-      # session cleanup, feed moderation sweeper), so exactly one instance must
-      # always be running with CPU: min 1, max 1, no CPU throttling. Raise
-      # CLOUD_RUN_MAX_INSTANCES only if every job may run once per instance.
+      # The background jobs run from Cloud Scheduler (POST /jobs/{name}), one run
+      # at a time across instances (advisory lock), so more than one instance is
+      # safe; each opens up to 10 database connections, so keep it small. The
+      # feed push notifications are @Async and finish after the response, which
+      # is why CPU stays allocated (--no-cpu-throttling below).
       MIN_INSTANCES: ${{ vars.CLOUD_RUN_MIN_INSTANCES || '1' }}
       MAX_INSTANCES: ${{ vars.CLOUD_RUN_MAX_INSTANCES || '1' }}
       CONCURRENCY: ${{ vars.CLOUD_RUN_CONCURRENCY || '40' }}
@@ -110,6 +111,10 @@ jobs:
         run: |
           echo "IMAGE=${REGION}-docker.pkg.dev/${PROJECT_ID}/${AR_REPOSITORY}/${IMAGE_NAME}:${GITHUB_SHA}" >> "$GITHUB_ENV"
           echo "RUNTIME_SA=hashtaglocal-backend-run@${PROJECT_ID}.iam.gserviceaccount.com" >> "$GITHUB_ENV"
+          echo "SCHEDULER_SA=hashtaglocal-scheduler@${PROJECT_ID}.iam.gserviceaccount.com" >> "$GITHUB_ENV"
+          # Audience of the OIDC token Cloud Scheduler sends: a fixed string per
+          # service, so it is known before the service URL exists.
+          echo "JOBS_AUDIENCE=${SERVICE}-jobs" >> "$GITHUB_ENV"
           # Settings that differ between the two environments carry the
           # environment as a suffix, e.g. SPRING_DATASOURCE_PASSWORD_STAGING.
           echo "SECRET_SUFFIX=$([ "$IS_PROD" = "true" ] && echo PRODUCTION || echo STAGING)" >> "$GITHUB_ENV"
@@ -164,6 +169,10 @@ jobs:
           add GCS_PROJECT_ID "$PROJECT_ID"
           # Database migrations (src/main/resources/db/migration) run at startup.
           add FLYWAY_ENABLED "true"
+          # Jobs are triggered by Cloud Scheduler, not by the in-process timer.
+          add SCHEDULER_ENABLED "false"
+          add JOBS_OIDC_AUDIENCE "$JOBS_AUDIENCE"
+          add JOBS_ALLOWED_INVOKERS "$SCHEDULER_SA"
 
           # Plain settings. A name with no variable keeps the app's own default
           # from application.yaml.
@@ -218,7 +227,7 @@ jobs:
             --cpu 1
             --memory 1Gi
             --concurrency "$CONCURRENCY"
-            --timeout 300
+            --timeout 900
             --cpu-boost
             --no-cpu-throttling
             --min-instances "$MIN_INSTANCES"
@@ -267,6 +276,80 @@ jobs:
         if: env.FIRST_DEPLOY == 'false'
         run: gcloud run services update-traffic "$SERVICE" --region "$REGION" --to-latest --quiet
 
+      - name: Create or update the Cloud Scheduler jobs
+        # One scheduler job per background job, calling POST /jobs/{name} with an
+        # OIDC token the app checks. The schedule lives here, not in the console.
+        # Each job's cron is the same variable the app used (a Spring cron: the
+        # seconds field is dropped); "-" or a *_ENABLED=false variable switches
+        # the job off. Jobs stay paused until CLOUD_SCHEDULER_ENABLED=true, so
+        # they never run alongside a VM that still runs its own copy.
+        run: |
+          URL=$(gcloud run services describe "$SERVICE" --region "$REGION" --format='value(status.url)')
+          var() { echo "$VARS_JSON" | jq -r --arg a "${1}_${SECRET_SUFFIX}" --arg b "$1" '.[$a] // .[$b] // empty'; }
+          to_unix() { local f; read -ra f <<< "$1"; if [ "${#f[@]}" -eq 6 ]; then unset 'f[0]'; fi; echo "${f[*]}"; }
+          job_state() { gcloud scheduler jobs describe "$1" --location "$REGION" --format='value(state)' 2>/dev/null || true; }
+
+          # endpoint | cron variable | default (Spring cron) | enabled variable
+          jobs=(
+            "event-ingestion|EVENTS_SCRAPE_CRON|0 */5 * * * *|"
+            "bulletin-weather|BULLETIN_WEATHER_CRON|0 0 8 * * *|BULLETIN_ENABLED"
+            "portal-issue-tracking|PORTALISSUE_CRON|0 0 1 * * *|PORTALISSUE_ENABLED"
+            "session-cleanup|AUTH_SESSION_CLEANUP_CRON|0 0 3 * * *|"
+            "feed-moderation-sweep|FEED_MODERATION_SWEEP_CRON|0 * * * * *|"
+          )
+          all_enabled="$(var CLOUD_SCHEDULER_ENABLED)"
+          failed=0
+          for entry in "${jobs[@]}"; do
+            IFS='|' read -r endpoint cron_var default flag_var <<< "$entry"
+            cron="$(var "$cron_var")"; cron="${cron:-$default}"
+            flag=""; [ -z "$flag_var" ] || flag="$(var "$flag_var")"
+            job="${SERVICE}-${endpoint}"
+
+            want=PAUSED
+            schedule="0 0 1 1 *"   # a date that cannot fire soon, for a switched-off job
+            if [ "$cron" != "-" ]; then
+              schedule="$(to_unix "$cron")"
+              if [ "$all_enabled" = "true" ] && [ "$flag" != "false" ]; then want=ENABLED; fi
+            fi
+
+            args=(
+              --location "$REGION"
+              --time-zone "Asia/Kolkata"
+              --uri "${URL}/jobs/${endpoint}"
+              --http-method POST
+              --oidc-service-account-email "$SCHEDULER_SA"
+              --oidc-token-audience "$JOBS_AUDIENCE"
+              --attempt-deadline 900s
+              --description "${endpoint} for ${SERVICE} (managed by GitHub Actions)"
+              --quiet
+            )
+            if [ -z "$(job_state "$job")" ]; then
+              # A created job starts ENABLED: create it on a schedule that cannot
+              # fire soon and pause it at once, until the state below is decided.
+              gcloud scheduler jobs create http "$job" "${args[@]}" --schedule "0 0 1 1 *"
+              gcloud scheduler jobs pause "$job" --location "$REGION" --quiet
+            fi
+            gcloud scheduler jobs update http "$job" "${args[@]}" --schedule "$schedule"
+
+            # No "|| true": a pause or resume that fails must fail the deploy.
+            if [ "$want" = "ENABLED" ]; then
+              [ "$(job_state "$job")" = "ENABLED" ] || gcloud scheduler jobs resume "$job" --location "$REGION" --quiet
+            else
+              [ "$(job_state "$job")" = "PAUSED" ] || gcloud scheduler jobs pause "$job" --location "$REGION" --quiet
+            fi
+            state="$(job_state "$job")"
+            echo "${job}: ${state} (${schedule})"
+            echo "| ${endpoint} | ${schedule} | ${state} |" >> "$RUNNER_TEMP/scheduler_rows"
+            if [ "$state" != "$want" ]; then
+              echo "::error::${job} is ${state}, expected ${want}."
+              failed=1
+            fi
+          done
+          [ "$failed" = "0" ] || exit 1
+          if [ "$all_enabled" != "true" ]; then
+            echo "::warning::The scheduler jobs are paused. Set the repository variable CLOUD_SCHEDULER_ENABLED_${SECRET_SUFFIX} (or CLOUD_SCHEDULER_ENABLED) to true to run them."
+          fi
+
       - name: Summary
         run: |
           URL=$(gcloud run services describe "$SERVICE" --region "$REGION" --format='value(status.url)')
@@ -275,4 +358,8 @@ jobs:
             echo "- URL: ${URL}"
             echo "- Image: \`${IMAGE}\`"
             echo "- Environment: ${APP_ENV}"
+            echo ""
+            echo "| Job | Schedule (Asia/Kolkata) | State |"
+            echo "|---|---|---|"
+            cat "$RUNNER_TEMP/scheduler_rows" 2>/dev/null || true
           } >> "$GITHUB_STEP_SUMMARY"

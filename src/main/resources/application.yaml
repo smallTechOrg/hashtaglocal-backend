@@ -54,6 +54,15 @@ logging:
       max-file-size: 10MB
       max-history: 10
 
+# Background jobs. In-process @Scheduled jobs run unless SCHEDULER_ENABLED=false (Cloud Run), where
+# Cloud Scheduler calls POST /jobs/{name} instead. A call must carry a Google OIDC token with this
+# audience from one of the allowed service accounts (comma-separated); empty refuses every call.
+jobs:
+  in-process-scheduler: ${SCHEDULER_ENABLED:true}
+  oidc:
+    audience: ${JOBS_OIDC_AUDIENCE:}
+    allowed-invokers: ${JOBS_ALLOWED_INVOKERS:}
+
 # Application-specific custom configuration
 app:
   geo:
