@@ -72,7 +72,8 @@ class AuthRefreshServiceTest {
     when(tokenService.refreshExpiryEpochSeconds()).thenReturn(newRefreshTokenExpiry);
 
     // Act
-    AuthTokenResponseData response = authRefreshService.refreshTokens(REFRESH_TOKEN, null, null, null);
+    AuthTokenResponseData response =
+        authRefreshService.refreshTokens(REFRESH_TOKEN, null, null, null);
 
     // Assert
     assertNotNull(response);
@@ -157,7 +158,8 @@ class AuthRefreshServiceTest {
     when(tokenService.nowEpochSeconds()).thenReturn(CURRENT_TIME);
 
     // Act
-    AuthTokenResponseData response = authRefreshService.refreshTokens(REFRESH_TOKEN, null, null, null);
+    AuthTokenResponseData response =
+        authRefreshService.refreshTokens(REFRESH_TOKEN, null, null, null);
 
     // Assert
     assertNotNull(response);
