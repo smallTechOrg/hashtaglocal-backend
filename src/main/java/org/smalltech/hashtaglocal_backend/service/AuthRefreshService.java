@@ -6,6 +6,7 @@ import org.smalltech.hashtaglocal_backend.entity.UserAuthSessionEntity;
 import org.smalltech.hashtaglocal_backend.model.TokenResponse;
 import org.smalltech.hashtaglocal_backend.model.response.AuthTokenResponseData;
 import org.smalltech.hashtaglocal_backend.repository.UserAuthSessionRepository;
+import org.smalltech.hashtaglocal_backend.util.AppVersionUtil;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -62,12 +63,10 @@ public class AuthRefreshService {
     }
     // Keep the session's latest app version current. The session entity is managed in this
     // transaction, so the change is flushed on commit; only written when it actually changed.
-    // Versions longer than the column are ignored so metadata can never break a refresh.
-    if (appVersion != null
-        && !appVersion.isBlank()
-        && appVersion.length() <= 50
-        && !appVersion.equals(session.getAppVersion())) {
-      session.setAppVersion(appVersion);
+    // Blank or oversized versions are ignored so metadata can never break a refresh.
+    String cleanVersion = AppVersionUtil.sanitize(appVersion);
+    if (cleanVersion != null && !cleanVersion.equals(session.getAppVersion())) {
+      session.setAppVersion(cleanVersion);
     }
 
     Long accessExpiry = session.getAccessTokenExpiryTs();

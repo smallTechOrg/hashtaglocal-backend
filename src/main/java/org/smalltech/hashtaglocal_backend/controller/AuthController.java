@@ -44,7 +44,8 @@ public class AuthController {
       @RequestParam(value = "code_verifier", required = false) String codeVerifier,
       @RequestParam(value = "redirect_uri", required = false) String redirectUri,
       @RequestParam(value = "platform", required = false) Platform platform,
-      @RequestParam(value = "device_id", required = false) String deviceId) {
+      @RequestParam(value = "device_id", required = false) String deviceId,
+      @RequestParam(value = "app_version", required = false) String appVersion) {
 
     System.out.println("/auth/google/callback hit");
     System.out.println("Auth Code: " + code);
@@ -56,6 +57,7 @@ public class AuthController {
             .redirectUri(redirectUri)
             .platform(platform)
             .deviceId(deviceId)
+            .appVersion(appVersion)
             .build();
 
     var tokenData = resolveAuthService(GOOGLE_PROVIDER).authenticate(request);
@@ -69,7 +71,8 @@ public class AuthController {
   public ResponseEntity<NewAPIResponse<AuthTokenResponseData>> authenticateWithAccessToken(
       @RequestParam("access_token") String accessToken,
       @RequestParam(value = "platform", required = false) Platform platform,
-      @RequestParam(value = "device_id", required = false) String deviceId) {
+      @RequestParam(value = "device_id", required = false) String deviceId,
+      @RequestParam(value = "app_version", required = false) String appVersion) {
 
     System.out.println("/auth/google/token hit");
     System.out.println("Google Access Token: " + accessToken);
@@ -79,6 +82,7 @@ public class AuthController {
             .accessToken(accessToken)
             .platform(platform)
             .deviceId(deviceId)
+            .appVersion(appVersion)
             .build();
 
     var tokenData = resolveAuthService(GOOGLE_PROVIDER).authenticate(request);
@@ -101,6 +105,7 @@ public class AuthController {
             .notificationToken(request.getNotificationToken())
             .platform(request.getPlatform())
             .deviceId(request.getDeviceId())
+            .appVersion(request.getAppVersion())
             .build();
 
     var tokenData = resolveAuthService(APPLE_PROVIDER).authenticate(oAuthRequest);
