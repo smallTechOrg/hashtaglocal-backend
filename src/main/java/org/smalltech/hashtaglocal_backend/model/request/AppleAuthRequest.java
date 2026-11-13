@@ -27,4 +27,7 @@ public class AppleAuthRequest {
 
   @JsonProperty("device_id")
   private String deviceId;
+
+  @JsonProperty("app_version")
+  private String appVersion;
 }

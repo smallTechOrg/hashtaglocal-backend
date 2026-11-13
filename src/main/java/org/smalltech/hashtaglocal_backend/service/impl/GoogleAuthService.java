@@ -22,6 +22,7 @@ import org.smalltech.hashtaglocal_backend.repository.UserAuthSessionRepository;
 import org.smalltech.hashtaglocal_backend.repository.UserRepository;
 import org.smalltech.hashtaglocal_backend.service.OAuthService;
 import org.smalltech.hashtaglocal_backend.service.TokenService;
+import org.smalltech.hashtaglocal_backend.util.AppVersionUtil;
 import org.smalltech.hashtaglocal_backend.util.UsernameUtil;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -78,7 +79,8 @@ public class GoogleAuthService implements OAuthService {
           request.getAccessToken(),
           request.getNotificationToken(),
           request.getPlatform(),
-          request.getDeviceId());
+          request.getDeviceId(),
+          request.getAppVersion());
     }
     return handleAuthorizationCode(
         request.getCode(),
@@ -86,7 +88,8 @@ public class GoogleAuthService implements OAuthService {
         request.getRedirectUri(),
         request.getNotificationToken(),
         request.getPlatform(),
-        request.getDeviceId());
+        request.getDeviceId(),
+        request.getAppVersion());
   }
 
   public AuthTokenResponseData handleAuthorizationCode(
@@ -95,7 +98,8 @@ public class GoogleAuthService implements OAuthService {
       String clientRedirectUri,
       String notificationToken,
       Platform platform,
-      String deviceId) {
+      String deviceId,
+      String appVersion) {
 
     System.out.println("Exchanging auth code for Google tokens");
 
@@ -133,11 +137,16 @@ public class GoogleAuthService implements OAuthService {
         (String) payload.get("name"),
         notificationToken,
         platform,
-        deviceId);
+        deviceId,
+        appVersion);
   }
 
   public AuthTokenResponseData handleAccessToken(
-      String accessToken, String notificationToken, Platform platform, String deviceId) {
+      String accessToken,
+      String notificationToken,
+      Platform platform,
+      String deviceId,
+      String appVersion) {
 
     System.out.println("Fetching Google user info");
 
@@ -154,7 +163,8 @@ public class GoogleAuthService implements OAuthService {
         googleUser.getName(),
         notificationToken,
         platform,
-        deviceId);
+        deviceId,
+        appVersion);
   }
 
   private AuthTokenResponseData loginOrSignup(
@@ -164,7 +174,8 @@ public class GoogleAuthService implements OAuthService {
       String name,
       String notificationToken,
       Platform platform,
-      String deviceId) {
+      String deviceId,
+      String appVersion) {
 
     System.out.println("Google userId: " + providerUserId);
 
@@ -214,7 +225,8 @@ public class GoogleAuthService implements OAuthService {
       isNewUser = true;
     }
 
-    return createSession(user, provider, isNewUser, notificationToken, platform, deviceId);
+    return createSession(
+        user, provider, isNewUser, notificationToken, platform, deviceId, appVersion);
   }
 
   private static final int MAX_ACTIVE_SESSIONS = 10;
@@ -225,7 +237,8 @@ public class GoogleAuthService implements OAuthService {
       boolean isNewUser,
       String notificationToken,
       Platform platform,
-      String deviceId) {
+      String deviceId,
+      String appVersion) {
 
     // Enforce per-user session cap — deactivate oldest sessions if over the limit
     List<Long> activeIds =
@@ -250,6 +263,7 @@ public class GoogleAuthService implements OAuthService {
                 .notificationToken(notificationToken)
                 .platform(platform)
                 .deviceId(deviceId)
+                .appVersion(AppVersionUtil.sanitize(appVersion))
                 .isActive(true)
                 .build());
 
