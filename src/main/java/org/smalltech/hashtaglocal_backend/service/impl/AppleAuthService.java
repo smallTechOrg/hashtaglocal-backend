@@ -24,6 +24,7 @@ import org.smalltech.hashtaglocal_backend.repository.UserAuthSessionRepository;
 import org.smalltech.hashtaglocal_backend.repository.UserRepository;
 import org.smalltech.hashtaglocal_backend.service.OAuthService;
 import org.smalltech.hashtaglocal_backend.service.TokenService;
+import org.smalltech.hashtaglocal_backend.util.AppVersionUtil;
 import org.smalltech.hashtaglocal_backend.util.UsernameUtil;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -70,7 +71,8 @@ public class AppleAuthService implements OAuthService {
         request.getFullName(),
         request.getNotificationToken(),
         request.getPlatform(),
-        request.getDeviceId());
+        request.getDeviceId(),
+        request.getAppVersion());
   }
 
   public AuthTokenResponseData handleIdentityToken(
@@ -78,12 +80,13 @@ public class AppleAuthService implements OAuthService {
       String fullName,
       String notificationToken,
       Platform platform,
-      String deviceId) {
+      String deviceId,
+      String appVersion) {
     System.out.println("âž¡ï¸ Verifying Apple identity token");
     JWTClaimsSet claims = verifyIdentityToken(identityToken);
     String sub = claims.getSubject();
     String email = (String) claims.getClaim("email");
-    return loginOrSignup(sub, email, fullName, notificationToken, platform, deviceId);
+    return loginOrSignup(sub, email, fullName, notificationToken, platform, deviceId, appVersion);
   }
 
   private JWTClaimsSet verifyIdentityToken(String identityToken) {
@@ -118,7 +121,8 @@ public class AppleAuthService implements OAuthService {
       String fullName,
       String notificationToken,
       Platform platform,
-      String deviceId) {
+      String deviceId,
+      String appVersion) {
 
     System.out.println("ðŸ‘¤ Apple userId: " + providerUserId);
 
@@ -159,7 +163,7 @@ public class AppleAuthService implements OAuthService {
       System.out.println("âœ… Provider saved | ID: " + provider.getId());
     }
 
-    return createSession(user, provider, notificationToken, platform, deviceId);
+    return createSession(user, provider, notificationToken, platform, deviceId, appVersion);
   }
 
   private static final int MAX_ACTIVE_SESSIONS = 10;
@@ -169,7 +173,8 @@ public class AppleAuthService implements OAuthService {
       UserAuthProviderEntity provider,
       String notificationToken,
       Platform platform,
-      String deviceId) {
+      String deviceId,
+      String appVersion) {
 
     // Enforce per-user session cap — deactivate oldest sessions if over the limit
     List<Long> activeIds =
@@ -194,6 +199,7 @@ public class AppleAuthService implements OAuthService {
                 .notificationToken(notificationToken)
                 .platform(platform)
                 .deviceId(deviceId)
+                .appVersion(AppVersionUtil.sanitize(appVersion))
                 .isActive(true)
                 .build());
 

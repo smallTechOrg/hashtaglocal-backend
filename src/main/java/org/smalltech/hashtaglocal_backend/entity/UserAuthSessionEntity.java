@@ -46,6 +46,10 @@ public class UserAuthSessionEntity {
   @Column(length = 15)
   private Platform platform;
 
+  /** Latest mobile app version seen on this session (updated on token refresh). */
+  @Column(length = 50)
+  private String appVersion;
+
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "user_id", nullable = false)
   private UserEntity user;
