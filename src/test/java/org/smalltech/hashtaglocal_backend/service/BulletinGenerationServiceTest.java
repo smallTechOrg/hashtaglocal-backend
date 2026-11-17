@@ -50,6 +50,7 @@ class BulletinGenerationServiceTest {
   @Mock private WeatherProvider weatherProvider;
   @Mock private GroqClient groqClient;
   @Mock private FeedService feedService;
+  @Mock private QuizQueueService quizQueueService;
   @Mock private JavaMailSender mailSender;
 
   private BulletinGenerationService service;
@@ -65,6 +66,7 @@ class BulletinGenerationServiceTest {
             weatherProvider,
             groqClient,
             feedService,
+            quizQueueService,
             mailSender);
     ReflectionTestUtils.setField(service, "alertAdminEmail", "admin@example.com");
     ReflectionTestUtils.setField(service, "alertFromEmail", "noreply@example.com");

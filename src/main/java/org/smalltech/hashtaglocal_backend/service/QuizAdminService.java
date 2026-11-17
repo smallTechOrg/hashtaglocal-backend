@@ -278,6 +278,8 @@ public class QuizAdminService {
         .options(BulletinViewMapper.optionTexts(quiz))
         .answerOptionIndex(quiz.getAnswerOptionIndex())
         .explanation(quiz.getExplanation())
+        .status(quiz.getStatus())
+        .rejectionReason(quiz.getRejectionReason())
         .hasAttempts(hasAttempts)
         .build();
   }

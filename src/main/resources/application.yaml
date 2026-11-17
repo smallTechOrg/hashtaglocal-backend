@@ -184,6 +184,13 @@ groq:
     # Spaces every Groq call: ~450 tokens per request stays under the 7000 tokens/minute limit.
     requests-per-minute: ${GROQ_REQUESTS_PER_MINUTE:12}
 
+# Anthropic (Claude) — generates the daily #local quiz candidates for ops review.
+anthropic:
+  api:
+    key: ${ANTHROPIC_API_KEY:}
+    url: ${ANTHROPIC_API_URL:https://api.anthropic.com/v1/messages}
+    model: ${ANTHROPIC_MODEL:claude-sonnet-5-5}
+
 portalissue:
   enabled: ${PORTALISSUE_ENABLED:true}
   cron: ${PORTALISSUE_CRON:0 0 1 * * *}
