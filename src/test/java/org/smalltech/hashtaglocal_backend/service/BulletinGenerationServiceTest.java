@@ -151,6 +151,26 @@ class BulletinGenerationServiceTest {
   }
 
   @Test
+  void fallbackAlertEmailShowsTheGroqErrorPerLocality() {
+    Locality locality =
+        stubGeneration(
+            "satara",
+            new GroqClient.WeatherSummary(
+                "Today: 21°C.", true, "503 Service Unavailable: model is over capacity"));
+    when(userRepository.findDistinctUserLocalities()).thenReturn(List.of(locality));
+
+    service.generateForAllUserLocalities();
+
+    ArgumentCaptor<SimpleMailMessage> captor = ArgumentCaptor.forClass(SimpleMailMessage.class);
+    verify(mailSender).send(captor.capture());
+    assertTrue(
+        captor
+            .getValue()
+            .getText()
+            .contains("satara — 503 Service Unavailable: model is over capacity"));
+  }
+
+  @Test
   void aiSummaryIsNotCountedAsFallback() {
     Locality locality =
         stubGeneration("satara", new GroqClient.WeatherSummary("Grab a raincoat.", false));

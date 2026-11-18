@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ThreadLocalRandom;
 import lombok.extern.slf4j.Slf4j;
 import org.smalltech.hashtaglocal_backend.service.weather.WeatherSnapshot;
 import org.springframework.beans.factory.annotation.Value;
@@ -11,7 +13,10 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.HttpServerErrorException;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
 
 /**
  * Groq chat-completions client (OpenAI-compatible REST, no SDK) for the two bulletin texts: the
@@ -66,11 +71,16 @@ public class GroqClient {
 
   // ─────────────────────────────────────────────────────────────────────────
 
-  // A rate-limited request is retried after Groq's retry-after wait. A wait above the cap means a
-  // longer limit (e.g. tokens per day) was hit, so give up rather than hold the caller.
+  // A rate-limited (429) request is retried after Groq's retry-after wait. A transient failure
+  // (503 "over capacity", other 5xx gateway errors, timeouts) is retried with exponential backoff,
+  // or after Groq's retry-after wait when it sends one. A wait above the cap means a longer limit
+  // (e.g. tokens per day) was hit, so give up rather than hold the caller.
   private static final int MAX_ATTEMPTS = 5;
   private static final long MAX_RETRY_WAIT_SECONDS = 15;
   private static final long DEFAULT_RETRY_WAIT_SECONDS = 5;
+  private static final long DEFAULT_BACKOFF_BASE_MILLIS = 2_000;
+  private static final Set<Integer> TRANSIENT_SERVER_STATUSES = Set.of(500, 502, 503, 504);
+  private static final int MAX_FAILURE_REASON_LENGTH = 200;
 
   private final RestClient restClient;
   private final ObjectMapper objectMapper;
@@ -79,9 +89,20 @@ public class GroqClient {
   private final String model;
   private final long requestIntervalMillis;
   private long nextRequestAtMillis;
+  private long backoffBaseMillis = DEFAULT_BACKOFF_BASE_MILLIS;
 
-  /** Weather summary text; {@code fallback} is true for the plain line used when Groq failed. */
-  public record WeatherSummary(String text, boolean fallback) {}
+  /**
+   * Weather summary text; {@code fallback} is true for the plain line used when Groq failed, in
+   * which case {@code failureReason} says why (null otherwise).
+   */
+  public record WeatherSummary(String text, boolean fallback, String failureReason) {
+    public WeatherSummary(String text, boolean fallback) {
+      this(text, fallback, null);
+    }
+  }
+
+  /** Result of one completion: the text, or null text with the reason it could not be had. */
+  private record Completion(String text, String failureReason) {}
 
   public GroqClient(
       RestClient.Builder restClientBuilder,
@@ -110,10 +131,10 @@ public class GroqClient {
             .replace("{{localityName}}", localityName)
             .replace("{{weatherData}}", describe(weather))
             .replace("{{recentSummaries}}", formatRecentSummaries(recentSummaries));
-    String summary = complete(prompt);
-    return summary != null
-        ? new WeatherSummary(summary, false)
-        : new WeatherSummary(fallbackSummary(weather), true);
+    Completion completion = completeWithReason(prompt);
+    return completion.text() != null
+        ? new WeatherSummary(completion.text(), false, null)
+        : new WeatherSummary(fallbackSummary(weather), true, completion.failureReason());
   }
 
   private String formatRecentSummaries(List<String> summaries) {
@@ -143,9 +164,13 @@ public class GroqClient {
   }
 
   private String complete(String prompt) {
+    return completeWithReason(prompt).text();
+  }
+
+  private Completion completeWithReason(String prompt) {
     if (apiKey == null || apiKey.isBlank()) {
       log.warn("GROQ_API_KEY is not configured; skipping Groq generation");
-      return null;
+      return new Completion(null, "GROQ_API_KEY is not configured");
     }
     try {
       Map<String, Object> body =
@@ -173,28 +198,79 @@ public class GroqClient {
           JsonNode content =
               objectMapper.readTree(raw).path("choices").path(0).path("message").path("content");
           String text = content.asText("").trim();
-          return text.isBlank() ? null : text;
-        } catch (HttpClientErrorException.TooManyRequests e) {
-          long waitSeconds = retryWaitSeconds(e.getResponseHeaders());
-          if (attempt >= MAX_ATTEMPTS || waitSeconds > MAX_RETRY_WAIT_SECONDS) {
+          return text.isBlank()
+              ? new Completion(null, "Groq returned an empty response")
+              : new Completion(text, null);
+        } catch (RestClientException e) {
+          long delayMillis = retryDelayMillis(e, attempt);
+          if (delayMillis < 0) {
             throw e;
           }
           log.warn(
-              "Groq rate limited (attempt {}/{}); retrying in {}s",
+              "Groq request failed (attempt {}/{}): {}; retrying in {}ms",
               attempt,
               MAX_ATTEMPTS,
-              waitSeconds);
-          Thread.sleep(waitSeconds * 1000);
+              e.getMessage(),
+              delayMillis);
+          Thread.sleep(delayMillis);
         }
       }
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
       log.warn("Groq completion interrupted");
-      return null;
+      return new Completion(null, "Groq request was interrupted");
     } catch (Exception e) {
       log.warn("Groq completion failed: {}", e.getMessage());
-      return null;
+      return new Completion(null, describeFailure(e));
     }
+  }
+
+  /**
+   * How long to wait before the next attempt, or -1 to give up (out of attempts, a wait above the
+   * cap, or an error retrying cannot fix such as 401/400).
+   */
+  private long retryDelayMillis(RestClientException e, int attempt) {
+    if (attempt >= MAX_ATTEMPTS) {
+      return -1;
+    }
+    if (e instanceof HttpClientErrorException.TooManyRequests tooMany) {
+      return capped(retryWaitSeconds(tooMany.getResponseHeaders()));
+    }
+    if (e instanceof HttpServerErrorException serverError) {
+      if (!TRANSIENT_SERVER_STATUSES.contains(serverError.getStatusCode().value())) {
+        return -1;
+      }
+      Long retryAfter = retryAfterSeconds(serverError.getResponseHeaders());
+      return retryAfter != null ? capped(retryAfter) : backoffMillis(attempt);
+    }
+    if (e instanceof ResourceAccessException) { // connect / read timeout, I/O error
+      return backoffMillis(attempt);
+    }
+    return -1;
+  }
+
+  private static long capped(long waitSeconds) {
+    return waitSeconds > MAX_RETRY_WAIT_SECONDS ? -1 : waitSeconds * 1000;
+  }
+
+  /** Exponential backoff (base, 2x, 4x, ...) up to the wait cap, plus up to 25% random jitter. */
+  long backoffMillis(int attempt) {
+    long delay = Math.min(backoffBaseMillis << (attempt - 1), MAX_RETRY_WAIT_SECONDS * 1000);
+    return delay + ThreadLocalRandom.current().nextLong(delay / 4 + 1);
+  }
+
+  /** Test hook: shrinks the backoff so retry tests do not really wait seconds. */
+  void setBackoffBaseMillis(long backoffBaseMillis) {
+    this.backoffBaseMillis = backoffBaseMillis;
+  }
+
+  /** Short, single-line reason for the ops alert email. Never includes the API key. */
+  static String describeFailure(Exception e) {
+    String message = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
+    message = message.replaceAll("\\s+", " ").trim();
+    return message.length() > MAX_FAILURE_REASON_LENGTH
+        ? message.substring(0, MAX_FAILURE_REASON_LENGTH) + "..."
+        : message;
   }
 
   /**
@@ -215,6 +291,12 @@ public class GroqClient {
   }
 
   static long retryWaitSeconds(HttpHeaders headers) {
+    Long retryAfter = retryAfterSeconds(headers);
+    return retryAfter != null ? retryAfter : DEFAULT_RETRY_WAIT_SECONDS;
+  }
+
+  /** Seconds from a numeric Retry-After header, or null when absent or unparseable. */
+  private static Long retryAfterSeconds(HttpHeaders headers) {
     String retryAfter = headers != null ? headers.getFirst(HttpHeaders.RETRY_AFTER) : null;
     if (retryAfter != null) {
       try {
@@ -223,7 +305,7 @@ public class GroqClient {
         log.debug("Unparseable Retry-After header: {}", retryAfter);
       }
     }
-    return DEFAULT_RETRY_WAIT_SECONDS;
+    return null;
   }
 
   private String fallbackSummary(WeatherSnapshot w) {

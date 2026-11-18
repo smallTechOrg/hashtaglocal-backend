@@ -8,6 +8,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Consumer;
 import lombok.Builder;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
@@ -71,11 +72,15 @@ public class BulletinGenerationService {
     List<String> fallbacks = new ArrayList<>();
     for (Locality locality : localities) {
       try {
-        switch (generateForLocality(locality, today)) {
+        String[] fallbackReason = new String[1];
+        switch (generateForLocality(locality, today, reason -> fallbackReason[0] = reason)) {
           case GENERATED -> generated++;
           case GENERATED_WITH_FALLBACK -> {
             generated++;
-            fallbacks.add(locality.getHashtag());
+            fallbacks.add(
+                fallbackReason[0] != null
+                    ? locality.getHashtag() + " — " + fallbackReason[0]
+                    : locality.getHashtag());
             log.warn(
                 "Bulletin for locality {} ({}) used the fallback summary",
                 locality.getId(),
@@ -159,8 +164,9 @@ public class BulletinGenerationService {
       String fallbackDetail =
           fallbacks.isEmpty()
               ? ""
-              : "\n\nFallback summaries (Groq failed, so the plain weather line was used). A re-run"
-                  + " does not replace these; edit them in the ops portal:\n"
+              : "\n\nFallback summaries (Groq failed, so the plain weather line was used; the Groq"
+                  + " error is shown after each locality). A re-run does not replace these; edit"
+                  + " them in the ops portal:\n"
                   + String.join("\n", fallbacks);
       message.setText(
           "The daily bulletin weather run for "
@@ -188,6 +194,14 @@ public class BulletinGenerationService {
   /** Generates one locality's bulletin for {@code date}. Returns SKIPPED if already covered. */
   @Transactional
   public GenerationOutcome generateForLocality(Locality locality, LocalDate date) {
+    return generateForLocality(locality, date, reason -> {});
+  }
+
+  /**
+   * As above; {@code fallbackReasonSink} receives why Groq failed when the fallback line is used.
+   */
+  private GenerationOutcome generateForLocality(
+      Locality locality, LocalDate date, Consumer<String> fallbackReasonSink) {
     if (periodicDataRepository
         .findByLocalityIdAndDateAndDataType(locality.getId(), date, DATA_TYPE_WEATHER)
         .isPresent()) {
@@ -227,9 +241,11 @@ public class BulletinGenerationService {
     bulletin = bulletinRepository.save(bulletin);
 
     feedService.publishBulletinPost(locality, bulletin, summaryText);
-    return weatherSummary.fallback()
-        ? GenerationOutcome.GENERATED_WITH_FALLBACK
-        : GenerationOutcome.GENERATED;
+    if (weatherSummary.fallback()) {
+      fallbackReasonSink.accept(weatherSummary.failureReason());
+      return GenerationOutcome.GENERATED_WITH_FALLBACK;
+    }
+    return GenerationOutcome.GENERATED;
   }
 
   /**
