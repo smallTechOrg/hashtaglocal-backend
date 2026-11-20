@@ -26,6 +26,9 @@ public class AdminQuizData {
   private Integer answerOptionIndex;
   private String explanation;
 
+  /** Which AI wrote the quiz, as provider/model; null for hand-entered quizzes. */
+  private String generatedBy;
+
   /** Review state: PENDING, QUEUED, REJECTED or PUBLISHED. */
   private QuizStatus status;
 

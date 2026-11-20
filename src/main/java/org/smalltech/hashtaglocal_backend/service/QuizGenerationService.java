@@ -17,13 +17,15 @@ import org.smalltech.hashtaglocal_backend.entity.Locality;
 import org.smalltech.hashtaglocal_backend.entity.QuizEntity;
 import org.smalltech.hashtaglocal_backend.model.QuizStatus;
 import org.smalltech.hashtaglocal_backend.repository.QuizRepository;
+import org.smalltech.hashtaglocal_backend.service.ai.AiFallbackChain;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Generates one quiz per locality with Claude and saves it as PENDING for admin review. Quality
- * rules are checked in code: valid JSON, four distinct options, a valid answer index, and no repeat
- * of a question from the last 100 days. A bad candidate is retried once, then skipped.
+ * Generates one quiz per locality through the AI fallback chain (Claude, then Groq, then Gemini)
+ * and saves it as PENDING for admin review. Quality rules are checked in code: valid JSON, four
+ * distinct options, a valid answer index, and no repeat of a question from the last 100 days. A bad
+ * candidate is retried once, then skipped.
  */
 @Service
 @RequiredArgsConstructor
@@ -44,14 +46,14 @@ public class QuizGenerationService {
       - The facts must be accurate. If you are not sure of a fact, pick another topic.
       - Exactly four options, all distinct, exactly one correct.
       - answer_index is the 1-based position of the correct option.
-      - explanation is 1-2 short sentences on why the answer is correct.
+      - explanation should be 1-2 highly interesting short sentences about the question and answer.
 
       %sReply with ONLY a JSON object, no other text, in this shape:
       {"question": "...", "options": ["...", "...", "...", "..."],
       "answer_index": 1, "explanation": "..."}
       """;
 
-  private final ClaudeClient claudeClient;
+  private final AiFallbackChain aiFallbackChain;
   private final QuizRepository quizRepository;
   private final ObjectMapper objectMapper;
 
@@ -68,7 +70,7 @@ public class QuizGenerationService {
     return Optional.of(saved);
   }
 
-  /** Asks Claude up to MAX_ATTEMPTS times for a valid quiz that is not a recent repeat. */
+  /** Asks the AI chain up to MAX_ATTEMPTS times for a valid quiz that is not a recent repeat. */
   Optional<GeneratedQuiz> generateCandidate(Locality locality, List<String> recentQuestions) {
     Set<String> recentKeys =
         recentQuestions.stream()
@@ -77,7 +79,11 @@ public class QuizGenerationService {
     String prompt = buildPrompt(locality, recentQuestions);
 
     for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-      Optional<GeneratedQuiz> quiz = claudeClient.complete(prompt, MAX_TOKENS).flatMap(this::parse);
+      Optional<GeneratedQuiz> quiz =
+          aiFallbackChain
+              .complete(prompt, MAX_TOKENS)
+              .flatMap(
+                  reply -> parse(reply.text()).map(q -> q.withGeneratedBy(reply.generatedBy())));
       if (quiz.isPresent() && !recentKeys.contains(questionKey(quiz.get().question()))) {
         return quiz;
       }
@@ -86,7 +92,7 @@ public class QuizGenerationService {
     return Optional.empty();
   }
 
-  /** Parses Claude's reply, ignoring any text around the JSON. Empty if a rule is broken. */
+  /** Parses the model's reply, ignoring any text around the JSON. Empty if a rule is broken. */
   Optional<GeneratedQuiz> parse(String reply) {
     int start = reply.indexOf('{');
     int end = reply.lastIndexOf('}');
@@ -116,11 +122,11 @@ public class QuizGenerationService {
             && answerIndex >= 1
             && answerIndex <= OPTION_COUNT;
     return valid
-        ? Optional.of(new GeneratedQuiz(question, options, answerIndex, explanation))
+        ? Optional.of(new GeneratedQuiz(question, options, answerIndex, explanation, null))
         : Optional.empty();
   }
 
-  /** The full prompt sent to Claude, including the recent questions to avoid. */
+  /** The full prompt sent to the model, including the recent questions to avoid. */
   String buildPrompt(Locality locality, List<String> recentQuestions) {
     String avoid =
         recentQuestions.isEmpty()
@@ -150,6 +156,7 @@ public class QuizGenerationService {
         .option4(option(o.get(3)))
         .answerOptionIndex(quiz.answerOptionIndex())
         .explanation(quiz.explanation())
+        .generatedBy(quiz.generatedBy())
         .status(QuizStatus.PENDING)
         .build();
   }
@@ -179,7 +186,19 @@ public class QuizGenerationService {
     return text.toLowerCase(Locale.ROOT).replaceAll("[^\\p{L}\\p{N}]+", " ").trim();
   }
 
-  /** A quiz candidate from Claude, before it is saved. */
+  /**
+   * A quiz candidate from the AI, before it is saved. {@code generatedBy} is the provider/model
+   * that wrote it, e.g. "anthropic/claude-sonnet-5-5".
+   */
   public record GeneratedQuiz(
-      String question, List<String> options, int answerOptionIndex, String explanation) {}
+      String question,
+      List<String> options,
+      int answerOptionIndex,
+      String explanation,
+      String generatedBy) {
+
+    GeneratedQuiz withGeneratedBy(String source) {
+      return new GeneratedQuiz(question, options, answerOptionIndex, explanation, source);
+    }
+  }
 }

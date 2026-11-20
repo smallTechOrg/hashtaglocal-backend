@@ -162,6 +162,7 @@ public class QuizReviewService {
         .options(BulletinViewMapper.optionTexts(quiz))
         .answerOptionIndex(quiz.getAnswerOptionIndex())
         .explanation(quiz.getExplanation())
+        .generatedBy(quiz.getGeneratedBy())
         .status(quiz.getStatus())
         .rejectionReason(quiz.getRejectionReason())
         .rejectionNote(quiz.getRejectionNote())

@@ -24,6 +24,8 @@ import org.smalltech.hashtaglocal_backend.entity.Locality;
 import org.smalltech.hashtaglocal_backend.entity.QuizEntity;
 import org.smalltech.hashtaglocal_backend.model.QuizStatus;
 import org.smalltech.hashtaglocal_backend.repository.QuizRepository;
+import org.smalltech.hashtaglocal_backend.service.ai.AiFallbackChain;
+import org.smalltech.hashtaglocal_backend.service.ai.AiFallbackChain.AiCompletion;
 
 @ExtendWith(MockitoExtension.class)
 class QuizGenerationServiceTest {
@@ -44,7 +46,9 @@ class QuizGenerationServiceTest {
 
   private static final String RECENT_QUESTION = "Which airport serves Port Blair?";
 
-  @Mock private ClaudeClient claudeClient;
+  private static final String GENERATED_BY = "anthropic/claude-sonnet-5-5";
+
+  @Mock private AiFallbackChain aiFallbackChain;
   @Mock private QuizRepository quizRepository;
 
   private QuizGenerationService service;
@@ -55,12 +59,12 @@ class QuizGenerationServiceTest {
   @BeforeEach
   void setUp() {
     // Real Jackson mapper: the parser is what is under test, not Spring's bean.
-    service = new QuizGenerationService(claudeClient, quizRepository, new ObjectMapper());
+    service = new QuizGenerationService(aiFallbackChain, quizRepository, new ObjectMapper());
   }
 
   @Test
   void validReplyIsSavedAsPendingQuiz() {
-    when(claudeClient.complete(anyString(), anyInt())).thenReturn(Optional.of(GOOD_REPLY));
+    when(aiFallbackChain.complete(anyString(), anyInt())).thenReturn(reply(GOOD_REPLY));
     when(quizRepository.save(any(QuizEntity.class))).thenAnswer(inv -> inv.getArgument(0));
 
     Optional<QuizEntity> saved = service.generatePendingQuiz(portBlair);
@@ -72,12 +76,13 @@ class QuizGenerationServiceTest {
     assertEquals(4, quiz.getAnswerOptionIndex());
     assertEquals("None of these", quiz.getOption4().get("text"));
     assertEquals(portBlair, quiz.getLocality());
+    assertEquals(GENERATED_BY, quiz.getGeneratedBy());
   }
 
   @Test
-  void repeatedQuestionIsRejectedAndClaudeIsAskedAgain() {
-    when(claudeClient.complete(anyString(), anyInt()))
-        .thenReturn(Optional.of(REPEAT_REPLY), Optional.of(GOOD_REPLY));
+  void repeatedQuestionIsRejectedAndAiIsAskedAgain() {
+    when(aiFallbackChain.complete(anyString(), anyInt()))
+        .thenReturn(reply(REPEAT_REPLY), reply(GOOD_REPLY));
     when(quizRepository.findByLocality_IdAndCreatedAtAfter(anyLong(), any()))
         .thenReturn(List.of(recentQuiz(RECENT_QUESTION)));
     when(quizRepository.save(any(QuizEntity.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -87,13 +92,13 @@ class QuizGenerationServiceTest {
     // Repeat on attempt 1 is dropped; attempt 2 is the fresh question and is saved.
     assertTrue(saved.isPresent());
     assertEquals(4, saved.get().getAnswerOptionIndex());
-    verify(claudeClient, times(2)).complete(anyString(), anyInt());
+    verify(aiFallbackChain, times(2)).complete(anyString(), anyInt());
   }
 
   @Test
   void twoBadRepliesSaveNothing() {
-    when(claudeClient.complete(anyString(), anyInt()))
-        .thenReturn(Optional.of("not json at all"), Optional.of(REPEAT_REPLY));
+    when(aiFallbackChain.complete(anyString(), anyInt()))
+        .thenReturn(reply("not json at all"), reply(REPEAT_REPLY));
     when(quizRepository.findByLocality_IdAndCreatedAtAfter(anyLong(), any()))
         .thenReturn(List.of(recentQuiz(RECENT_QUESTION)));
 
@@ -102,8 +107,8 @@ class QuizGenerationServiceTest {
   }
 
   @Test
-  void claudeUnavailableSavesNothing() {
-    when(claudeClient.complete(anyString(), anyInt())).thenReturn(Optional.empty());
+  void aiUnavailableSavesNothing() {
+    when(aiFallbackChain.complete(anyString(), anyInt())).thenReturn(Optional.empty());
 
     assertFalse(service.generatePendingQuiz(portBlair).isPresent());
     verify(quizRepository, never()).save(any(QuizEntity.class));
@@ -139,6 +144,10 @@ class QuizGenerationServiceTest {
     assertTrue(prompt.contains("Port Blair (#portblair)"));
     assertTrue(prompt.contains("- Which river flows through Port Blair?"));
     assertTrue(prompt.contains("Reply with ONLY a JSON object"));
+  }
+
+  private static Optional<AiCompletion> reply(String text) {
+    return Optional.of(new AiCompletion(text, GENERATED_BY));
   }
 
   private static QuizEntity recentQuiz(String question) {

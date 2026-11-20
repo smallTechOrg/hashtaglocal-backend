@@ -63,6 +63,13 @@ public class QuizEntity {
   private String explanation;
 
   /**
+   * Which AI wrote the quiz, as provider/model (e.g. "groq/some-model"), so admins can compare
+   * quality. Null for hand-entered quizzes.
+   */
+  @Column(name = "generated_by", length = 100)
+  private String generatedBy;
+
+  /**
    * Review lifecycle. The column default backfills existing hand-entered quizzes as PUBLISHED,
    * because ddl-auto=update cannot add a NOT NULL column to a populated table without one.
    */
