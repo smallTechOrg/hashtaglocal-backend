@@ -59,11 +59,10 @@ class QuizReviewServiceTest {
     QuizEntity pending = quiz(3L, QuizStatus.PENDING);
     when(quizRepository.findById(3L)).thenReturn(Optional.of(pending));
 
-    var rejected =
-        service.reject(3L, QuizRejectReason.WRONG_ANSWER, "  Check the river  ", ADMIN_ID);
+    var rejected = service.reject(3L, QuizRejectReason.INACCURATE, "  Check the river  ", ADMIN_ID);
 
     assertEquals(QuizStatus.REJECTED, pending.getStatus());
-    assertEquals(QuizRejectReason.WRONG_ANSWER, pending.getRejectionReason());
+    assertEquals(QuizRejectReason.INACCURATE, pending.getRejectionReason());
     assertEquals("Check the river", pending.getRejectionNote());
     assertEquals(ADMIN_ID, pending.getReviewedBy());
     assertEquals(QuizStatus.REJECTED, rejected.getStatus());
@@ -77,10 +76,10 @@ class QuizReviewServiceTest {
     when(quizRepository.findById(6L)).thenReturn(Optional.of(pending));
     when(quizGenerationService.generatePendingQuiz(portBlair)).thenReturn(Optional.empty());
 
-    service.reject(6L, QuizRejectReason.POOR_OPTIONS, null, ADMIN_ID);
+    service.reject(6L, QuizRejectReason.LOW_QUALITY, null, ADMIN_ID);
 
     assertEquals(QuizStatus.REJECTED, pending.getStatus());
-    assertEquals(QuizRejectReason.POOR_OPTIONS, pending.getRejectionReason());
+    assertEquals(QuizRejectReason.LOW_QUALITY, pending.getRejectionReason());
   }
 
   @Test
@@ -106,17 +105,17 @@ class QuizReviewServiceTest {
 
   @Test
   void rejectedListIsFilteredByHashtagAndReason() {
-    QuizEntity wrongAnswer = quiz(8L, QuizStatus.REJECTED);
-    wrongAnswer.setRejectionReason(QuizRejectReason.WRONG_ANSWER);
-    QuizEntity tooEasy = quiz(9L, QuizStatus.REJECTED);
-    tooEasy.setRejectionReason(QuizRejectReason.TOO_EASY);
+    QuizEntity inaccurate = quiz(8L, QuizStatus.REJECTED);
+    inaccurate.setRejectionReason(QuizRejectReason.INACCURATE);
+    QuizEntity notLocal = quiz(9L, QuizStatus.REJECTED);
+    notLocal.setRejectionReason(QuizRejectReason.NOT_LOCAL);
     when(quizRepository.findByStatusOrderByReviewedAtDesc(QuizStatus.REJECTED))
-        .thenReturn(List.of(wrongAnswer, tooEasy));
+        .thenReturn(List.of(inaccurate, notLocal));
 
     assertEquals(2, service.rejected(null, null).size());
     assertEquals(2, service.rejected("PortBlair", null).size());
     assertEquals(0, service.rejected("kargil", null).size());
-    assertEquals(1, service.rejected(null, QuizRejectReason.WRONG_ANSWER).size());
+    assertEquals(1, service.rejected(null, QuizRejectReason.INACCURATE).size());
   }
 
   @Test

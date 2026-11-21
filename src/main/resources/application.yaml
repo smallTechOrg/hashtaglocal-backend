@@ -200,7 +200,7 @@ ai:
         models: ${QUIZ_GROQ_MODELS:}
         keys: ${QUIZ_GROQ_KEYS:}
       - provider: gemini
-        models: ${QUIZ_GEMINI_MODELS:gemini-3.1-flash-lite}
+        models: ${QUIZ_GEMINI_MODELS:gemini-4-neon,gemini-3.1-flash-lite}
         keys: ${QUIZ_GEMINI_KEYS:}
 
 portalissue:

@@ -83,7 +83,7 @@ public class QuizEntity {
 
   /** Why an admin rejected the quiz; set only when {@code status} is REJECTED. */
   @Enumerated(EnumType.STRING)
-  @Column(name = "rejection_reason", length = 30)
+  @Column(name = "rejection_reason", columnDefinition = "varchar(30)")
   private QuizRejectReason rejectionReason;
 
   /** Free-text note from the admin; required when the reason is OTHER. */

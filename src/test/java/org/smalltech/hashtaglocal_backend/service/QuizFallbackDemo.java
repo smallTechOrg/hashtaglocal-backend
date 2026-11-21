@@ -41,7 +41,7 @@ import org.springframework.web.client.RestClient;
  */
 public final class QuizFallbackDemo {
 
-  private static final String DEFAULT_GEMINI_MODEL = "gemini-3.1-flash-lite";
+  private static final String DEFAULT_GEMINI_MODELS = "gemini-4-neon,gemini-3.1-flash-lite";
   private static final String DEFAULT_ANTHROPIC_MODELS = "claude-sonnet-5-5,claude-haiku-5-5";
   private static final String DEFAULT_PLACES =
       "Port Blair:portblair;Koramangala, Bengaluru:koramangala;Shillong:shillong";
@@ -91,10 +91,8 @@ public final class QuizFallbackDemo {
       System.exit(1);
     }
     String goodKey = geminiKeys.get(0);
-    String model =
-        list(env("QUIZ_GEMINI_MODELS", DEFAULT_GEMINI_MODEL)).stream()
-            .findFirst()
-            .orElse(DEFAULT_GEMINI_MODEL);
+    // All configured Gemini models, best first (comma-separated), same as the app uses.
+    String model = env("QUIZ_GEMINI_MODELS", DEFAULT_GEMINI_MODELS);
     Locality demoPlace = places.get(0);
 
     title("PART 1 - FALLBACK MECHANISM (live API calls)");
@@ -195,7 +193,7 @@ public final class QuizFallbackDemo {
     System.out.println();
     System.out.println("== " + place.getName() + " (#" + place.getHashtag() + ") ==");
     if (quiz.isEmpty()) {
-      System.out.println("   No valid quiz after 2 attempts.");
+      System.out.println("   No quiz passed the checks and evaluation.");
       return;
     }
     GeneratedQuiz q = quiz.get();
@@ -298,7 +296,7 @@ public final class QuizFallbackDemo {
     for (QuizCard card : cards) {
       html.append("<div class=\"card\"><div class=\"place\">").append(esc(card.place()));
       if (card.quiz() == null) {
-        html.append("</div><p class=\"none\">No valid quiz after 2 attempts.</p></div>");
+        html.append("</div><p class=\"none\">No quiz passed the checks and evaluation.</p></div>");
         continue;
       }
       GeneratedQuiz q = card.quiz();
