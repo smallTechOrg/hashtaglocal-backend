@@ -3,6 +3,8 @@ package org.smalltech.hashtaglocal_backend.service.ai;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Duration;
 import java.util.Locale;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
@@ -19,6 +21,9 @@ abstract class RestAiProvider implements AiProvider {
   // A hung call would stop the chain from ever falling back, so every call has a deadline.
   private static final Duration READ_TIMEOUT = Duration.ofSeconds(60);
   private static final int MAX_DETAIL_CHARS = 200;
+  // All three providers put a readable "message" inside their JSON error body.
+  private static final Pattern ERROR_MESSAGE =
+      Pattern.compile("\"message\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.)*)\"");
 
   protected final RestClient restClient;
   protected final ObjectMapper objectMapper;
@@ -75,9 +80,13 @@ abstract class RestAiProvider implements AiProvider {
     }
   }
 
-  /** HTTP status plus the start of the error body, for logs. Bodies never contain our key. */
+  /**
+   * HTTP status plus the provider's error message (or the start of the body), for logs. Error
+   * bodies never contain our key.
+   */
   static String detail(int status, String body) {
-    return status + " " + shorten(body);
+    Matcher message = ERROR_MESSAGE.matcher(body == null ? "" : body);
+    return status + " " + shorten(message.find() ? message.group(1) : body);
   }
 
   private static String shorten(String text) {
