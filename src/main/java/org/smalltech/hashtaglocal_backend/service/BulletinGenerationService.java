@@ -49,6 +49,7 @@ public class BulletinGenerationService {
   private final WeatherProvider weatherProvider;
   private final GroqClient groqClient;
   private final FeedService feedService;
+  private final QuizQueueService quizQueueService;
   private final JavaMailSender mailSender;
 
   @Value("${bulletin.alert.admin-email:${account.deletion.admin-email:}}")
@@ -83,6 +84,8 @@ public class BulletinGenerationService {
           }
           case SKIPPED -> skipped++;
         }
+        // The day's quiz is attached whether or not the weather was generated this run.
+        quizQueueService.publishForDate(locality, today);
         // Gentle pacing between external API calls (same approach as LocationMetadataUpdateJob).
         Thread.sleep(100);
       } catch (InterruptedException e) {

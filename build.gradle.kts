@@ -93,6 +93,18 @@ tasks.named<org.springframework.boot.gradle.tasks.run.BootRun>("bootRun") {
     environment(dotEnv)
 }
 
+// Live demo of the quiz AI fallback chain and quiz quality, using the real keys in .env.
+// ./gradlew quizDemo --console=plain [--args="--pause --places=Name:hashtag;Name:hashtag"]
+tasks.register<JavaExec>("quizDemo") {
+    group = "demo"
+    description = "Live demo of the quiz AI fallback chain and quiz quality (real API calls)"
+    classpath = sourceSets["test"].runtimeClasspath
+    mainClass.set("org.smalltech.hashtaglocal_backend.service.QuizFallbackDemo")
+    environment(System.getenv())
+    environment(dotEnv)
+    standardInput = System.`in`
+}
+
 
 
 

@@ -184,6 +184,25 @@ groq:
     # Spaces every Groq call: ~450 tokens per request stays under the 7000 tokens/minute limit.
     requests-per-minute: ${GROQ_REQUESTS_PER_MINUTE:12}
 
+# AI fallback chain for the #local quiz candidates (ops review them before they go out).
+# Tried top to bottom: each model on every key, then the next model, then the next provider.
+# Models (best first) and keys are comma-separated. A level with no models or no keys is skipped.
+# Each key must come from a separate account/org (Gemini: separate Google Cloud project),
+# otherwise the keys share one quota. These keys are separate from GROQ_API_KEY (bulletin) and
+# GEMINI_API_KEY (feed moderation), so quiz generation cannot use up their quota.
+ai:
+  quiz:
+    chain:
+      - provider: anthropic
+        models: ${QUIZ_ANTHROPIC_MODELS:${ANTHROPIC_MODEL:claude-sonnet-5-5},claude-haiku-5-5}
+        keys: ${QUIZ_ANTHROPIC_KEYS:${ANTHROPIC_API_KEY:}}
+      - provider: groq
+        models: ${QUIZ_GROQ_MODELS:}
+        keys: ${QUIZ_GROQ_KEYS:}
+      - provider: gemini
+        models: ${QUIZ_GEMINI_MODELS:gemini-4-neon,gemini-3.1-flash-lite}
+        keys: ${QUIZ_GEMINI_KEYS:}
+
 portalissue:
   enabled: ${PORTALISSUE_ENABLED:true}
   cron: ${PORTALISSUE_CRON:0 0 1 * * *}
