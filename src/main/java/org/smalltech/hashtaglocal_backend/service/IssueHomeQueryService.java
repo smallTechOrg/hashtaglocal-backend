@@ -14,6 +14,9 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class IssueHomeQueryService {
 
+  /** Only issues reported on or after this moment appear in the home feed and the map. */
+  private static final LocalDateTime SHOW_ISSUES_SINCE = LocalDateTime.of(2026, 2, 1, 0, 0);
+
   private final IssueRepository issueRepository;
 
   /**
@@ -24,7 +27,7 @@ public class IssueHomeQueryService {
    * @param viewerUserId authenticated viewer's user ID, or {@code null} for anonymous callers
    */
   public List<IssueEntity> findRecentIssues(String localityHashtag, Long viewerUserId) {
-    LocalDateTime since = LocalDateTime.now().minusMonths(6);
+    LocalDateTime since = SHOW_ISSUES_SINCE;
     Long safeUserId = viewerUserId != null ? viewerUserId : -1L;
 
     List<IssueStatusModel> statuses =
@@ -48,7 +51,7 @@ public class IssueHomeQueryService {
    */
   public List<IssueEntity> findNearbyIssues(
       double lat, double lng, double radiusMeters, Long viewerUserId) {
-    LocalDateTime since = LocalDateTime.now().minusMonths(6);
+    LocalDateTime since = SHOW_ISSUES_SINCE;
     Long safeUserId = viewerUserId != null ? viewerUserId : -1L;
 
     List<String> statuses =
