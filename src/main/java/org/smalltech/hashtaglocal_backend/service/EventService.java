@@ -1,8 +1,11 @@
 package org.smalltech.hashtaglocal_backend.service;
 
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.smalltech.hashtaglocal_backend.entity.EventApprovalEntity;
@@ -128,7 +131,7 @@ public class EventService {
       Locality locality = loc.getLocality();
       EventData.LocalityData localityData =
           locality != null
-              ? EventData.LocalityData.builder().hashtags(List.of(locality.getHashtag())).build()
+              ? EventData.LocalityData.builder().hashtags(hashtagsWithAncestors(locality)).build()
               : null;
       locationData =
           EventData.LocationData.builder()
@@ -178,5 +181,24 @@ public class EventService {
         .displayName(approval != null ? approval.getDisplayName() : null)
         .createdAt(entity.getCreatedAt())
         .build();
+  }
+
+  /**
+   * The locality's own hashtag first, then each ancestor's (e.g. {@code #bijnor}, {@code #india}),
+   * so a parent channel such as {@code #india} matches the events of all its localities. The own
+   * hashtag stays first because clients display {@code hashtags[0]}.
+   */
+  static List<String> hashtagsWithAncestors(Locality locality) {
+    List<String> tags = new ArrayList<>();
+    Set<Long> seen = new HashSet<>();
+    for (Locality l = locality; l != null && tags.size() < 10; l = l.getParent()) {
+      if (l.getId() != null && !seen.add(l.getId())) {
+        break; // defensive: a cycle in parent_id must not loop forever
+      }
+      if (l.getHashtag() != null && !tags.contains(l.getHashtag())) {
+        tags.add(l.getHashtag());
+      }
+    }
+    return tags;
   }
 }
