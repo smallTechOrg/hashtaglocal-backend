@@ -209,6 +209,14 @@ jobs:
             add PORTALISSUE_REPORT_SCRAPE_URL "$(var PORTALISSUE_SCRAPE_URL)"
           fi
 
+          # Every other secret of the GitHub Environment becomes an env var of the same name, so a new
+          # setting only needs adding in GitHub (Settings -> Environments -> production).
+          for name in $(echo "$VARS_JSON" | jq -r 'keys[]'); do
+            case "$name" in github_token|GITHUB_TOKEN|GCS_KEY_JSON|FIREBASE_KEY_JSON|*_STAGING|*_PRODUCTION) continue ;; esac
+            grep -q "^${name}:" "$env_file" && continue
+            add "$name" "$(var "$name")"
+          done
+
           # Anything else: one KEY=VALUE per line in the variable EXTRA_ENV
           # (or EXTRA_ENV_STAGING / EXTRA_ENV_PRODUCTION).
           extra="$(var EXTRA_ENV)"
