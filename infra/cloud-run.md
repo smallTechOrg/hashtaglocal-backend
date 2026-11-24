@@ -169,6 +169,9 @@ gcloud scheduler jobs run hashtaglocal-backend-staging-session-cleanup --locatio
    `BULLETIN_OPEN_METEO_URL`, `GROQ_API_URL`, `GROQ_MODEL`, `GROQ_REQUESTS_PER_MINUTE`,
    `FLYWAY_BASELINE_VERSION`, `FEED_MODERATION_SWEEP_CRON`.
 
+   Push notifications are **off** unless `NOTIFICATIONS_ENABLED=true` is set (master switch for
+   chat, issue, bulletin and ops broadcast pushes; `application.yaml` defaults it to `false`).
+
    Note `AUTH_ACCESS_TOKEN_EXPIRY_SECONDS` / `AUTH_REFRESH_TOKEN_EXPIRY_SECONDS` default to 10 and 30
    seconds in `application.yaml`. Set real values here or every user is logged out almost at once.
 

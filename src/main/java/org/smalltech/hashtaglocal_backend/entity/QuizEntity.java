@@ -10,6 +10,8 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.Type;
+import org.smalltech.hashtaglocal_backend.model.QuizRejectReason;
+import org.smalltech.hashtaglocal_backend.model.QuizStatus;
 
 /**
  * Daily quiz content for a locality, entered by ops through the admin portal (AI generation comes
@@ -59,6 +61,42 @@ public class QuizEntity {
   /** Engaging explanation shown after an attempt — Groq-generated at creation, ops-editable. */
   @Column(columnDefinition = "text")
   private String explanation;
+
+  /**
+   * Which AI wrote the quiz, as provider/model (e.g. "groq/some-model"), so admins can compare
+   * quality. Null for hand-entered quizzes.
+   */
+  @Column(name = "generated_by", length = 100)
+  private String generatedBy;
+
+  /**
+   * Review lifecycle. The column default backfills existing hand-entered quizzes as PUBLISHED,
+   * because ddl-auto=update cannot add a NOT NULL column to a populated table without one.
+   */
+  @Enumerated(EnumType.STRING)
+  @Column(
+      nullable = false,
+      length = 20,
+      columnDefinition = "varchar(20) not null default 'PUBLISHED'")
+  @Builder.Default
+  private QuizStatus status = QuizStatus.PUBLISHED;
+
+  /** Why an admin rejected the quiz; set only when {@code status} is REJECTED. */
+  @Enumerated(EnumType.STRING)
+  @Column(name = "rejection_reason", columnDefinition = "varchar(30)")
+  private QuizRejectReason rejectionReason;
+
+  /** Free-text note from the admin; required when the reason is OTHER. */
+  @Column(name = "rejection_note", columnDefinition = "text")
+  private String rejectionNote;
+
+  /** Id of the admin user who approved or rejected the quiz. */
+  @Column(name = "reviewed_by")
+  private Long reviewedBy;
+
+  /** When the admin approved or rejected the quiz. */
+  @Column(name = "reviewed_at")
+  private LocalDateTime reviewedAt;
 
   @CreationTimestamp
   @Column(nullable = false, updatable = false)

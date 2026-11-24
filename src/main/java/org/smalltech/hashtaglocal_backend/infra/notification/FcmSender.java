@@ -17,6 +17,7 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 
@@ -33,9 +34,18 @@ public class FcmSender {
 
   private final FirebaseMessaging firebaseMessaging;
 
+  /** Master switch (notifications.enabled). Off: nothing is sent to FCM, whatever the type. */
+  private final boolean enabled;
+
   @Autowired
-  public FcmSender(@Nullable FirebaseMessaging firebaseMessaging) {
+  public FcmSender(
+      @Nullable FirebaseMessaging firebaseMessaging,
+      @Value("${notifications.enabled:false}") boolean enabled) {
     this.firebaseMessaging = firebaseMessaging;
+    this.enabled = enabled;
+    if (!enabled) {
+      log.warn("Push notifications are disabled (notifications.enabled=false); none will be sent");
+    }
   }
 
   /**
@@ -54,6 +64,10 @@ public class FcmSender {
   @Nullable
   public String send(
       String token, String title, String body, Map<String, String> data, String analyticsLabel) {
+    if (!enabled) {
+      log.info("Push notifications disabled; skipping notification to one device");
+      return null;
+    }
     if (firebaseMessaging == null) {
       log.debug("FCM not configured; skipping notification to token {}", token);
       return null;
@@ -98,6 +112,10 @@ public class FcmSender {
       Map<String, String> data,
       String analyticsLabel) {
 
+    if (!enabled) {
+      log.info("Push notifications disabled; skipping multicast to {} tokens", tokens.size());
+      return new MulticastResult(Map.of(), List.of());
+    }
     if (firebaseMessaging == null) {
       log.debug("FCM not configured; skipping multicast to {} tokens", tokens.size());
       return new MulticastResult(Map.of(), List.of());
