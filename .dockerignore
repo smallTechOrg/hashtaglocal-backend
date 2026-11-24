@@ -1,0 +1,16 @@
+.git
+.github
+.gradle
+build
+bin
+out
+.idea
+.vscode
+.env
+*-key.json
+logs
+hs_err_pid*.log
+scripts
+infra
+*.md
+src/test
