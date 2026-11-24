@@ -120,6 +120,12 @@ springdoc:
   default-consumes-media-type: application/json
   default-produces-media-type: application/json
 
+# Master switch for every push notification (chat, issue, bulletin, ops broadcast). Off by default:
+# nothing is sent to FCM unless NOTIFICATIONS_ENABLED=true. The per-feature switches
+# (feed.notification.enabled, bulletin.notification.enabled) only apply when this is on.
+notifications:
+  enabled: ${NOTIFICATIONS_ENABLED:false}
+
 firebase:
   credentials:
     path: ${FIREBASE_CREDENTIALS_PATH:firebase-key.json}

@@ -1,6 +1,12 @@
 {
   "properties": [
     {
+      "name": "notifications.enabled",
+      "type": "java.lang.Boolean",
+      "defaultValue": false,
+      "description": "Master switch for push notifications. When false nothing is sent to FCM."
+    },
+    {
       "name": "firebase.credentials.path",
       "type": "java.lang.String",
       "description": "Path to the Firebase service account key JSON file."
