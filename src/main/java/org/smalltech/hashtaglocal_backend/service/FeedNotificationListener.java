@@ -9,6 +9,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.Executor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.smalltech.hashtaglocal_backend.entity.BulletinEntity;
@@ -32,11 +33,13 @@ import org.smalltech.hashtaglocal_backend.repository.NotificationLogRepository;
 import org.smalltech.hashtaglocal_backend.repository.UserAuthSessionRepository;
 import org.smalltech.hashtaglocal_backend.util.NotificationUtils;
 import org.smalltech.hashtaglocal_backend.util.NotificationUtils.PushMessage;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -70,14 +73,36 @@ public class FeedNotificationListener {
   @Value("${feed.notification.enabled:false}")
   private boolean chatNotificationEnabled;
 
+  /**
+   * Send the push inside the request that published the post instead of on a background thread. On
+   * Cloud Run with request-based billing the CPU is throttled once the response is sent, so a
+   * background send can stall until the next request (or be lost when the instance stops). The VM
+   * keeps the background send (default).
+   */
+  @Value("${feed.notification.inline:false}")
+  private boolean inline;
+
+  /** Spring Boot's executor, the same one {@code @Async} used before. */
+  @Autowired(required = false)
+  @Qualifier("applicationTaskExecutor")
+  private Executor asyncExecutor;
+
   // fallbackExecution: the generation cron may publish outside a transaction.
-  @Async
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
   public void onFeedPublished(FeedPublishedEvent event) {
-    try {
-      notifyPost(event.feedPostId());
-    } catch (Exception e) {
-      log.error("Feed notification failed for post {}: {}", event.feedPostId(), e.getMessage(), e);
+    Runnable send =
+        () -> {
+          try {
+            notifyPost(event.feedPostId());
+          } catch (Exception e) {
+            log.error(
+                "Feed notification failed for post {}: {}", event.feedPostId(), e.getMessage(), e);
+          }
+        };
+    if (inline || asyncExecutor == null) {
+      send.run();
+    } else {
+      asyncExecutor.execute(send);
     }
   }
 
@@ -349,7 +374,11 @@ public class FeedNotificationListener {
   }
 
   private TransactionTemplate transactionTemplate() {
-    return new TransactionTemplate(transactionManager);
+    // REQUIRES_NEW: when the push runs inline in an AFTER_COMMIT listener the publishing
+    // transaction has already committed; joining it would silently drop these writes.
+    TransactionTemplate tt = new TransactionTemplate(transactionManager);
+    tt.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+    return tt;
   }
 
   private String toJson(Map<String, String> map) {

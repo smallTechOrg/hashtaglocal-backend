@@ -1,13 +1,17 @@
 # Cloud Run Deployment - Hashtag Local Backend
 
-Replaces the manual VM deploy in [deployment.md](deployment.md). Same design as
-the `chatbot0` repo: GitHub Actions builds a container, deploys a Cloud Run
-revision with no traffic, smoke-tests it, then promotes it.
+Replaces the manual VM deploy in [deployment.md](deployment.md). GitHub Actions builds a container,
+deploys a Cloud Run revision with no traffic, smoke-tests it, then promotes it.
 
-| Branch | Cloud Run service | `APP_ENV` | Database secrets |
-|---|---|---|---|
-| `staging` | `hashtaglocal-backend-staging` | `staging` | `HASHTAGLOCAL_DB_*_STAGING` |
-| `main` | `hashtaglocal-backend` | `production` | `HASHTAGLOCAL_DB_*_PRODUCTION` |
+**Production only for now.** Run *Actions → Deploy to Cloud Run → Run workflow* on `main`. Staging stays
+on its VM (`api-staging.smalltech.in/local`) until it is rolled over.
+
+**Who owns what.**
+- [`smallTechOrg/infra`](https://github.com/smallTechOrg/infra) (Terraform) creates the service, its
+  IAM (public invoker), the serverless NEG behind `api.smalltech.in/local`, the Cloud Scheduler jobs and
+  the uptime check.
+- This workflow only rolls out revisions (image, env, CPU/memory, scaling) and moves traffic to them.
+  Terraform never touches those.
 
 ## Flow (`.github/workflows/deploy.yml`)
 
@@ -51,14 +55,14 @@ Cloud Scheduler --(cron, OIDC token)--> POST /jobs/{name} --> the job runs insid
 | `session-cleanup` | `/jobs/session-cleanup` | `AUTH_SESSION_CLEANUP_CRON` | `0 0 3 * * *` | cron is `-` |
 | `feed-moderation-sweep` | `/jobs/feed-moderation-sweep` | `FEED_MODERATION_SWEEP_CRON` | `0 * * * * *` | cron is `-` |
 
-- **The schedule lives in the repo.** Every deploy creates or updates the scheduler jobs. The cron comes
+- **The schedule lives in `smallTechOrg/infra`** (Terraform, `hashtaglocal.tf`). Change a cron there
+  by pull request. The cron comes
   from the variable above (so existing values keep working: the seconds field is dropped for Cloud
   Scheduler), in `Asia/Kolkata`. `-` or `*_ENABLED=false` switches a job off.
-- **Paused by default.** The jobs run only when the variable `CLOUD_SCHEDULER_ENABLED` (or
-  `CLOUD_SCHEDULER_ENABLED_STAGING` / `_PRODUCTION`) is `true`. Each deploy pauses or resumes them to
-  match and fails if it cannot, so pausing by hand in the console is undone by the next deploy.
-  **Leave it off while a VM still runs the same jobs against the same database**, or every job runs
-  twice (duplicate event imports, duplicate push notifications).
+- **Paused until cutover.** The jobs are created paused (Terraform `paused = true`) and resumed in the
+  same change that moves `/local` to Cloud Run and stops the VM service. **Never run them while the VM
+  still runs the same jobs against the same database**, or every job runs twice (duplicate event
+  imports, duplicate push notifications).
 - **Auth.** The service is public, so the endpoint checks the caller itself (`JobInvokerVerifier`): a
   Google-signed OIDC token with audience `<service>-jobs` from the service account
   `hashtaglocal-scheduler@`. Anything else gets 401. With either setting unset every call is refused.
@@ -77,10 +81,15 @@ gcloud scheduler jobs run hashtaglocal-backend-staging-session-cleanup --locatio
 
 - **Background jobs** run from Cloud Scheduler, not from the app's own timer (see
   [Background jobs](#background-jobs)). The service keeps `--no-cpu-throttling` and
-  `min-instances=1` because the feed push notifications are `@Async` and finish after
-  the response. `max-instances` is 1 by default (`CLOUD_RUN_MAX_INSTANCES`); more is safe
+  request-based billing (organisation policy). There is no CPU after a response, so the feed push
+  notification is sent **inside** the publishing request (`FEED_NOTIFICATION_INLINE=true`) instead
+  of on a background thread. The VM keeps the background send. `max-instances` is 1 by default (`CLOUD_RUN_MAX_INSTANCES`); more is safe
   for the jobs, but every instance opens up to 10 database connections.
-- **Configuration and credentials** are all GitHub repository variables (no Secret Manager).
+- **Configuration and credentials** are secrets of the GitHub Environment `production` (Settings →
+  Environments → production), so they are masked in the public Actions logs. Repository *variables*
+  are never read by the workflow. Anyone who can edit the repository's environments can change them
+  without GCP access. Values end up as plain Cloud Run env vars, visible to anyone who can view the
+  service in GCP.
   The two key files are stored as JSON text in `GCS_KEY_JSON` and `FIREBASE_KEY_JSON`; the
   container's `docker-entrypoint.sh` writes them to `/tmp/keys/` at start. Nothing is baked into the image.
 - **Logs** go to stdout (Cloud Logging); the log file is turned off.
