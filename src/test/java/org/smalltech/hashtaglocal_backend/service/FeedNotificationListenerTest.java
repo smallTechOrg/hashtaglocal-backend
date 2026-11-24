@@ -18,6 +18,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.Executor;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.smalltech.hashtaglocal_backend.config.TimeConstants;
@@ -28,6 +29,7 @@ import org.smalltech.hashtaglocal_backend.entity.IssueEntity;
 import org.smalltech.hashtaglocal_backend.entity.Locality;
 import org.smalltech.hashtaglocal_backend.entity.NotificationLogEntity;
 import org.smalltech.hashtaglocal_backend.entity.UserEntity;
+import org.smalltech.hashtaglocal_backend.event.FeedPublishedEvent;
 import org.smalltech.hashtaglocal_backend.infra.notification.FcmSender;
 import org.smalltech.hashtaglocal_backend.infra.notification.FcmSender.MulticastResult;
 import org.smalltech.hashtaglocal_backend.model.FeedPostKind;
@@ -44,6 +46,7 @@ import org.smalltech.hashtaglocal_backend.util.NotificationUtils;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.SimpleTransactionStatus;
 
 class FeedNotificationListenerTest {
@@ -54,6 +57,7 @@ class FeedNotificationListenerTest {
   private NotificationLogRepository logRepository;
   private FcmSender fcmSender;
   private FeedNotificationListener listener;
+  private PlatformTransactionManager txManager;
 
   @BeforeEach
   void setUp() {
@@ -62,7 +66,7 @@ class FeedNotificationListenerTest {
     sessionRepository = mock(UserAuthSessionRepository.class);
     logRepository = mock(NotificationLogRepository.class);
     fcmSender = mock(FcmSender.class);
-    PlatformTransactionManager txManager = mock(PlatformTransactionManager.class);
+    txManager = mock(PlatformTransactionManager.class);
     when(txManager.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
     listener =
         new FeedNotificationListener(
@@ -485,5 +489,56 @@ class FeedNotificationListenerTest {
             anyString(),
             anyMap(),
             eq("bulletin_system"));
+  }
+
+  // ---- delivery mode: inline (Cloud Run) vs background executor (VM) -------------------------
+
+  @Test
+  void inlineModeSendsInTheCallersThreadAndNeverUsesTheExecutor() {
+    List<Runnable> submitted = new ArrayList<>();
+    ReflectionTestUtils.setField(listener, "asyncExecutor", (Executor) submitted::add);
+    ReflectionTestUtils.setField(listener, "inline", true);
+    UserEntity alice = UserEntity.builder().id(3L).username("alice").build();
+    when(feedPostRepository.findByIdForNotification(42L))
+        .thenReturn(Optional.of(textPost(alice, "Water supply is back on 5th main")));
+    when(sessionRepository.findActiveNotificationTokensByLocalityIdExcludingUser(1L, 3L))
+        .thenReturn(List.of("t2"));
+    stubSend();
+
+    listener.onFeedPublished(new FeedPublishedEvent(42L));
+
+    assertEquals(0, submitted.size());
+    verify(fcmSender).sendMulticast(anyList(), anyString(), anyString(), anyMap(), anyString());
+  }
+
+  @Test
+  void backgroundModeHandsTheSendToTheExecutor() {
+    List<Runnable> submitted = new ArrayList<>();
+    ReflectionTestUtils.setField(listener, "asyncExecutor", (Executor) submitted::add);
+    ReflectionTestUtils.setField(listener, "inline", false);
+
+    listener.onFeedPublished(new FeedPublishedEvent(42L));
+
+    assertEquals(1, submitted.size());
+    verify(feedPostRepository, never()).findByIdForNotification(anyLong());
+  }
+
+  @Test
+  void logWritesUseANewTransactionSoTheyCommitAfterThePublisherCommitted() {
+    UserEntity alice = UserEntity.builder().id(3L).username("alice").build();
+    when(feedPostRepository.findByIdForNotification(42L))
+        .thenReturn(Optional.of(textPost(alice, "Water supply is back on 5th main")));
+    when(sessionRepository.findActiveNotificationTokensByLocalityIdExcludingUser(1L, 3L))
+        .thenReturn(List.of("t2"));
+    stubSend();
+
+    listener.notifyPost(42L);
+
+    org.mockito.ArgumentCaptor<TransactionDefinition> def =
+        org.mockito.ArgumentCaptor.forClass(TransactionDefinition.class);
+    verify(txManager, org.mockito.Mockito.atLeastOnce()).getTransaction(def.capture());
+    for (TransactionDefinition d : def.getAllValues()) {
+      assertEquals(TransactionDefinition.PROPAGATION_REQUIRES_NEW, d.getPropagationBehavior());
+    }
   }
 }
