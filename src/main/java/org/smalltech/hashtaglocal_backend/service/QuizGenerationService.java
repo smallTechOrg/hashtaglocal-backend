@@ -21,6 +21,7 @@ import org.smalltech.hashtaglocal_backend.entity.QuizEntity;
 import org.smalltech.hashtaglocal_backend.model.QuizStatus;
 import org.smalltech.hashtaglocal_backend.repository.QuizRepository;
 import org.smalltech.hashtaglocal_backend.service.ai.AiFallbackChain;
+import org.smalltech.hashtaglocal_backend.service.ai.AiProviderException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -95,8 +96,13 @@ public class QuizGenerationService {
   private final QuizRepository quizRepository;
   private final ObjectMapper objectMapper;
 
-  /** Generates and saves one PENDING quiz, or returns empty if no acceptable quiz was produced. */
-  @Transactional
+  /**
+   * Generates and saves one PENDING quiz, or returns empty if no acceptable quiz was produced.
+   *
+   * @throws AiProviderException when the provider configured in the Ops Dashboard fails. Nothing is
+   *     saved before that point, so it does not need to roll back a caller's transaction.
+   */
+  @Transactional(noRollbackFor = AiProviderException.class)
   public Optional<QuizEntity> generatePendingQuiz(Locality locality) {
     Optional<GeneratedQuiz> candidate = generateCandidate(locality, recentQuestions(locality));
     if (candidate.isEmpty()) {

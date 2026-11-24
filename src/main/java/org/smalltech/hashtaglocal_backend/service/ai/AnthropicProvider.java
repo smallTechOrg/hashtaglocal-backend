@@ -13,7 +13,7 @@ import org.springframework.web.client.RestClient;
 @Component
 public class AnthropicProvider extends RestAiProvider {
 
-  private static final String URL = "https://api.anthropic.com/v1/messages";
+  static final String DEFAULT_URL = "https://api.anthropic.com/v1/messages";
   private static final String API_VERSION = "2023-06-01";
 
   public AnthropicProvider(RestClient.Builder restClientBuilder, ObjectMapper objectMapper) {
@@ -26,7 +26,17 @@ public class AnthropicProvider extends RestAiProvider {
   }
 
   @Override
-  protected String send(String model, String apiKey, String prompt, int maxTokens) {
+  public String displayName() {
+    return "Claude (Anthropic)";
+  }
+
+  @Override
+  public String defaultEndpoint() {
+    return DEFAULT_URL;
+  }
+
+  @Override
+  protected String send(String url, String model, String apiKey, String prompt, int maxTokens) {
     Map<String, Object> body =
         Map.of(
             "model",
@@ -37,7 +47,7 @@ public class AnthropicProvider extends RestAiProvider {
             List.of(Map.of("role", "user", "content", prompt)));
     return restClient
         .post()
-        .uri(URL)
+        .uri(url)
         .header("x-api-key", apiKey)
         .header("anthropic-version", API_VERSION)
         .contentType(MediaType.APPLICATION_JSON)

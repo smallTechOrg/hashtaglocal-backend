@@ -17,7 +17,8 @@ import org.springframework.web.client.RestClient;
 @Component
 public class GeminiProvider extends RestAiProvider {
 
-  private static final String ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models";
+  /** Base URL; the model and ":generateContent" are appended. */
+  static final String DEFAULT_URL = "https://generativelanguage.googleapis.com/v1beta/models";
 
   public GeminiProvider(RestClient.Builder restClientBuilder, ObjectMapper objectMapper) {
     super(restClientBuilder, objectMapper);
@@ -29,7 +30,17 @@ public class GeminiProvider extends RestAiProvider {
   }
 
   @Override
-  protected String send(String model, String apiKey, String prompt, int maxTokens) {
+  public String displayName() {
+    return "Gemini (Google)";
+  }
+
+  @Override
+  public String defaultEndpoint() {
+    return DEFAULT_URL;
+  }
+
+  @Override
+  protected String send(String url, String model, String apiKey, String prompt, int maxTokens) {
     Map<String, Object> body =
         Map.of(
             "contents",
@@ -39,7 +50,7 @@ public class GeminiProvider extends RestAiProvider {
     // Key in a header, not the URL, so it can never end up in a logged URL.
     return restClient
         .post()
-        .uri(ENDPOINT + "/{model}:generateContent", model)
+        .uri(stripTrailingSlash(url) + "/{model}:generateContent", model)
         .header("x-goog-api-key", apiKey)
         .contentType(MediaType.APPLICATION_JSON)
         .body(body)
@@ -82,6 +93,10 @@ public class GeminiProvider extends RestAiProvider {
       // 500, 503 overloaded, 504 and anything else unexpected.
       default -> AiResult.failure(AiFailure.TRANSIENT, detail);
     };
+  }
+
+  private static String stripTrailingSlash(String url) {
+    return url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
   }
 
   /** The wait from the error's RetryInfo detail (e.g. "37s" or "12.5s"), or null. */

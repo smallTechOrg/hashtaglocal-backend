@@ -213,7 +213,13 @@ class AiFallbackChainTest {
     }
 
     @Override
-    public AiResult call(String model, String apiKey, String prompt, int maxTokens) {
+    public String defaultEndpoint() {
+      return "https://" + name + ".example.com/v1";
+    }
+
+    @Override
+    public AiResult call(
+        String endpoint, String model, String apiKey, String prompt, int maxTokens) {
       calls.add(name + ":" + apiKey + ":" + model);
       return scripted.getOrDefault(apiKey + ":" + model, otherwise);
     }

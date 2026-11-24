@@ -37,16 +37,22 @@ abstract class RestAiProvider implements AiProvider {
   }
 
   @Override
-  public final AiResult call(String model, String apiKey, String prompt, int maxTokens) {
+  public final AiResult call(
+      String endpoint, String model, String apiKey, String prompt, int maxTokens) {
+    String url = endpoint == null || endpoint.isBlank() ? defaultEndpoint() : endpoint.trim();
+    if (url == null || url.isBlank()) {
+      // A provider with no default (openai-compatible) needs an endpoint.
+      return AiResult.failure(AiFailure.BAD_REQUEST, "no endpoint configured for " + name());
+    }
     String raw;
     try {
-      raw = send(model, apiKey, prompt, maxTokens);
+      raw = send(url, model, apiKey, prompt, maxTokens);
     } catch (RestClientResponseException e) {
       return classify(
           e.getStatusCode().value(), e.getResponseHeaders(), e.getResponseBodyAsString());
     } catch (RestClientException e) {
       // Timeouts and connection errors.
-      return AiResult.failure(AiFailure.TRANSIENT, shorten(e.getMessage()));
+      return AiResult.failure(AiFailure.TRANSIENT, shorten(SecretRedactor.redact(e.getMessage())));
     }
     try {
       String text = extractText(raw);
@@ -54,12 +60,18 @@ abstract class RestAiProvider implements AiProvider {
           ? AiResult.failure(AiFailure.INVALID_RESPONSE, "reply had no text")
           : AiResult.success(text.trim());
     } catch (Exception e) {
-      return AiResult.failure(AiFailure.INVALID_RESPONSE, "unreadable reply: " + e.getMessage());
+      return AiResult.failure(
+          AiFailure.INVALID_RESPONSE,
+          "unreadable reply: " + shorten(SecretRedactor.redact(e.getMessage())));
     }
   }
 
-  /** Sends the request and returns the raw response body. HTTP errors are thrown by RestClient. */
-  protected abstract String send(String model, String apiKey, String prompt, int maxTokens);
+  /**
+   * Sends the request to {@code url} and returns the raw response body. HTTP errors are thrown by
+   * RestClient. Implementations must send the key in a header, never in the URL.
+   */
+  protected abstract String send(
+      String url, String model, String apiKey, String prompt, int maxTokens);
 
   /** The reply text from a successful response body. */
   protected abstract String extractText(String raw) throws Exception;
@@ -81,12 +93,13 @@ abstract class RestAiProvider implements AiProvider {
   }
 
   /**
-   * HTTP status plus the provider's error message (or the start of the body), for logs. Error
-   * bodies never contain our key.
+   * HTTP status plus the provider's error message (or the start of the body), for logs and for the
+   * Ops Dashboard. Some providers echo part of the key back (e.g. "Incorrect API key provided:
+   * sk-ab***yz"), so anything key-shaped is masked.
    */
   static String detail(int status, String body) {
     Matcher message = ERROR_MESSAGE.matcher(body == null ? "" : body);
-    return status + " " + shorten(message.find() ? message.group(1) : body);
+    return status + " " + shorten(SecretRedactor.redact(message.find() ? message.group(1) : body));
   }
 
   private static String shorten(String text) {

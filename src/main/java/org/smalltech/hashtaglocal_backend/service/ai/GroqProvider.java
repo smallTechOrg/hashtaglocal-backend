@@ -18,7 +18,7 @@ import org.springframework.web.client.RestClient;
 @Component
 public class GroqProvider extends RestAiProvider {
 
-  private static final String URL = "https://api.groq.com/openai/v1/chat/completions";
+  static final String DEFAULT_URL = "https://api.groq.com/openai/v1/chat/completions";
 
   // A wait longer than this means a daily limit was hit, not a per-minute one.
   private static final Duration DAILY_LIMIT_THRESHOLD = Duration.ofSeconds(60);
@@ -39,7 +39,17 @@ public class GroqProvider extends RestAiProvider {
   }
 
   @Override
-  protected String send(String model, String apiKey, String prompt, int maxTokens) {
+  public String displayName() {
+    return "Groq";
+  }
+
+  @Override
+  public String defaultEndpoint() {
+    return DEFAULT_URL;
+  }
+
+  @Override
+  protected String send(String url, String model, String apiKey, String prompt, int maxTokens) {
     Map<String, Object> body =
         Map.of(
             "model",
@@ -52,7 +62,7 @@ public class GroqProvider extends RestAiProvider {
             maxTokens);
     return restClient
         .post()
-        .uri(URL)
+        .uri(url)
         .header(HttpHeaders.AUTHORIZATION, "Bearer " + apiKey)
         .contentType(MediaType.APPLICATION_JSON)
         .body(body)

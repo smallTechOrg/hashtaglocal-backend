@@ -18,6 +18,7 @@ import org.smalltech.hashtaglocal_backend.model.response.AdminQuizData;
 import org.smalltech.hashtaglocal_backend.model.response.QueuedQuizCountData;
 import org.smalltech.hashtaglocal_backend.repository.QuizRepository;
 import org.smalltech.hashtaglocal_backend.repository.UserRepository;
+import org.smalltech.hashtaglocal_backend.service.ai.AiProviderException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -142,7 +143,14 @@ public class QuizReviewService {
     review(quiz, adminUserId, LocalDateTime.now());
     // Replacement for the same locality. A failed generation does not undo the rejection; the
     // new question lands in the pending list, or ops can click generate again.
-    quizGenerationService.generatePendingQuiz(quiz.getLocality());
+    try {
+      quizGenerationService.generatePendingQuiz(quiz.getLocality());
+    } catch (AiProviderException e) {
+      log.warn(
+          "Replacement quiz for {} not generated: {}",
+          quiz.getLocality().getHashtag(),
+          e.getMessage());
+    }
     return toData(quiz);
   }
 

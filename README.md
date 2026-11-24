@@ -72,6 +72,35 @@ To run all the test cases, use this command:
 ```declarative
 ./gradlew test
 ```
+## Quiz AI provider (Ops Dashboard)
+
+Quiz generation uses the AI provider an admin saves on the Ops Dashboard's **AI Provider** page
+(`/ops/ai-provider`, API `/admin/ai-provider`, ADMIN only). With nothing saved, it uses the
+`QUIZ_*` fallback chain from `.env`, as before.
+
+- **Env var:** `AI_CONFIG_ENCRYPTION_KEY`, base64 of 32 random bytes (`openssl rand -base64 32`).
+  The saved API key is stored only as AES-256-GCM ciphertext under this key; no endpoint ever
+  returns the key (only `has_key` and its last 4 characters). Without the env var a key cannot be
+  saved. Optional: `AI_CONFIG_ALLOW_PRIVATE_ENDPOINTS` (default `false`), `AI_CONFIG_CACHE_TTL`
+  (default `30s`).
+- **Migration:** `src/main/resources/db/migration/V2__ai_provider_config.sql` creates
+  `ai_provider_config` (one row) and `ai_provider_config_audit`. Flyway runs it on start when
+  `FLYWAY_ENABLED=true` (Cloud Run); locally, Hibernate creates the tables, or run the file with
+  `psql -d hashtaglocal -f src/main/resources/db/migration/V2__ai_provider_config.sql`.
+- **Switching provider:** pick the provider (Claude/Anthropic, OpenAI, Groq, Gemini, or
+  OpenAI-compatible), leave the endpoint blank for the provider's default, enter the model and key, click **Test connection**,
+  then **Save**. The next quiz generation uses it, with no restart (other instances pick it up
+  within the cache TTL). Leaving the key blank keeps the saved key; switching provider needs a new
+  key. **Reset to .env** deletes the saved config.
+- **OpenAI-compatible** covers any server that speaks the OpenAI Chat Completions format
+  (OpenRouter, Together, DeepSeek, Mistral, vLLM, ...). The endpoint is required: a base URL
+  (`https://openrouter.ai/api/v1`) gets `/chat/completions` appended, a full URL is used as is. It
+  sends `max_tokens` (not OpenAI's `max_completion_tokens`) and strips `<think>` blocks from replies.
+- If the saved provider fails (bad key, unknown model, quota), quiz generation returns `502
+  AI_PROVIDER_ERROR` with the reason, instead of silently falling back to `.env`.
+- **Adding a provider:** add a `@Component` extending `RestAiProvider` in `service/ai`; its
+  `name()` then appears in the dashboard and is accepted by the API.
+
 ## Deployment
 
 The app runs on Google Cloud Run. Pushing to `main` deploys production and pushing to `staging` deploys
