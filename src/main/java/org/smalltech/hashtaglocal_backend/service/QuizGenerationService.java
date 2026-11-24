@@ -31,12 +31,12 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>Flow per locality:
  *
  * <ol>
- *   <li>Generate a quiz with the LLM. The prompt holds only the locality name; old questions are
- *       never added to it, since longer prompts make the model worse.
+ *   <li>Generate a quiz with the LLM. The prompt lists the locality's existing questions (last 100
+ *       days) so the model writes a new one, plus any attempts already rejected in this run.
  *   <li>Check it in code: valid JSON, four distinct options, a valid answer index, and not an exact
- *       repeat of a question from the last 100 days.
- *   <li>Evaluate it with a second LLM call: relevant and high quality, accurate, and not a
- *       duplicate. The existing questions go into this prompt, so duplicates are caught here.
+ *       repeat of an existing question.
+ *   <li>Evaluate it with a second LLM call for quality and accuracy only (relevant, interesting,
+ *       100% accurate). Duplicates are handled by the generation prompt and the code check.
  *   <li>If it passes, save it as PENDING. If not, generate again, up to MAX_ATTEMPTS times.
  * </ol>
  */
@@ -54,7 +54,7 @@ public class QuizGenerationService {
   /** Matches a named placeholder such as {locality} in the prompt templates. */
   private static final Pattern PLACEHOLDER = Pattern.compile("\\{(\\w+)}");
 
-  // Placeholders: {locality}.
+  // Placeholders: {locality}, {existingQuizzes}. {existingQuizzes} is empty when there are none.
   private static final String PROMPT_TEMPLATE =
       """
       Be a quizmaster and write one multiple-choice quiz for the community of {locality} in India.
@@ -66,29 +66,27 @@ public class QuizGenerationService {
       - answer_index is the 1-based position of the correct option.
       - explanation should be 1-2 highly interesting short sentences about the question and answer.
 
+      {existingQuizzes}
+
       Reply with ONLY a JSON object, no other text, in this shape:
       {"question": "...", "options": ["...", "...", "...", "..."],
       "answer_index": 1, "explanation": "..."}
       """;
 
-  // Placeholders: {locality}, {quiz}, {existingQuizzes}.
+  // Placeholders: {locality}, {quiz}.
   private static final String EVAL_PROMPT_TEMPLATE =
       """
       Be a quiz evaluator and evaluate the quiz on these following criteria:
       - Relevant & High Quality. Should be related to the locality {locality} and should be \
       interesting.
       - Accuracy. The question and answer should be 100% accurate.
-      - Non-Duplicate. The quiz should not have already been asked.
 
       This is the quiz:
       {quiz}
 
-      These are the already existing quizzes:
-      {existingQuizzes}
-
       Reply with ONLY a JSON object, no other text, in this shape:
       {"is_evaluation_passed": true, "rejection_reason": null}
-      When it fails, rejection_reason is one of: INACCURATE, NOT_RELEVANT, LOW_QUALITY, DUPLICATE.
+      When it fails, rejection_reason is one of: INACCURATE, NOT_RELEVANT, LOW_QUALITY.
       """;
 
   private final AiFallbackChain aiFallbackChain;
@@ -110,52 +108,61 @@ public class QuizGenerationService {
 
   /**
    * Generates and evaluates up to MAX_ATTEMPTS quizzes, returning the first one that passes the
-   * code checks and the LLM evaluation. {@code existingQuestions} only go to the evaluator.
+   * code checks and the LLM evaluation. The generation prompt lists {@code existingQuestions} plus
+   * every question already tried in this run, so each retry asks for something new.
    */
   Optional<GeneratedQuiz> generateCandidate(Locality locality, List<String> existingQuestions) {
     Set<String> existingKeys =
         existingQuestions.stream()
             .map(QuizGenerationService::questionKey)
             .collect(Collectors.toSet());
-    String prompt = buildPrompt(locality);
+    List<String> avoid = new ArrayList<>(existingQuestions);
     String hashtag = locality.getHashtag();
 
     for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
       Optional<GeneratedQuiz> quiz =
           aiFallbackChain
-              .complete(prompt, MAX_TOKENS)
+              .complete(buildPrompt(locality, avoid), MAX_TOKENS)
               .flatMap(
                   reply -> parse(reply.text()).map(q -> q.withGeneratedBy(reply.generatedBy())));
       if (quiz.isEmpty()) {
         log.info("Attempt {} for {}: no valid quiz", attempt, hashtag);
         continue;
       }
-      // Exact repeats are caught here for free; paraphrases are left to the evaluator.
-      if (existingKeys.contains(questionKey(quiz.get().question()))) {
-        log.info("Attempt {} for {}: exact repeat of an existing question", attempt, hashtag);
+      String question = quiz.get().question();
+      // Safety net: the model was told not to repeat, but an exact repeat is caught here for free.
+      if (existingKeys.contains(questionKey(question))) {
+        log.info(
+            "Attempt {} for {}: exact repeat of an existing question: {}",
+            attempt,
+            hashtag,
+            question);
         continue;
       }
-      Evaluation evaluation = evaluate(locality, quiz.get(), existingQuestions);
+      Evaluation evaluation = evaluate(locality, quiz.get());
       if (evaluation.passed()) {
         log.info("Attempt {} for {}: quiz passed evaluation", attempt, hashtag);
         return quiz;
       }
       log.info(
-          "Attempt {} for {}: rejected by evaluation ({})",
+          "Attempt {} for {}: rejected by evaluation ({}): {}",
           attempt,
           hashtag,
-          evaluation.rejectionReason());
+          evaluation.rejectionReason(),
+          question);
+      // Don't let the next attempt write the same rejected question again.
+      avoid.add(question);
     }
     return Optional.empty();
   }
 
   /**
-   * Asks the LLM whether the quiz passes. An unavailable evaluator or an unreadable reply counts as
-   * a fail, so nothing unevaluated reaches the pending list.
+   * Asks the LLM whether the quiz passes on quality and accuracy. An unavailable evaluator or an
+   * unreadable reply counts as a fail, so nothing unevaluated reaches the pending list.
    */
-  Evaluation evaluate(Locality locality, GeneratedQuiz quiz, List<String> existingQuestions) {
+  Evaluation evaluate(Locality locality, GeneratedQuiz quiz) {
     return aiFallbackChain
-        .complete(buildEvaluationPrompt(locality, quiz, existingQuestions), EVAL_MAX_TOKENS)
+        .complete(buildEvaluationPrompt(locality, quiz), EVAL_MAX_TOKENS)
         .map(reply -> parseEvaluation(reply.text()))
         .orElse(Evaluation.failed("EVALUATOR_UNAVAILABLE"));
   }
@@ -183,9 +190,8 @@ public class QuizGenerationService {
     }
   }
 
-  /** The prompt asking the LLM to judge one quiz against the criteria and existing questions. */
-  String buildEvaluationPrompt(
-      Locality locality, GeneratedQuiz quiz, List<String> existingQuestions) {
+  /** The prompt asking the LLM to judge one quiz on quality and accuracy. */
+  String buildEvaluationPrompt(Locality locality, GeneratedQuiz quiz) {
     List<String> o = quiz.options();
     String options =
         IntStream.range(0, o.size())
@@ -200,13 +206,7 @@ public class QuizGenerationService {
             + quiz.answerOptionIndex()
             + "\nExplanation: "
             + quiz.explanation();
-    String existing =
-        existingQuestions.isEmpty()
-            ? "None yet."
-            : existingQuestions.stream().map(q -> "- " + q).collect(Collectors.joining("\n"));
-    return fill(
-        EVAL_PROMPT_TEMPLATE,
-        Map.of("locality", locality.getName(), "quiz", quizText, "existingQuizzes", existing));
+    return fill(EVAL_PROMPT_TEMPLATE, Map.of("locality", locality.getName(), "quiz", quizText));
   }
 
   /** Parses the model's reply, ignoring any text around the JSON. Empty if a rule is broken. */
@@ -243,9 +243,20 @@ public class QuizGenerationService {
         : Optional.empty();
   }
 
-  /** The generation prompt: only the locality name, nothing else. */
-  String buildPrompt(Locality locality) {
-    return fill(PROMPT_TEMPLATE, Map.of("locality", locality.getName()));
+  /**
+   * The generation prompt: the locality name and the questions to avoid (existing ones and any
+   * rejected in this run). With nothing to avoid, the section and its blank line are left out.
+   */
+  String buildPrompt(Locality locality, List<String> avoidQuestions) {
+    String existing =
+        avoidQuestions.isEmpty()
+            ? ""
+            : "These are the already existing quizzes. Do NOT repeat or closely paraphrase any of"
+                + " them:\n"
+                + avoidQuestions.stream().map(q -> "- " + q).collect(Collectors.joining("\n"));
+    return fill(
+            PROMPT_TEMPLATE, Map.of("locality", locality.getName(), "existingQuizzes", existing))
+        .replaceAll("\n{3,}", "\n\n");
   }
 
   /**
@@ -310,8 +321,8 @@ public class QuizGenerationService {
 
   /**
    * The evaluator's verdict on one quiz candidate. {@code rejectionReason} is null when it passed;
-   * otherwise INACCURATE, NOT_RELEVANT, LOW_QUALITY or DUPLICATE from the model, or one of our own
-   * codes (EVALUATOR_UNAVAILABLE, UNREADABLE_EVALUATION, UNKNOWN).
+   * otherwise INACCURATE, NOT_RELEVANT or LOW_QUALITY from the model, or one of our own codes
+   * (EVALUATOR_UNAVAILABLE, UNREADABLE_EVALUATION, UNKNOWN).
    */
   record Evaluation(boolean passed, String rejectionReason) {
     static Evaluation failed(String reason) {
