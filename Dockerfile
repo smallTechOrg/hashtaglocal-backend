@@ -9,10 +9,12 @@ WORKDIR /src
 # until the build files change.
 COPY gradlew settings.gradle.kts build.gradle.kts ./
 COPY gradle gradle
-RUN chmod +x gradlew && ./gradlew --no-daemon dependencies > /dev/null
+# Resolve from Google's Maven Central mirror (Maven Central rate-limits CI runners): ci/gradle-mirror.init.gradle
+COPY ci/gradle-mirror.init.gradle ci/gradle-mirror.init.gradle
+RUN chmod +x gradlew && ./gradlew --no-daemon -I ci/gradle-mirror.init.gradle dependencies > /dev/null
 
 COPY src src
-RUN ./gradlew --no-daemon bootJar -x test \
+RUN ./gradlew --no-daemon -I ci/gradle-mirror.init.gradle bootJar -x test \
     && cp "$(ls build/libs/*.jar | grep -v -- '-plain' | head -n 1)" /app.jar
 
 # ---- runtime ----
