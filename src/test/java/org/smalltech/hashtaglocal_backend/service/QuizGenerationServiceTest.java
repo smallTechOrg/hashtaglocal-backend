@@ -139,10 +139,14 @@ class QuizGenerationServiceTest {
     assertTrue(service.generatePendingQuiz(portBlair).isPresent());
     verify(aiFallbackChain, times(2)).complete(startsWith(GEN), anyInt());
     verify(aiFallbackChain, times(2)).complete(startsWith(EVAL), anyInt());
+    // The retry's generation prompt lists the rejected question so it isn't written again.
+    verify(aiFallbackChain)
+        .complete(
+            and(startsWith(GEN), contains("- Which river flows through Port Blair?")), anyInt());
   }
 
   @Test
-  void existingQuestionsGoToTheEvaluatorButNeverToTheGenerator() {
+  void existingQuestionsGoToTheGeneratorButNotTheEvaluator() {
     when(aiFallbackChain.complete(startsWith(GEN), anyInt())).thenReturn(reply(GOOD_REPLY));
     when(aiFallbackChain.complete(startsWith(EVAL), anyInt())).thenReturn(reply(GOOD_VERDICT));
     when(quizRepository.findByLocality_IdAndCreatedAtAfter(anyLong(), any()))
@@ -151,9 +155,9 @@ class QuizGenerationServiceTest {
 
     service.generatePendingQuiz(portBlair);
 
-    verify(aiFallbackChain).complete(and(startsWith(EVAL), contains(RECENT_QUESTION)), anyInt());
+    verify(aiFallbackChain).complete(and(startsWith(GEN), contains(RECENT_QUESTION)), anyInt());
     verify(aiFallbackChain, never())
-        .complete(and(startsWith(GEN), contains(RECENT_QUESTION)), anyInt());
+        .complete(and(startsWith(EVAL), contains(RECENT_QUESTION)), anyInt());
   }
 
   @Test
@@ -242,30 +246,41 @@ class QuizGenerationServiceTest {
   }
 
   @Test
-  void generationPromptHasOnlyTheLocalityName() {
-    String prompt = service.buildPrompt(portBlair);
+  void generationPromptListsExistingQuizzesToAvoid() {
+    String prompt = service.buildPrompt(portBlair, List.of(RECENT_QUESTION));
 
     assertTrue(prompt.contains("community of Port Blair in India."));
+    assertTrue(prompt.contains("Do NOT repeat or closely paraphrase any of them:"));
+    assertTrue(prompt.contains("- " + RECENT_QUESTION));
     assertFalse(prompt.contains("#portblair"));
     assertFalse(prompt.contains("{locality}"));
+    assertFalse(prompt.contains("{existingQuizzes}"));
     // The JSON shape keeps its braces.
     assertTrue(prompt.contains("{\"question\": \"...\""));
   }
 
   @Test
-  void evaluationPromptHasQuizAndExistingQuestions() {
+  void generationPromptWithNothingToAvoidHasNoListOrGap() {
+    String prompt = service.buildPrompt(portBlair, List.of());
+
+    assertFalse(prompt.contains("already existing quizzes"));
+    assertFalse(prompt.contains("{existingQuizzes}"));
+    assertFalse(prompt.contains("\n\n\n"));
+  }
+
+  @Test
+  void evaluationPromptChecksQualityAndAccuracyOnly() {
     QuizGenerationService.GeneratedQuiz quiz = service.parse(GOOD_REPLY).orElseThrow();
 
-    String withHistory = service.buildEvaluationPrompt(portBlair, quiz, List.of(RECENT_QUESTION));
-    assertTrue(withHistory.contains("related to the locality Port Blair"));
-    assertTrue(withHistory.contains("Question: Which river flows through Port Blair?"));
-    assertTrue(withHistory.contains("4. None of these"));
-    assertTrue(withHistory.contains("- " + RECENT_QUESTION));
-    assertFalse(withHistory.contains("{quiz}"));
-    assertFalse(withHistory.contains("{existingQuizzes}"));
-
-    String noHistory = service.buildEvaluationPrompt(portBlair, quiz, List.of());
-    assertTrue(noHistory.contains("None yet."));
+    String prompt = service.buildEvaluationPrompt(portBlair, quiz);
+    assertTrue(prompt.contains("related to the locality Port Blair"));
+    assertTrue(prompt.contains("Accuracy."));
+    assertTrue(prompt.contains("Question: Which river flows through Port Blair?"));
+    assertTrue(prompt.contains("4. None of these"));
+    assertFalse(prompt.contains("Non-Duplicate"));
+    assertFalse(prompt.contains("DUPLICATE"));
+    assertFalse(prompt.contains("existing quizzes"));
+    assertFalse(prompt.contains("{quiz}"));
   }
 
   @Test
