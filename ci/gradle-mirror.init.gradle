@@ -1,0 +1,16 @@
+// CI and image builds only (local builds don't use this file): resolve plugins and dependencies from
+// Google's mirror of Maven Central first. Shared GitHub runners hit Maven Central's anonymous rate limit
+// (HTTP 429); the mirror serves the same artifacts. The build's own repositories remain as a fallback.
+def mirror = 'https://maven-central.storage-download.googleapis.com/maven2/'
+
+beforeSettings { settings ->
+    settings.pluginManagement.repositories {
+        maven { url = mirror }
+        gradlePluginPortal()
+    }
+}
+
+allprojects {
+    buildscript { repositories { maven { url = mirror } } }
+    repositories { maven { url = mirror } }
+}
