@@ -32,6 +32,12 @@ class EndpointValidatorTest {
         validator.validate("  https://api.example.com/v1/messages "));
   }
 
+  @Test
+  void lowerCasesTheScheme() {
+    // The ai_configs CHECK constraint (LIKE 'https://%') is case-sensitive.
+    assertEquals("https://api.example.com/v1", validator.validate("HTTPS://api.example.com/v1"));
+  }
+
   @ParameterizedTest
   @ValueSource(
       strings = {

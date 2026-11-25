@@ -142,7 +142,8 @@ public class AiFallbackChain {
     if (result.failure() == AiFailure.INVALID_RESPONSE) {
       return Optional.empty();
     }
-    throw new AiProviderException(describe(result.failure()) + " [" + label + "]: " + detail);
+    throw new AiProviderException(
+        describe(result.failure()) + " [" + label + "]: " + detail, result.failure());
   }
 
   /**

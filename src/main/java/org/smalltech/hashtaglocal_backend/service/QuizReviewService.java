@@ -37,7 +37,14 @@ public class QuizReviewService {
   private final UserRepository userRepository;
   private final QuizGenerationService quizGenerationService;
 
-  /** Generates one PENDING quiz per saved-user locality, or only for {@code hashtag} if given. */
+  /**
+   * Generates one PENDING quiz per saved-user locality, or only for {@code hashtag} if given.
+   *
+   * <p>A temporary AI failure (rate limit, outage) skips that locality and moves on, so one blip
+   * does not lose the whole batch; it is thrown only when no quiz was generated at all. A config
+   * failure (bad key, unknown model, used-up quota) is thrown at once: every other locality would
+   * fail the same way.
+   */
   public List<AdminQuizData> generate(String hashtag) {
     List<Locality> localities = userRepository.findDistinctUserLocalities();
     if (hashtag != null && !hashtag.isBlank()) {
@@ -50,11 +57,23 @@ public class QuizReviewService {
     }
 
     List<AdminQuizData> generated = new ArrayList<>();
+    AiProviderException lastTemporaryFailure = null;
     for (Locality locality : localities) {
-      quizGenerationService
-          .generatePendingQuiz(locality)
-          .map(this::toData)
-          .ifPresent(generated::add);
+      try {
+        quizGenerationService
+            .generatePendingQuiz(locality)
+            .map(this::toData)
+            .ifPresent(generated::add);
+      } catch (AiProviderException e) {
+        if (!e.isTemporary()) {
+          throw e;
+        }
+        log.warn("Quiz for {} not generated: {}", locality.getHashtag(), e.getMessage());
+        lastTemporaryFailure = e;
+      }
+    }
+    if (generated.isEmpty() && lastTemporaryFailure != null) {
+      throw lastTemporaryFailure;
     }
     return generated;
   }

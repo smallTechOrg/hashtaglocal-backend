@@ -44,7 +44,7 @@ public class EndpointValidator {
   }
 
   /**
-   * @return the trimmed endpoint
+   * @return the trimmed endpoint, with the scheme lower-cased
    * @throws IllegalArgumentException with a user-facing reason when the endpoint is not allowed
    */
   public String validate(String endpoint) {
@@ -77,7 +77,8 @@ public class EndpointValidator {
     if (!allowPrivate) {
       checkPublic(host);
     }
-    return trimmed;
+    // Lower-case the scheme: the ai_configs CHECK constraint (LIKE 'https://%') is case-sensitive.
+    return "https" + trimmed.substring(uri.getScheme().length());
   }
 
   private void checkPublic(String host) {

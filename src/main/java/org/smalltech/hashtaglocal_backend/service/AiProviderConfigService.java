@@ -150,8 +150,11 @@ public class AiProviderConfigService {
    * Makes one minimal call with the submitted values, filling any blank field from the saved
    * connection. Saves nothing. An empty reply still counts as connected: the key, model and
    * endpoint all worked.
+   *
+   * <p>Deliberately not {@code @Transactional}: the provider call can take up to the client's read
+   * timeout, and a transaction would hold a database connection for all of it. The saved row is
+   * read in the repository's own short transaction, and the entity has no lazy fields.
    */
-  @Transactional(readOnly = true)
   public AiConnectionTestData test(AiProviderConfigRequest request) {
     Optional<AiProviderConfigEntity> saved = current();
     String name =

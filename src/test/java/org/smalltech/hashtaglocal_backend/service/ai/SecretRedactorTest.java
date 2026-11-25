@@ -28,4 +28,17 @@ class SecretRedactorTest {
   void leavesOrdinaryMessagesAlone() {
     assertEquals("401 invalid x-api-key", SecretRedactor.redact("401 invalid x-api-key"));
   }
+
+  @Test
+  void leavesWordsThatOnlyContainKeyPrefixesAlone() {
+    String text = "risk-assessment failed in task-manager; disk-usage high; Risk-Based routing";
+    assertEquals(text, SecretRedactor.redact(text));
+  }
+
+  @Test
+  void stillMasksAKeyAfterPunctuation() {
+    assertEquals(
+        "key=[REDACTED] (\"[REDACTED]\")",
+        SecretRedactor.redact("key=sk-abc123xyz (\"gsk_abcdef12\")"));
+  }
 }

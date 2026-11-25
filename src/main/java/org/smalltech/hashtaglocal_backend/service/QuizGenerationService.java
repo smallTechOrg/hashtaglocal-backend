@@ -157,13 +157,23 @@ public class QuizGenerationService {
 
   /**
    * Asks the LLM whether the quiz passes. An unavailable evaluator or an unreadable reply counts as
-   * a fail, so nothing unevaluated reaches the pending list.
+   * a fail, so nothing unevaluated reaches the pending list. That includes a temporary failure
+   * (rate limit, outage) of the Ops Dashboard connection, so the next attempt can still run; a
+   * config failure (bad key, unknown model) is thrown, since every later call would fail too.
    */
   Evaluation evaluate(Locality locality, GeneratedQuiz quiz, List<String> existingQuestions) {
-    return aiFallbackChain
-        .complete(buildEvaluationPrompt(locality, quiz, existingQuestions), EVAL_MAX_TOKENS)
-        .map(reply -> parseEvaluation(reply.text()))
-        .orElse(Evaluation.failed("EVALUATOR_UNAVAILABLE"));
+    try {
+      return aiFallbackChain
+          .complete(buildEvaluationPrompt(locality, quiz, existingQuestions), EVAL_MAX_TOKENS)
+          .map(reply -> parseEvaluation(reply.text()))
+          .orElse(Evaluation.failed("EVALUATOR_UNAVAILABLE"));
+    } catch (AiProviderException e) {
+      if (!e.isTemporary()) {
+        throw e;
+      }
+      log.warn("Evaluator unavailable for {}: {}", locality.getHashtag(), e.getMessage());
+      return Evaluation.failed("EVALUATOR_UNAVAILABLE");
+    }
   }
 
   /**
