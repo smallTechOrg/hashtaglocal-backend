@@ -21,16 +21,17 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * The AI provider used for quiz generation, editable at runtime. All routes are under {@code
- * /admin/ai-provider}, so the {@code /admin/**} rule in SecurityConfig restricts them to
- * ROLE_ADMIN. No route ever returns the API key or its ciphertext.
+ * The AI connection used for quiz generation (a name plus an OpenAI-compatible endpoint, model and
+ * key), editable at runtime. All routes are under {@code /admin/ai-provider}, so the {@code
+ * /admin/**} rule in SecurityConfig restricts them to ROLE_ADMIN. No route ever returns the API key
+ * or its ciphertext.
  */
 @RestController
 @RequestMapping("/admin/ai-provider")
 @Tag(
     name = "Admin — AI Provider",
     description =
-        "Provider, endpoint, model and key used for quiz generation. Takes effect without"
+        "Name, OpenAI-compatible endpoint, model and key used for quiz generation. Takes effect without"
             + " a restart.")
 @SecurityRequirement(name = "bearerAuth")
 @RequiredArgsConstructor
@@ -40,7 +41,7 @@ public class AiProviderAdminController {
 
   @GetMapping
   @Operation(
-      summary = "Current AI provider config",
+      summary = "Current AI connection",
       description =
           "Returns has_key and key_last4, never the key. source is ENV when nothing is"
               + " saved and the .env chain is used.")
@@ -50,10 +51,10 @@ public class AiProviderAdminController {
 
   @PutMapping
   @Operation(
-      summary = "Save the AI provider config",
+      summary = "Save the AI connection",
       description =
-          "A blank api_key keeps the saved key (same provider only). A blank endpoint"
-              + " uses the provider's default.")
+          "name, endpoint (OpenAI-compatible, https) and model are required. A blank api_key"
+              + " keeps the saved key, only for the same endpoint host. Adds a row to ai_configs.")
   public ResponseEntity<NewAPIResponse<AiProviderConfigData>> save(
       @Valid @RequestBody AiProviderConfigRequest request,
       @AuthenticationPrincipal Long adminUserId) {
@@ -62,8 +63,10 @@ public class AiProviderAdminController {
 
   @DeleteMapping
   @Operation(
-      summary = "Reset to .env",
-      description = "Deletes the saved config; quiz generation goes back to the .env chain.")
+      summary = "Remove the AI connection",
+      description =
+          "Adds a 'removed' row and clears every stored key; quiz generation goes back to the"
+              + " .env chain.")
   public ResponseEntity<NewAPIResponse<AiProviderConfigData>> reset(
       @AuthenticationPrincipal Long adminUserId) {
     return ok(service.reset(adminUserId));
@@ -71,7 +74,7 @@ public class AiProviderAdminController {
 
   @PostMapping("/test")
   @Operation(
-      summary = "Test connection",
+      summary = "Test the AI connection",
       description =
           "One minimal call with the submitted values; blank fields use the saved"
               + " config. Saves nothing.")

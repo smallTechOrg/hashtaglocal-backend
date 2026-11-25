@@ -1,20 +1,16 @@
 package org.smalltech.hashtaglocal_backend.service;
 
 import java.net.URI;
-import java.time.Clock;
-import java.time.LocalDateTime;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.regex.Pattern;
 import lombok.extern.slf4j.Slf4j;
-import org.smalltech.hashtaglocal_backend.entity.AiProviderConfigAuditEntity;
 import org.smalltech.hashtaglocal_backend.entity.AiProviderConfigEntity;
 import org.smalltech.hashtaglocal_backend.entity.UserEntity;
 import org.smalltech.hashtaglocal_backend.exception.DownstreamServiceException;
 import org.smalltech.hashtaglocal_backend.model.request.AiProviderConfigRequest;
 import org.smalltech.hashtaglocal_backend.model.response.AiConnectionTestData;
 import org.smalltech.hashtaglocal_backend.model.response.AiProviderConfigData;
-import org.smalltech.hashtaglocal_backend.repository.AiProviderConfigAuditRepository;
 import org.smalltech.hashtaglocal_backend.repository.AiProviderConfigRepository;
 import org.smalltech.hashtaglocal_backend.repository.UserRepository;
 import org.smalltech.hashtaglocal_backend.security.SecretCipher;
@@ -22,7 +18,6 @@ import org.smalltech.hashtaglocal_backend.service.ai.AiConfigResolver;
 import org.smalltech.hashtaglocal_backend.service.ai.AiConfigResolver.ActiveAiConfig;
 import org.smalltech.hashtaglocal_backend.service.ai.AiFailure;
 import org.smalltech.hashtaglocal_backend.service.ai.AiFallbackChain;
-import org.smalltech.hashtaglocal_backend.service.ai.AiProvider;
 import org.smalltech.hashtaglocal_backend.service.ai.AiResult;
 import org.smalltech.hashtaglocal_backend.service.ai.EndpointValidator;
 import org.smalltech.hashtaglocal_backend.service.ai.SecretRedactor;
@@ -34,8 +29,12 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
- * Admin management of the AI provider used for quiz generation: read, save, reset to {@code .env},
- * and test. The API key is encrypted before it is stored and is never returned.
+ * Admin management of the AI connection used for quiz generation: read, save, remove (back to
+ * {@code .env}), and test. A connection is a name the admin chooses plus an OpenAI-compatible
+ * endpoint, a model and an API key. The key is encrypted before it is stored and is never returned.
+ *
+ * <p>{@code ai_configs} is both the current connection and its history: Save and Remove each add a
+ * row, and the newest row is in effect. Only the newest row keeps an encrypted key.
  */
 @Service
 @Slf4j
@@ -45,88 +44,59 @@ public class AiProviderConfigService {
   static final int TEST_MAX_TOKENS = 32;
 
   private static final Pattern MODEL_NAME = Pattern.compile("[A-Za-z0-9._:/@-]{1,200}");
+  private static final int MAX_NAME_LENGTH = 100;
   private static final int MIN_KEY_LENGTH = 8;
 
   private final AiProviderConfigRepository repository;
-  private final AiProviderConfigAuditRepository auditRepository;
   private final UserRepository userRepository;
   private final SecretCipher cipher;
   private final EndpointValidator endpointValidator;
   private final AiFallbackChain chain;
   private final AiConfigResolver resolver;
-  private final Clock clock;
 
   @Autowired
   public AiProviderConfigService(
       AiProviderConfigRepository repository,
-      AiProviderConfigAuditRepository auditRepository,
       UserRepository userRepository,
       SecretCipher cipher,
       EndpointValidator endpointValidator,
       AiFallbackChain chain,
       AiConfigResolver resolver) {
-    this(
-        repository,
-        auditRepository,
-        userRepository,
-        cipher,
-        endpointValidator,
-        chain,
-        resolver,
-        Clock.systemDefaultZone());
-  }
-
-  AiProviderConfigService(
-      AiProviderConfigRepository repository,
-      AiProviderConfigAuditRepository auditRepository,
-      UserRepository userRepository,
-      SecretCipher cipher,
-      EndpointValidator endpointValidator,
-      AiFallbackChain chain,
-      AiConfigResolver resolver,
-      Clock clock) {
     this.repository = repository;
-    this.auditRepository = auditRepository;
     this.userRepository = userRepository;
     this.cipher = cipher;
     this.endpointValidator = endpointValidator;
     this.chain = chain;
     this.resolver = resolver;
-    this.clock = clock;
   }
 
   @Transactional(readOnly = true)
   public AiProviderConfigData get() {
-    return toData(repository.findById(AiProviderConfigEntity.SINGLETON_ID));
+    return toData(current());
+  }
+
+  /** The connection in effect: the newest row, unless it is a "removed" row. Read fresh. */
+  private Optional<AiProviderConfigEntity> current() {
+    return repository.findTopByOrderByIdDesc().filter(AiProviderConfigEntity::isActive);
   }
 
   /**
-   * Validates and saves the config. A blank API key keeps the saved one (only for the same
-   * provider). Everything is validated and the key encrypted before the row is touched, so a bad
-   * request never leaves a half-written config.
+   * Validates the connection and adds it as the newest row. A blank API key keeps the saved one
+   * (same host only). Everything is validated and the key encrypted before anything is written, so
+   * a bad request never leaves a half-written config.
    */
   @Transactional
   public AiProviderConfigData save(AiProviderConfigRequest request, Long adminUserId) {
-    AiProvider provider = requireProvider(request.getProvider());
-    String endpoint =
-        validateEndpoint(
-            provider,
-            isBlank(request.getEndpoint()) ? provider.defaultEndpoint() : request.getEndpoint());
+    String name = requireName(request.getName());
+    String endpoint = validateEndpoint(request.getEndpoint());
     String model = requireModel(request.getModel());
     String newKey = cleanKey(request.getApiKey());
 
-    Optional<AiProviderConfigEntity> existing =
-        repository.findById(AiProviderConfigEntity.SINGLETON_ID);
+    Optional<AiProviderConfigEntity> existing = current();
     String ciphertext = null;
     if (newKey == null) {
       if (existing.isEmpty()) {
         throw new IllegalArgumentException("API key is required");
-      }
-      if (!existing.get().getProvider().equals(provider.name())) {
-        throw new IllegalArgumentException(
-            "Enter the API key for "
-                + provider.displayName()
-                + "; the saved key belongs to another provider");
       }
       requireSameServer(existing.get(), endpoint);
     } else {
@@ -134,102 +104,80 @@ public class AiProviderConfigService {
       ciphertext = cipher.encrypt(newKey, AiProviderConfigEntity.KEY_CIPHER_CONTEXT);
     }
 
-    AiProviderConfigEntity config =
-        existing.orElseGet(
-            () -> AiProviderConfigEntity.builder().id(AiProviderConfigEntity.SINGLETON_ID).build());
-    config.setProvider(provider.name());
-    config.setEndpoint(endpoint);
-    config.setModel(model);
-    if (ciphertext != null) {
-      config.setApiKeyCiphertext(ciphertext);
-      config.setApiKeyLast4(last4(newKey));
-    }
-    LocalDateTime now = LocalDateTime.now(clock);
-    config.setUpdatedBy(adminUserId);
-    config.setUpdatedAt(now);
-    AiProviderConfigEntity saved = repository.save(config);
-
-    auditRepository.save(
-        AiProviderConfigAuditEntity.builder()
-            .action(AiProviderConfigAuditEntity.Action.SAVED)
-            .provider(saved.getProvider())
-            .endpoint(saved.getEndpoint())
-            .model(saved.getModel())
-            .keyChanged(ciphertext != null)
-            .changedBy(adminUserId)
-            .changedAt(now)
-            .build());
+    boolean keyChanged = ciphertext != null;
+    AiProviderConfigEntity saved =
+        repository.save(
+            AiProviderConfigEntity.builder()
+                .name(name)
+                .endpoint(endpoint)
+                .model(model)
+                .apiKeyCiphertext(keyChanged ? ciphertext : existing.get().getApiKeyCiphertext())
+                .apiKeyLast4(keyChanged ? last4(newKey) : existing.get().getApiKeyLast4())
+                .keyChanged(keyChanged)
+                .updatedBy(adminUserId)
+                .build());
+    // The key now lives on the new row only; older rows keep their history but not their keys.
+    repository.clearKeysExcept(saved.getId());
     log.info(
-        "AI provider config saved by user {}: {}/{} at {} (key {})",
+        "AI connection '{}' saved by user {}: {} at {} (key {})",
+        saved.getName(),
         adminUserId,
-        saved.getProvider(),
         saved.getModel(),
         saved.getEndpoint(),
-        ciphertext != null ? "replaced" : "kept");
+        keyChanged ? "replaced" : "kept");
     invalidateAfterCommit();
     return toData(Optional.of(saved));
   }
 
-  /** Deletes the saved config, so quiz generation goes back to the .env chain. */
+  /**
+   * Adds a "removed" row (no connection, no key) and clears the key from every older row, so quiz
+   * generation goes back to the .env chain and no saved key is left in the database.
+   */
   @Transactional
   public AiProviderConfigData reset(Long adminUserId) {
-    Optional<AiProviderConfigEntity> existing =
-        repository.findById(AiProviderConfigEntity.SINGLETON_ID);
-    if (existing.isPresent()) {
-      repository.delete(existing.get());
-      auditRepository.save(
-          AiProviderConfigAuditEntity.builder()
-              .action(AiProviderConfigAuditEntity.Action.RESET)
-              .keyChanged(true)
-              .changedBy(adminUserId)
-              .changedAt(LocalDateTime.now(clock))
-              .build());
-      log.info("AI provider config reset to .env by user {}", adminUserId);
+    if (current().isPresent()) {
+      AiProviderConfigEntity removed =
+          repository.save(
+              AiProviderConfigEntity.builder().keyChanged(true).updatedBy(adminUserId).build());
+      repository.clearKeysExcept(removed.getId());
+      log.info("AI connection removed by user {}; quiz generation uses .env", adminUserId);
       invalidateAfterCommit();
     }
     return toData(Optional.empty());
   }
 
   /**
-   * Makes one minimal call with the submitted values, filling any blank field from the saved config
-   * (same provider only). Saves nothing. An empty reply still counts as connected: the key, model
-   * and endpoint all worked.
+   * Makes one minimal call with the submitted values, filling any blank field from the saved
+   * connection. Saves nothing. An empty reply still counts as connected: the key, model and
+   * endpoint all worked.
    */
   @Transactional(readOnly = true)
   public AiConnectionTestData test(AiProviderConfigRequest request) {
-    Optional<AiProviderConfigEntity> saved =
-        repository.findById(AiProviderConfigEntity.SINGLETON_ID);
-    AiProvider provider =
-        requireProvider(
-            isBlank(request.getProvider())
-                ? saved.map(AiProviderConfigEntity::getProvider).orElse(null)
-                : request.getProvider());
-    Optional<AiProviderConfigEntity> sameProvider =
-        saved.filter(s -> s.getProvider().equals(provider.name()));
-
+    Optional<AiProviderConfigEntity> saved = current();
+    String name =
+        !isBlank(request.getName())
+            ? requireName(request.getName())
+            : saved.map(AiProviderConfigEntity::getName).orElse(null);
     String endpoint =
         validateEndpoint(
-            provider,
             !isBlank(request.getEndpoint())
                 ? request.getEndpoint()
-                : sameProvider
-                    .map(AiProviderConfigEntity::getEndpoint)
-                    .orElse(provider.defaultEndpoint()));
+                : saved.map(AiProviderConfigEntity::getEndpoint).orElse(null));
     String model =
         requireModel(
             !isBlank(request.getModel())
                 ? request.getModel()
-                : sameProvider.map(AiProviderConfigEntity::getModel).orElse(null));
+                : saved.map(AiProviderConfigEntity::getModel).orElse(null));
     String key = cleanKey(request.getApiKey());
     if (key == null) {
-      if (sameProvider.isEmpty()) {
+      if (saved.isEmpty()) {
         throw new IllegalArgumentException("API key is required");
       }
-      requireSameServer(sameProvider.get(), endpoint);
-      key = decryptSaved(sameProvider.get());
+      requireSameServer(saved.get(), endpoint);
+      key = decryptSaved(saved.get());
     }
 
-    ActiveAiConfig config = new ActiveAiConfig(provider.name(), endpoint, model, key);
+    ActiveAiConfig config = new ActiveAiConfig(name, endpoint, model, key);
     long start = System.nanoTime();
     AiResult result = chain.callConfigured(config, TEST_PROMPT, TEST_MAX_TOKENS);
     long latencyMs = (System.nanoTime() - start) / 1_000_000;
@@ -237,15 +185,14 @@ public class AiProviderConfigService {
     boolean connected = result.isSuccess() || result.failure() == AiFailure.INVALID_RESPONSE;
     String message =
         connected
-            ? "Connected to " + provider.displayName() + " (" + model + ")"
+            ? "Connected to " + displayName(name, endpoint) + " (" + model + ")"
             : AiFallbackChain.describe(result.failure())
                 + ": "
                 + SecretRedactor.redact(result.detail(), key);
-    log.info(
-        "AI provider test {}/{}: {}", provider.name(), model, connected ? "ok" : result.failure());
+    log.info("AI connection test {}: {}", config.label(), connected ? "ok" : result.failure());
     return AiConnectionTestData.builder()
         .success(connected)
-        .provider(provider.name())
+        .name(name)
         .endpoint(endpoint)
         .model(model)
         .latencyMs(latencyMs)
@@ -255,6 +202,9 @@ public class AiProviderConfigService {
 
   private String decryptSaved(AiProviderConfigEntity saved) {
     requireEncryption();
+    if (saved.getApiKeyCiphertext() == null) {
+      throw new IllegalArgumentException("API key is required");
+    }
     try {
       return cipher.decrypt(saved.getApiKeyCiphertext(), AiProviderConfigEntity.KEY_CIPHER_CONTEXT);
     } catch (SecretCipher.SecretDecryptionException e) {
@@ -269,17 +219,7 @@ public class AiProviderConfigService {
     AiProviderConfigData.AiProviderConfigDataBuilder data =
         AiProviderConfigData.builder()
             .encryptionConfigured(cipher.isConfigured())
-            .envChain(chain.envChainSummary())
-            .availableProviders(
-                chain.providers().values().stream()
-                    .map(
-                        p ->
-                            AiProviderConfigData.ProviderOption.builder()
-                                .name(p.name())
-                                .displayName(p.displayName())
-                                .defaultEndpoint(p.defaultEndpoint())
-                                .build())
-                    .toList());
+            .envChain(chain.envChainSummary());
     if (saved.isEmpty()) {
       return data.source(AiProviderConfigData.Source.ENV)
           .hasKey(!chain.envChainSummary().isEmpty())
@@ -287,7 +227,7 @@ public class AiProviderConfigService {
     }
     AiProviderConfigEntity c = saved.get();
     return data.source(AiProviderConfigData.Source.DATABASE)
-        .provider(c.getProvider())
+        .name(c.getName())
         .endpoint(c.getEndpoint())
         .model(c.getModel())
         .hasKey(c.getApiKeyCiphertext() != null && !c.getApiKeyCiphertext().isBlank())
@@ -302,6 +242,11 @@ public class AiProviderConfigService {
                     .map(UserEntity::getUsername)
                     .orElse(null))
         .build();
+  }
+
+  /** The connection's name, or its host when it has none (a test before the first save). */
+  private static String displayName(String name, String endpoint) {
+    return !isBlank(name) ? name : URI.create(endpoint).getHost();
   }
 
   /**
@@ -326,24 +271,26 @@ public class AiProviderConfigService {
     return scheme + "://" + host + ":" + port;
   }
 
-  /** The validated endpoint; a provider with no default (openai-compatible) must be given one. */
-  private String validateEndpoint(AiProvider provider, String endpoint) {
+  /** The validated OpenAI-compatible endpoint (https, public host). */
+  private String validateEndpoint(String endpoint) {
     if (isBlank(endpoint)) {
-      throw new IllegalArgumentException("Endpoint is required for " + provider.displayName());
+      throw new IllegalArgumentException("Endpoint is required");
     }
     return endpointValidator.validate(endpoint);
   }
 
-  private AiProvider requireProvider(String name) {
+  private static String requireName(String name) {
     if (isBlank(name)) {
-      throw new IllegalArgumentException("Provider is required");
+      throw new IllegalArgumentException("Name is required");
     }
-    AiProvider provider = chain.providers().get(name.trim().toLowerCase(java.util.Locale.ROOT));
-    if (provider == null) {
-      throw new IllegalArgumentException(
-          "Unknown provider. Allowed: " + String.join(", ", chain.providers().keySet()));
+    String trimmed = name.trim();
+    if (trimmed.length() > MAX_NAME_LENGTH) {
+      throw new IllegalArgumentException("Name must be at most " + MAX_NAME_LENGTH + " characters");
     }
-    return provider;
+    if (trimmed.chars().anyMatch(Character::isISOControl)) {
+      throw new IllegalArgumentException("Name must not contain control characters");
+    }
+    return trimmed;
   }
 
   private static String requireModel(String model) {

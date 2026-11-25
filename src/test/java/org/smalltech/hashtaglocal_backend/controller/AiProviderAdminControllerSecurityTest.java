@@ -36,7 +36,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 /**
- * The AI provider routes are admin-only, enforced on the backend by the real security chain and
+ * The AI connection routes are admin-only, enforced on the backend by the real security chain and
  * auth filter (not just by hiding the page).
  */
 @WebMvcTest(AiProviderAdminController.class)
@@ -45,7 +45,9 @@ class AiProviderAdminControllerSecurityTest {
 
   private static final String SECRET = "sk-ant-secret-value-1234";
   private static final String BODY =
-      "{\"provider\":\"anthropic\",\"model\":\"claude-x\",\"api_key\":\"" + SECRET + "\"}";
+      "{\"name\":\"Claude\",\"endpoint\":\"https://api.anthropic.com/v1\",\"model\":\"claude-x\",\"api_key\":\""
+          + SECRET
+          + "\"}";
 
   @Autowired private MockMvc mvc;
   @MockitoBean private AiProviderConfigService service;
@@ -54,12 +56,11 @@ class AiProviderAdminControllerSecurityTest {
   private final AiProviderConfigData config =
       AiProviderConfigData.builder()
           .source(AiProviderConfigData.Source.DATABASE)
-          .provider("anthropic")
+          .name("Claude")
           .model("claude-x")
           .hasKey(true)
           .keyLast4("1234")
           .envChain(List.of())
-          .availableProviders(List.of())
           .build();
 
   @BeforeEach

@@ -12,7 +12,7 @@ import org.junit.jupiter.api.Test;
 
 class SecretCipherTest {
 
-  private static final String CONTEXT = "ai_provider_config.api_key";
+  private static final String CONTEXT = "ai_configs.api_key";
   private static final String SECRET = "sk-ant-api03-secret-value-1234";
 
   private final SecretCipher cipher = new SecretCipher(randomKey());

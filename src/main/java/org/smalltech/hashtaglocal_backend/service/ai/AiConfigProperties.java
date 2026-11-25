@@ -8,7 +8,7 @@ import org.springframework.context.annotation.Configuration;
 
 /**
  * {@code ai.config}: settings for the AI provider config that admins edit in the Ops Dashboard
- * (stored in {@code ai_provider_config}).
+ * (stored in {@code ai_configs}).
  */
 @Configuration
 @ConfigurationProperties(prefix = "ai.config")

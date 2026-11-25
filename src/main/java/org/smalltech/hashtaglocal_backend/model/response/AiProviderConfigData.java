@@ -6,8 +6,8 @@ import lombok.Builder;
 import lombok.Value;
 
 /**
- * The AI provider config as the Ops Dashboard sees it. Never carries the key or its ciphertext:
- * only {@code hasKey} and the last four characters.
+ * The AI connection as the Ops Dashboard sees it. Never carries the key or its ciphertext: only
+ * {@code hasKey} and the last four characters.
  */
 @Value
 @Builder
@@ -21,8 +21,13 @@ public class AiProviderConfigData {
   }
 
   Source source;
-  String provider;
+
+  /** The admin's own name for the connection. */
+  String name;
+
+  /** OpenAI-compatible endpoint. */
   String endpoint;
+
   String model;
   boolean hasKey;
   String keyLast4;
@@ -35,15 +40,4 @@ public class AiProviderConfigData {
 
   /** The .env chain's provider/model pairs, used when {@code source} is ENV. */
   List<String> envChain;
-
-  /** Providers that may be chosen (the allowlist). */
-  List<ProviderOption> availableProviders;
-
-  @Value
-  @Builder
-  public static class ProviderOption {
-    String name;
-    String displayName;
-    String defaultEndpoint;
-  }
 }

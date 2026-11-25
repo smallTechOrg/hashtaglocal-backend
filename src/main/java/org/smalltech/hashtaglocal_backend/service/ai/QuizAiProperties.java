@@ -19,7 +19,7 @@ public class QuizAiProperties {
 
   @Data
   public static class Level {
-    /** Provider name: anthropic, openai, groq or gemini (openai-compatible needs the dashboard). */
+    /** Provider name: anthropic, groq or gemini. */
     private String provider;
 
     /** Model ids, best first. */

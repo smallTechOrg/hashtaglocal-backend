@@ -21,11 +21,21 @@ import org.springframework.stereotype.Component;
 @Slf4j
 public class AiConfigResolver {
 
-  /** The config quiz generation should use. {@code toString()} never shows the key. */
-  public record ActiveAiConfig(String provider, String endpoint, String model, String apiKey) {
+  /** The connection quiz generation should use. {@code toString()} never shows the key. */
+  public record ActiveAiConfig(String name, String endpoint, String model, String apiKey) {
+
+    /** Fits {@code quizzes.generated_by} (100 chars). */
+    private static final int MAX_LABEL = 100;
+
+    /** "name/model", recorded on each quiz as who wrote it. */
+    public String label() {
+      String label = (name == null || name.isBlank() ? "ai" : name.trim()) + "/" + model;
+      return label.length() <= MAX_LABEL ? label : label.substring(0, MAX_LABEL);
+    }
+
     @Override
     public String toString() {
-      return "ActiveAiConfig[" + provider + ", " + endpoint + ", " + model + "]";
+      return "ActiveAiConfig[" + name + ", " + endpoint + ", " + model + "]";
     }
   }
 
@@ -67,6 +77,10 @@ public class AiConfigResolver {
       return Optional.empty();
     }
     AiProviderConfigEntity c = config.get();
+    if (c.getApiKeyCiphertext() == null) {
+      throw new AiProviderException(
+          "The AI provider saved in the Ops Dashboard has no API key. Enter the key again.");
+    }
     if (!cipher.isConfigured()) {
       throw new AiProviderException(
           "An AI provider is configured in the Ops Dashboard, but AI_CONFIG_ENCRYPTION_KEY is not"
@@ -75,7 +89,7 @@ public class AiConfigResolver {
     try {
       String key =
           cipher.decrypt(c.getApiKeyCiphertext(), AiProviderConfigEntity.KEY_CIPHER_CONTEXT);
-      return Optional.of(new ActiveAiConfig(c.getProvider(), c.getEndpoint(), c.getModel(), key));
+      return Optional.of(new ActiveAiConfig(c.getName(), c.getEndpoint(), c.getModel(), key));
     } catch (SecretCipher.SecretDecryptionException e) {
       log.error("Saved AI provider key could not be decrypted (wrong AI_CONFIG_ENCRYPTION_KEY?)");
       throw new AiProviderException(
@@ -84,12 +98,17 @@ public class AiConfigResolver {
     }
   }
 
-  /** The saved row (from cache), without decrypting anything. */
+  /**
+   * The config in effect (from cache), without decrypting anything: the newest row, unless that is
+   * a "removed" row.
+   */
   public Optional<AiProviderConfigEntity> load() {
     Cached current = cached;
     Instant now = clock.instant();
     if (current == null || !now.isBefore(current.loadedAt().plus(properties.getCacheTtl()))) {
-      current = new Cached(repository.findById(AiProviderConfigEntity.SINGLETON_ID), now);
+      current =
+          new Cached(
+              repository.findTopByOrderByIdDesc().filter(AiProviderConfigEntity::isActive), now);
       cached = current;
     }
     return current.config();

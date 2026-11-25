@@ -49,22 +49,22 @@ class AiConfigResolverTest {
   void cachesForTheTtlThenRereads() {
     properties.setCacheTtl(Duration.ofSeconds(30));
     AiConfigResolver resolver = new AiConfigResolver(repository, cipher, properties, clock);
-    when(repository.findById(AiProviderConfigEntity.SINGLETON_ID)).thenReturn(Optional.empty());
+    when(repository.findTopByOrderByIdDesc()).thenReturn(Optional.empty());
 
     resolver.active();
     now = now.plusSeconds(29);
     resolver.active();
-    verify(repository, times(1)).findById(AiProviderConfigEntity.SINGLETON_ID);
+    verify(repository, times(1)).findTopByOrderByIdDesc();
 
     now = now.plusSeconds(2);
     resolver.active();
-    verify(repository, times(2)).findById(AiProviderConfigEntity.SINGLETON_ID);
+    verify(repository, times(2)).findTopByOrderByIdDesc();
   }
 
   @Test
   void invalidateForcesAFreshRead() {
     AiConfigResolver resolver = new AiConfigResolver(repository, cipher, properties, clock);
-    when(repository.findById(AiProviderConfigEntity.SINGLETON_ID))
+    when(repository.findTopByOrderByIdDesc())
         .thenReturn(Optional.empty())
         .thenReturn(Optional.of(row("sk-ant-new-key-1234")));
 
@@ -76,10 +76,20 @@ class AiConfigResolverTest {
     assertFalse(config.toString().contains("sk-ant-new-key-1234"), "toString hides the key");
   }
 
+  @Test
+  void aRemovedRowAsTheNewestMeansNothingIsSaved() {
+    AiConfigResolver resolver = new AiConfigResolver(repository, cipher, properties, clock);
+    AiProviderConfigEntity removed =
+        AiProviderConfigEntity.builder().id(2L).keyChanged(true).updatedBy(1L).build();
+    when(repository.findTopByOrderByIdDesc()).thenReturn(Optional.of(removed));
+
+    assertTrue(resolver.active().isEmpty(), "quiz generation falls back to .env");
+  }
+
   private AiProviderConfigEntity row(String key) {
     return AiProviderConfigEntity.builder()
-        .id(AiProviderConfigEntity.SINGLETON_ID)
-        .provider("anthropic")
+        .id(1L)
+        .name("Claude")
         .endpoint("https://api.anthropic.com/v1/messages")
         .model("claude-x")
         .apiKeyCiphertext(cipher.encrypt(key, AiProviderConfigEntity.KEY_CIPHER_CONTEXT))

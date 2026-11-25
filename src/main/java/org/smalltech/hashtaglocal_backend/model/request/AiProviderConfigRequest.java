@@ -5,17 +5,17 @@ import lombok.Data;
 import lombok.ToString;
 
 /**
- * AI provider settings from the Ops Dashboard, for save and for "Test connection".
+ * An AI connection from the Ops Dashboard, for save and for "Test": a name the admin chooses, an
+ * OpenAI-compatible endpoint, a model and an API key.
  *
- * <p>Save: {@code provider} and {@code model} are required; a blank {@code endpoint} means the
- * provider's default; a blank {@code apiKey} keeps the saved key. Test: any blank field falls back
- * to the saved config.
+ * <p>Save: {@code name}, {@code endpoint} and {@code model} are required; a blank {@code apiKey}
+ * keeps the saved key (same host only). Test: any blank field falls back to the saved connection.
  */
 @Data
 public class AiProviderConfigRequest {
 
-  @Size(max = 50)
-  private String provider;
+  @Size(max = 100)
+  private String name;
 
   @Size(max = 500)
   private String endpoint;

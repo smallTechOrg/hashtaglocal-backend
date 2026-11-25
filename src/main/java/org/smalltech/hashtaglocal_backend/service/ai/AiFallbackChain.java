@@ -5,7 +5,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -20,10 +19,11 @@ import org.springframework.stereotype.Component;
 /**
  * Sends a quiz prompt to the AI.
  *
- * <p><b>Admin-configured provider.</b> When an admin has saved a provider in the Ops Dashboard
- * ({@link AiConfigResolver}), only that provider/model/key is used, read at request time so a save
- * takes effect on the next call without a restart. A failure there is thrown as an {@link
- * AiProviderException} instead of silently falling back, so the admin sees what is wrong.
+ * <p><b>Ops Dashboard connection.</b> When an admin has saved an AI connection ({@link
+ * AiConfigResolver}), only that OpenAI-compatible endpoint/model/key is used, through {@link
+ * OpenAiCompatibleClient}. It is read at request time, so a save takes effect on the next call
+ * without a restart. A failure there is thrown as an {@link AiProviderException} instead of
+ * silently falling back, so the admin sees what is wrong.
  *
  * <p><b>.env chain (fallback).</b> With no saved config, the prompt goes down the configured
  * providers until one answers. Order: the best model on every key, then the next model, then the
@@ -60,9 +60,9 @@ public class AiFallbackChain {
   }
 
   private final List<Slot> slots;
-  private final Map<String, AiProvider> providersByName;
   private final AiConfigResolver configResolver;
   private final EndpointValidator endpointValidator;
+  private final OpenAiCompatibleClient client;
   private final Clock clock;
   private final Map<String, Instant> cooldownUntil = new ConcurrentHashMap<>();
 
@@ -71,17 +71,18 @@ public class AiFallbackChain {
       QuizAiProperties properties,
       List<AiProvider> providers,
       AiConfigResolver configResolver,
-      EndpointValidator endpointValidator) {
-    this(properties, providers, configResolver, endpointValidator, Clock.systemUTC());
+      EndpointValidator endpointValidator,
+      OpenAiCompatibleClient client) {
+    this(properties, providers, configResolver, endpointValidator, client, Clock.systemUTC());
   }
 
-  /** The .env chain only, with no admin-configured provider. */
+  /** The .env chain only, with no Ops Dashboard connection. */
   public AiFallbackChain(QuizAiProperties properties, List<AiProvider> providers) {
-    this(properties, providers, null, null, Clock.systemUTC());
+    this(properties, providers, null, null, null, Clock.systemUTC());
   }
 
   AiFallbackChain(QuizAiProperties properties, List<AiProvider> providers, Clock clock) {
-    this(properties, providers, null, null, clock);
+    this(properties, providers, null, null, null, clock);
   }
 
   AiFallbackChain(
@@ -89,15 +90,12 @@ public class AiFallbackChain {
       List<AiProvider> providers,
       AiConfigResolver configResolver,
       EndpointValidator endpointValidator,
+      OpenAiCompatibleClient client,
       Clock clock) {
     this.clock = clock;
     this.configResolver = configResolver;
     this.endpointValidator = endpointValidator;
-    this.providersByName =
-        providers.stream()
-            .collect(
-                Collectors.toMap(
-                    AiProvider::name, Function.identity(), (a, b) -> a, LinkedHashMap::new));
+    this.client = client;
     this.slots = buildSlots(properties, providers);
     log.info(
         "Quiz AI chain: {}",
@@ -107,11 +105,11 @@ public class AiFallbackChain {
   }
 
   /**
-   * The reply from the admin-configured provider, or else the first successful reply from the .env
+   * The reply from the Ops Dashboard connection, or else the first successful reply from the .env
    * chain. Empty when the reply had no usable text, or (.env chain) every slot failed or is cooling
    * down.
    *
-   * @throws AiProviderException when the admin-configured provider fails
+   * @throws AiProviderException when the Ops Dashboard connection fails
    */
   public Optional<AiCompletion> complete(String prompt, int maxTokens) {
     Optional<AiConfigResolver.ActiveAiConfig> configured =
@@ -120,11 +118,6 @@ public class AiFallbackChain {
       return completeWithConfig(configured.get(), prompt, maxTokens);
     }
     return completeWithEnvChain(prompt, maxTokens);
-  }
-
-  /** The registered providers by name, in registration order (the allowlist). */
-  public Map<String, AiProvider> providers() {
-    return providersByName;
   }
 
   /** The .env chain's provider/model pairs in order, for display. Never includes keys. */
@@ -139,7 +132,7 @@ public class AiFallbackChain {
   private Optional<AiCompletion> completeWithConfig(
       AiConfigResolver.ActiveAiConfig config, String prompt, int maxTokens) {
     AiResult result = callConfigured(config, prompt, maxTokens);
-    String label = config.provider() + "/" + config.model();
+    String label = config.label();
     if (result.isSuccess()) {
       log.info("Quiz AI reply from {} (Ops Dashboard config)", label);
       return Optional.of(new AiCompletion(result.text(), label));
@@ -153,15 +146,13 @@ public class AiFallbackChain {
   }
 
   /**
-   * Calls {@code config} after checking the provider is known and the endpoint is allowed. Shared
-   * with the Ops Dashboard's "Test connection". Never throws; a blocked endpoint is a BAD_REQUEST.
+   * Calls {@code config} after checking the endpoint is allowed. Shared with the Ops Dashboard's
+   * "Test". Never throws; a blocked endpoint is a BAD_REQUEST.
    */
   public AiResult callConfigured(
       AiConfigResolver.ActiveAiConfig config, String prompt, int maxTokens) {
-    AiProvider provider = providersByName.get(config.provider());
-    if (provider == null) {
-      return AiResult.failure(
-          AiFailure.BAD_REQUEST, "unknown provider '" + config.provider() + "'");
+    if (client == null) {
+      return AiResult.failure(AiFailure.BAD_REQUEST, "no Ops Dashboard connection client");
     }
     if (endpointValidator != null) {
       try {
@@ -170,7 +161,7 @@ public class AiFallbackChain {
         return AiResult.failure(AiFailure.BAD_REQUEST, e.getMessage());
       }
     }
-    return provider.call(config.endpoint(), config.model(), config.apiKey(), prompt, maxTokens);
+    return client.call(config.endpoint(), config.model(), config.apiKey(), prompt, maxTokens);
   }
 
   /** A short, admin-facing description of a failure type. */
@@ -192,14 +183,7 @@ public class AiFallbackChain {
       if (skippedProviders.contains(slot.provider().name()) || isCoolingDown(slot)) {
         continue;
       }
-      AiResult result =
-          slot.provider()
-              .call(
-                  slot.provider().defaultEndpoint(),
-                  slot.model(),
-                  slot.apiKey(),
-                  prompt,
-                  maxTokens);
+      AiResult result = slot.provider().call(slot.model(), slot.apiKey(), prompt, maxTokens);
       if (result.isSuccess()) {
         log.info("Quiz AI reply from {}", slot.label());
         return Optional.of(
