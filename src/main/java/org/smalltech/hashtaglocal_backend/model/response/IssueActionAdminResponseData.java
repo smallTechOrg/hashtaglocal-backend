@@ -3,6 +3,7 @@ package org.smalltech.hashtaglocal_backend.model.response;
 import java.time.LocalDateTime;
 import lombok.Builder;
 import lombok.Data;
+import org.smalltech.hashtaglocal_backend.model.Media;
 
 /**
  * Response payload for a single issue action returned by the admin queue endpoint.
@@ -40,4 +41,11 @@ public class IssueActionAdminResponseData {
 
   /** Username of the admin who reviewed this action (null if still pending). */
   private String approvedByUsername;
+
+  /**
+   * The media submitted with this specific action (e.g. the verification or resolution photo).
+   * {@code null} when the action carries no media. Distinct from the issue's {@code media_urls},
+   * which aggregates media across all of the issue's actions.
+   */
+  private Media media;
 }
