@@ -20,6 +20,7 @@ import org.smalltech.hashtaglocal_backend.model.response.AuthTokenResponseData;
 import org.smalltech.hashtaglocal_backend.repository.UserAuthProviderRepository;
 import org.smalltech.hashtaglocal_backend.repository.UserAuthSessionRepository;
 import org.smalltech.hashtaglocal_backend.repository.UserRepository;
+import org.smalltech.hashtaglocal_backend.service.AppVersionTracker;
 import org.smalltech.hashtaglocal_backend.service.OAuthService;
 import org.smalltech.hashtaglocal_backend.service.TokenService;
 import org.smalltech.hashtaglocal_backend.util.AppVersionUtil;
@@ -52,19 +53,22 @@ public class GoogleAuthService implements OAuthService {
   private final UserAuthSessionRepository userAuthSessionRepository;
   private final TokenService tokenService;
   private final UsernameUtil usernameUtil;
+  private final AppVersionTracker appVersionTracker;
 
   public GoogleAuthService(
       UserRepository userRepository,
       UserAuthProviderRepository userAuthProviderRepository,
       UserAuthSessionRepository userAuthSessionRepository,
       TokenService tokenService,
-      UsernameUtil usernameUtil) {
+      UsernameUtil usernameUtil,
+      AppVersionTracker appVersionTracker) {
 
     this.userRepository = userRepository;
     this.userAuthProviderRepository = userAuthProviderRepository;
     this.userAuthSessionRepository = userAuthSessionRepository;
     this.tokenService = tokenService;
     this.usernameUtil = usernameUtil;
+    this.appVersionTracker = appVersionTracker;
   }
 
   @Override
@@ -268,6 +272,7 @@ public class GoogleAuthService implements OAuthService {
                 .build());
 
     System.out.println("Session created | ID: " + session.getId());
+    appVersionTracker.record(session);
 
     return AuthTokenResponseData.builder()
         .accessToken(

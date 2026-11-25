@@ -63,7 +63,8 @@ public class MetricsAdminController {
       summary = "Metric drill-down",
       description =
           "Returns the individual users/issues behind a computed metric for a specific week. "
-              + "Supported metrics: NEW_USERS, ACTIVE_USERS, ISSUES_REPORTED, ISSUES_VERIFIED, QUIZ_USERS.")
+              + "Supported metrics: NEW_USERS, ACTIVE_USERS, ISSUES_REPORTED, ISSUES_VERIFIED, QUIZ_USERS, "
+              + "OUTDATED_USERS (app 2+ releases behind the latest).")
   public ResponseEntity<NewAPIResponse<MetricDetailResponse>> getMetricDetail(
       @RequestParam String metric, @RequestParam int weekYear, @RequestParam int weekNumber) {
 

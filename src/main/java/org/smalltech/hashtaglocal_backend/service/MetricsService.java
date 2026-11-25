@@ -7,18 +7,25 @@ import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.IsoFields;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.function.BinaryOperator;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.smalltech.hashtaglocal_backend.dto.MetricDetailItem;
 import org.smalltech.hashtaglocal_backend.dto.MetricDetailResponse;
 import org.smalltech.hashtaglocal_backend.dto.OpsSummaryResponse;
 import org.smalltech.hashtaglocal_backend.dto.WeeklyMetricPoint;
 import org.smalltech.hashtaglocal_backend.dto.WeeklyMetricsResponse;
+import org.smalltech.hashtaglocal_backend.entity.AppVersionSeenEntity;
 import org.smalltech.hashtaglocal_backend.entity.IssueEntity;
 import org.smalltech.hashtaglocal_backend.entity.Locality;
 import org.smalltech.hashtaglocal_backend.entity.Location;
 import org.smalltech.hashtaglocal_backend.entity.UserEntity;
 import org.smalltech.hashtaglocal_backend.model.EventApprovalStatus;
+import org.smalltech.hashtaglocal_backend.repository.AppVersionSeenRepository;
 import org.smalltech.hashtaglocal_backend.repository.EventApprovalRepository;
 import org.smalltech.hashtaglocal_backend.repository.EventRepository;
 import org.smalltech.hashtaglocal_backend.repository.FeedPostRepository;
@@ -28,6 +35,7 @@ import org.smalltech.hashtaglocal_backend.repository.NotificationLogRepository;
 import org.smalltech.hashtaglocal_backend.repository.QuizAttemptRepository;
 import org.smalltech.hashtaglocal_backend.repository.UserAuthSessionRepository;
 import org.smalltech.hashtaglocal_backend.repository.UserRepository;
+import org.smalltech.hashtaglocal_backend.util.AppVersionUtil;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -47,6 +55,7 @@ public class MetricsService {
   private final EventApprovalRepository eventApprovalRepository;
   private final EventRepository eventRepository;
   private final FeedPostRepository feedPostRepository;
+  private final AppVersionSeenRepository appVersionSeenRepository;
 
   public WeeklyMetricsResponse getWeeklyMetrics(
       int fromWeekYear, int fromWeekNumber, int toWeekYear, int toWeekNumber) {
@@ -70,6 +79,7 @@ public class MetricsService {
 
       long quizAttempts = quizAttemptRepository.countAttemptsBetween(start, end);
       double dailyAvg = quizAttempts / 7.0;
+      AppVersionWeek versions = appVersionWeek(year, week);
 
       points.add(
           WeeklyMetricPoint.builder()
@@ -86,6 +96,10 @@ public class MetricsService {
               .issuesVerified(issueActionRepository.countVerifiedIssuesBetween(start, end))
               .dailyAvgQuiz(Math.round(dailyAvg * 10.0) / 10.0)
               .uniqueQuizUsers(quizAttemptRepository.countDistinctUsersBetween(start, end))
+              .latestAppVersion(versions.latest())
+              .onLatestVersionPct(versions.percentOf(versions.onLatestCount()))
+              .outdatedUsers(versions.hasUsers() ? (long) versions.outdated().size() : null)
+              .outdatedPct(versions.percentOf(versions.outdated().size()))
               .build());
 
       cursor = cursor.plusWeeks(1);
@@ -112,6 +126,7 @@ public class MetricsService {
           case "ISSUES_REPORTED" -> buildIssuesReportedDetail(start, end);
           case "ISSUES_VERIFIED" -> buildIssuesVerifiedDetail(start, end);
           case "QUIZ_USERS" -> buildQuizUsersDetail(start, end);
+          case "OUTDATED_USERS" -> buildOutdatedUsersDetail(weekYear, weekNumber);
           default -> List.of();
         };
 
@@ -210,6 +225,96 @@ public class MetricsService {
                     .locality(localityName(u))
                     .build())
         .toList();
+  }
+
+  private List<MetricDetailItem> buildOutdatedUsersDetail(int weekYear, int weekNumber) {
+    List<AppVersionSeenEntity> outdated = appVersionWeek(weekYear, weekNumber).outdated();
+    Map<Long, UserEntity> users =
+        userRepository
+            .findAllById(outdated.stream().map(AppVersionSeenEntity::getUserId).toList())
+            .stream()
+            .collect(Collectors.toMap(UserEntity::getId, Function.identity()));
+    return outdated.stream()
+        .sorted(Comparator.comparing(AppVersionSeenEntity::getLastSeenAt).reversed())
+        .map(
+            seen -> {
+              UserEntity u = users.get(seen.getUserId());
+              return MetricDetailItem.builder()
+                  .username(u != null ? u.getUsername() : null)
+                  .locality(u != null ? localityName(u) : null)
+                  .platform(seen.getPlatform() != null ? seen.getPlatform().name() : null)
+                  .appVersion(seen.getAppVersion())
+                  .date(seen.getLastSeenAt().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME))
+                  .build();
+            })
+        .toList();
+  }
+
+  // ---- App version metrics ----
+
+  /** A user counts as outdated when their version is this many releases behind the latest. */
+  static final int OUTDATED_RELEASES_BEHIND = 2;
+
+  /**
+   * The app versions of one ISO week.
+   *
+   * @param latest the newest version reported in this week or any earlier one; null before any
+   * @param perUser each user whose app reported a version this week, with their newest one
+   * @param onLatestCount how many of those users are on {@code latest}
+   * @param outdated those users who are {@link #OUTDATED_RELEASES_BEHIND} or more releases behind
+   */
+  record AppVersionWeek(
+      String latest,
+      List<AppVersionSeenEntity> perUser,
+      long onLatestCount,
+      List<AppVersionSeenEntity> outdated) {
+
+    boolean hasUsers() {
+      return !perUser.isEmpty();
+    }
+
+    /** Whole-number share of this week's users, or null when no user reported a version. */
+    Integer percentOf(long count) {
+      return hasUsers() ? (int) Math.round(count * 100.0 / perUser.size()) : null;
+    }
+  }
+
+  /**
+   * Releases are the distinct versions reported up to the end of the week, in version order, so
+   * "releases behind" is the distance between two versions in that list. A user with two devices
+   * counts once, on the newer version.
+   */
+  AppVersionWeek appVersionWeek(int weekYear, int weekNumber) {
+    Comparator<String> byVersion = AppVersionUtil::compare;
+    List<String> releases =
+        appVersionSeenRepository.findVersionsSeenUpTo(weekYear, weekNumber).stream()
+            .sorted(byVersion)
+            .toList();
+    if (releases.isEmpty()) {
+      return new AppVersionWeek(null, List.of(), 0, List.of());
+    }
+    String latest = releases.get(releases.size() - 1);
+    int latestRank = releases.size() - 1;
+
+    List<AppVersionSeenEntity> perUser =
+        appVersionSeenRepository.findByWeekYearAndWeekNumber(weekYear, weekNumber).stream()
+            .collect(
+                Collectors.toMap(
+                    AppVersionSeenEntity::getUserId,
+                    Function.identity(),
+                    BinaryOperator.maxBy(
+                        Comparator.comparing(AppVersionSeenEntity::getAppVersion, byVersion))))
+            .values()
+            .stream()
+            .toList();
+
+    long onLatest = perUser.stream().filter(s -> s.getAppVersion().equals(latest)).count();
+    List<AppVersionSeenEntity> outdated =
+        perUser.stream()
+            .filter(
+                s -> latestRank - releases.indexOf(s.getAppVersion()) >= OUTDATED_RELEASES_BEHIND)
+            .toList();
+    return new AppVersionWeek(latest, perUser, onLatest, outdated);
   }
 
   // ---- Helpers ----

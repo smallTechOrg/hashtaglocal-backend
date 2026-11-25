@@ -15,4 +15,5 @@ public class MetricDetailItem {
   private String platform;
   private String date;
   private String issueKey;
+  private String appVersion;
 }
