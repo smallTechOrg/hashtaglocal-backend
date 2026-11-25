@@ -2,6 +2,7 @@ package org.smalltech.hashtaglocal_backend.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.AdditionalMatchers.and;
 import static org.mockito.ArgumentMatchers.any;
@@ -28,8 +29,10 @@ import org.smalltech.hashtaglocal_backend.entity.Locality;
 import org.smalltech.hashtaglocal_backend.entity.QuizEntity;
 import org.smalltech.hashtaglocal_backend.model.QuizStatus;
 import org.smalltech.hashtaglocal_backend.repository.QuizRepository;
+import org.smalltech.hashtaglocal_backend.service.ai.AiFailure;
 import org.smalltech.hashtaglocal_backend.service.ai.AiFallbackChain;
 import org.smalltech.hashtaglocal_backend.service.ai.AiFallbackChain.AiCompletion;
+import org.smalltech.hashtaglocal_backend.service.ai.AiProviderException;
 
 @ExtendWith(MockitoExtension.class)
 class QuizGenerationServiceTest {
@@ -174,6 +177,29 @@ class QuizGenerationServiceTest {
     when(aiFallbackChain.complete(startsWith(EVAL), anyInt())).thenReturn(Optional.empty());
 
     assertFalse(service.generatePendingQuiz(portBlair).isPresent());
+    verify(quizRepository, never()).save(any(QuizEntity.class));
+  }
+
+  @Test
+  void temporaryEvaluatorFailureCountsAsBadAndTheNextAttemptRuns() {
+    when(aiFallbackChain.complete(startsWith(GEN), anyInt())).thenReturn(reply(GOOD_REPLY));
+    when(aiFallbackChain.complete(startsWith(EVAL), anyInt()))
+        .thenThrow(new AiProviderException("rate limited", AiFailure.RATE_LIMITED))
+        .thenReturn(reply(GOOD_VERDICT));
+    when(quizRepository.save(any(QuizEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    assertTrue(service.generatePendingQuiz(portBlair).isPresent());
+    verify(aiFallbackChain, times(2)).complete(startsWith(GEN), anyInt());
+  }
+
+  @Test
+  void configEvaluatorFailureIsThrown() {
+    when(aiFallbackChain.complete(startsWith(GEN), anyInt())).thenReturn(reply(GOOD_REPLY));
+    when(aiFallbackChain.complete(startsWith(EVAL), anyInt()))
+        .thenThrow(new AiProviderException("bad key", AiFailure.AUTH_FAILED));
+
+    assertThrows(AiProviderException.class, () -> service.generatePendingQuiz(portBlair));
+    verify(aiFallbackChain, times(1)).complete(startsWith(GEN), anyInt());
     verify(quizRepository, never()).save(any(QuizEntity.class));
   }
 

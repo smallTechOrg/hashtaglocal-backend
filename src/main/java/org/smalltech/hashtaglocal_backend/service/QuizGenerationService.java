@@ -21,6 +21,7 @@ import org.smalltech.hashtaglocal_backend.entity.QuizEntity;
 import org.smalltech.hashtaglocal_backend.model.QuizStatus;
 import org.smalltech.hashtaglocal_backend.repository.QuizRepository;
 import org.smalltech.hashtaglocal_backend.service.ai.AiFallbackChain;
+import org.smalltech.hashtaglocal_backend.service.ai.AiProviderException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -93,8 +94,13 @@ public class QuizGenerationService {
   private final QuizRepository quizRepository;
   private final ObjectMapper objectMapper;
 
-  /** Generates and saves one PENDING quiz, or returns empty if no acceptable quiz was produced. */
-  @Transactional
+  /**
+   * Generates and saves one PENDING quiz, or returns empty if no acceptable quiz was produced.
+   *
+   * @throws AiProviderException when the provider configured in the Ops Dashboard fails. Nothing is
+   *     saved before that point, so it does not need to roll back a caller's transaction.
+   */
+  @Transactional(noRollbackFor = AiProviderException.class)
   public Optional<QuizEntity> generatePendingQuiz(Locality locality) {
     Optional<GeneratedQuiz> candidate = generateCandidate(locality, recentQuestions(locality));
     if (candidate.isEmpty()) {
@@ -158,13 +164,24 @@ public class QuizGenerationService {
 
   /**
    * Asks the LLM whether the quiz passes on quality and accuracy. An unavailable evaluator or an
-   * unreadable reply counts as a fail, so nothing unevaluated reaches the pending list.
+   * unreadable reply counts as a fail, so nothing unevaluated reaches the pending list. That
+   * includes a temporary failure (rate limit, outage) of the Ops Dashboard connection, so the next
+   * attempt can still run; a config failure (bad key, unknown model) is thrown, since every later
+   * call would fail too.
    */
   Evaluation evaluate(Locality locality, GeneratedQuiz quiz) {
-    return aiFallbackChain
-        .complete(buildEvaluationPrompt(locality, quiz), EVAL_MAX_TOKENS)
-        .map(reply -> parseEvaluation(reply.text()))
-        .orElse(Evaluation.failed("EVALUATOR_UNAVAILABLE"));
+    try {
+      return aiFallbackChain
+          .complete(buildEvaluationPrompt(locality, quiz), EVAL_MAX_TOKENS)
+          .map(reply -> parseEvaluation(reply.text()))
+          .orElse(Evaluation.failed("EVALUATOR_UNAVAILABLE"));
+    } catch (AiProviderException e) {
+      if (!e.isTemporary()) {
+        throw e;
+      }
+      log.warn("Evaluator unavailable for {}: {}", locality.getHashtag(), e.getMessage());
+      return Evaluation.failed("EVALUATOR_UNAVAILABLE");
+    }
   }
 
   /**

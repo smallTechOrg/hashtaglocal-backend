@@ -72,6 +72,40 @@ To run all the test cases, use this command:
 ```declarative
 ./gradlew test
 ```
+## Quiz AI connection (Ops Dashboard)
+
+Quiz generation uses the AI connection an admin saves on the Ops Dashboard's **AI Provider** page
+(`/ops/ai-provider`, API `/admin/ai-provider`, ADMIN only): a name the admin chooses, an
+OpenAI-compatible endpoint, a model and an API key. With nothing saved, it uses the `QUIZ_*`
+fallback chain from `.env`, as before.
+
+- **Env var:** `AI_CONFIG_ENCRYPTION_KEY`, base64 of 32 random bytes (`openssl rand -base64 32`).
+  The saved API key is stored only as AES-256-GCM ciphertext under this key; no endpoint ever
+  returns the key (only `has_key` and its last 4 characters). Without the env var a key cannot be
+  saved. Optional: `AI_CONFIG_ALLOW_PRIVATE_ENDPOINTS` (default `false`), `AI_CONFIG_CACHE_TTL`
+  (default `30s`).
+- **Migration:** `src/main/resources/db/migration/V2__ai_configs.sql` creates
+  `ai_configs`, which is both the current config and its history: every Save adds a new row with
+  `is_active = true` and sets the previous row inactive, and **Remove key** sets the active row
+  inactive. Only the active row keeps the encrypted key; inactive rows keep who created and changed
+  them and when (and the key's last 4 characters).
+  Flyway runs it on start when `FLYWAY_ENABLED=true` (Cloud Run); locally, Hibernate creates the
+  table, or run the file with
+  `psql -d hashtaglocal -f src/main/resources/db/migration/V2__ai_configs.sql`.
+- **Switching AI:** enter a name (e.g. "Claude"), the provider's OpenAI-compatible endpoint, the
+  model and the key, click **Test**, then **Save**. The next quiz generation uses it, with no
+  restart (other instances pick it up within the cache TTL). Leaving the key blank keeps the saved
+  key, but only for the same endpoint host. **Remove key** sets the connection inactive and clears
+  its key, so quiz generation goes back to `.env`.
+- **Endpoints:** every connection uses the OpenAI Chat Completions format, which the major
+  providers accept, e.g. Claude `https://api.anthropic.com/v1`, ChatGPT
+  `https://api.openai.com/v1`, Gemini `https://generativelanguage.googleapis.com/v1beta/openai`,
+  OpenRouter `https://openrouter.ai/api/v1`. A base URL gets `/chat/completions` appended; a full
+  URL is used as is. The request sends `max_tokens`, and retries with `max_completion_tokens` when
+  the server asks for it (OpenAI's reasoning models). `<think>` blocks are stripped from replies.
+- If the saved connection fails (bad key, unknown model, quota), quiz generation returns `502
+  AI_PROVIDER_ERROR` with the reason, instead of silently falling back to `.env`.
+
 ## Deployment
 
 The app runs on Google Cloud Run. Pushing to `main` deploys production and pushing to `staging` deploys

@@ -23,6 +23,8 @@ import org.smalltech.hashtaglocal_backend.model.QuizStatus;
 import org.smalltech.hashtaglocal_backend.model.response.QueuedQuizCountData;
 import org.smalltech.hashtaglocal_backend.repository.QuizRepository;
 import org.smalltech.hashtaglocal_backend.repository.UserRepository;
+import org.smalltech.hashtaglocal_backend.service.ai.AiFailure;
+import org.smalltech.hashtaglocal_backend.service.ai.AiProviderException;
 
 @ExtendWith(MockitoExtension.class)
 class QuizReviewServiceTest {
@@ -131,6 +133,40 @@ class QuizReviewServiceTest {
     assertEquals(0, counts.get(0).getQueued());
     assertEquals("portblair", counts.get(1).getHashtag());
     assertEquals(3, counts.get(1).getQueued());
+  }
+
+  @Test
+  void generateSkipsALocalityOnATemporaryAiFailure() {
+    when(userRepository.findDistinctUserLocalities()).thenReturn(List.of(kargil, portBlair));
+    when(quizGenerationService.generatePendingQuiz(kargil))
+        .thenThrow(new AiProviderException("rate limited", AiFailure.RATE_LIMITED));
+    when(quizGenerationService.generatePendingQuiz(portBlair))
+        .thenReturn(Optional.of(quiz(11L, QuizStatus.PENDING)));
+
+    var generated = service.generate(null);
+
+    assertEquals(1, generated.size());
+    assertEquals("portblair", generated.get(0).getHashtag());
+  }
+
+  @Test
+  void generateThrowsATemporaryAiFailureWhenNothingWasGenerated() {
+    when(userRepository.findDistinctUserLocalities()).thenReturn(List.of(kargil, portBlair));
+    when(quizGenerationService.generatePendingQuiz(any()))
+        .thenThrow(new AiProviderException("outage", AiFailure.TRANSIENT));
+
+    assertThrows(AiProviderException.class, () -> service.generate(null));
+    verify(quizGenerationService).generatePendingQuiz(portBlair);
+  }
+
+  @Test
+  void generateStopsAtOnceOnAConfigAiFailure() {
+    when(userRepository.findDistinctUserLocalities()).thenReturn(List.of(kargil, portBlair));
+    when(quizGenerationService.generatePendingQuiz(kargil))
+        .thenThrow(new AiProviderException("bad key", AiFailure.AUTH_FAILED));
+
+    assertThrows(AiProviderException.class, () -> service.generate(null));
+    verify(quizGenerationService, never()).generatePendingQuiz(portBlair);
   }
 
   private QuizEntity quiz(Long id, QuizStatus status) {

@@ -134,6 +134,9 @@ gcloud scheduler jobs run hashtaglocal-backend-staging-session-cleanup --locatio
    without it push notifications are off), `GOOGLE_MAPS_API_KEY`, `GROQ_API_KEY`, `GEMINI_API_KEY`,
    `SPRING_MAIL_PASSWORD`, `GOOGLE_OAUTH_CLIENT_SECRET`, `PORTALISSUE_AUTH_USERNAME`, `PORTALISSUE_AUTH_PASSWORD`.
    A missing `GEMINI_API_KEY` means feed posts go to human review instead of auto-publishing.
+   `AI_CONFIG_ENCRYPTION_KEY` (`openssl rand -base64 32`, a different value per environment) encrypts the
+   quiz AI key saved from the Ops Dashboard; without it the dashboard cannot save a key and quiz generation
+   uses the `QUIZ_*` chain. Changing it makes a saved key unreadable: re-enter the key in the dashboard.
 
    Everything else is listed under *GitHub settings* below.
 

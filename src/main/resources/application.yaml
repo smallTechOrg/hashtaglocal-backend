@@ -224,6 +224,16 @@ ai:
       - provider: gemini
         models: ${QUIZ_GEMINI_MODELS:gemini-4-neon,gemini-3.1-flash-lite}
         keys: ${QUIZ_GEMINI_KEYS:}
+  # The provider an admin saves in the Ops Dashboard (AI Provider page) replaces the chain above
+  # for quiz generation, with no restart. With nothing saved, the chain above is used.
+  config:
+    # Base64 of 32 random bytes (openssl rand -base64 32). Encrypts the saved API key (AES-GCM).
+    # Secret: set it in the environment / secret manager only. Without it, keys cannot be saved.
+    encryption-key: ${AI_CONFIG_ENCRYPTION_KEY:}
+    # SSRF guard: endpoints on private/loopback/link-local addresses are refused unless true.
+    allow-private-endpoints: ${AI_CONFIG_ALLOW_PRIVATE_ENDPOINTS:false}
+    # Per-instance cache of the saved config; a save clears it on the instance that handled it.
+    cache-ttl: ${AI_CONFIG_CACHE_TTL:30s}
 
 portalissue:
   enabled: ${PORTALISSUE_ENABLED:true}

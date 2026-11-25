@@ -46,7 +46,7 @@ abstract class RestAiProvider implements AiProvider {
           e.getStatusCode().value(), e.getResponseHeaders(), e.getResponseBodyAsString());
     } catch (RestClientException e) {
       // Timeouts and connection errors.
-      return AiResult.failure(AiFailure.TRANSIENT, shorten(e.getMessage()));
+      return AiResult.failure(AiFailure.TRANSIENT, shorten(SecretRedactor.redact(e.getMessage())));
     }
     try {
       String text = extractText(raw);
@@ -81,15 +81,16 @@ abstract class RestAiProvider implements AiProvider {
   }
 
   /**
-   * HTTP status plus the provider's error message (or the start of the body), for logs. Error
-   * bodies never contain our key.
+   * HTTP status plus the provider's error message (or the start of the body), for logs and for the
+   * Ops Dashboard. Some providers echo part of the key back (e.g. "Incorrect API key provided:
+   * sk-ab***yz"), so anything key-shaped is masked.
    */
   static String detail(int status, String body) {
     Matcher message = ERROR_MESSAGE.matcher(body == null ? "" : body);
-    return status + " " + shorten(message.find() ? message.group(1) : body);
+    return status + " " + shorten(SecretRedactor.redact(message.find() ? message.group(1) : body));
   }
 
-  private static String shorten(String text) {
+  static String shorten(String text) {
     if (text == null) {
       return "";
     }
