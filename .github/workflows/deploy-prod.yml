@@ -1,0 +1,29 @@
+name: deploy-prod
+
+# Deploys to hashtaglocal-backend (api.smalltech.in/local).
+# - Automatically on every push to main.
+# - Re-run by hand from main only: Actions -> deploy-prod -> Run workflow (main).
+# Its deploy account can only be obtained by runs on main (enforced in GCP, not just here).
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/_deploy.yml
+    with:
+      environment: production
+      service: hashtaglocal-backend
+      deployer_sa: hashtaglocal-deploy-prod@ai-agent-boilerplate0.iam.gserviceaccount.com
+    secrets: inherit
