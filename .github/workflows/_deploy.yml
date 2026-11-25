@@ -123,11 +123,20 @@ jobs:
           # environment as a suffix, e.g. SPRING_DATASOURCE_PASSWORD_STAGING.
           echo "SECRET_SUFFIX=$([ "$IS_PROD" = "true" ] && echo PRODUCTION || echo STAGING)" >> "$GITHUB_ENV"
 
+      # Docker layers are cached in GitHub Actions, so the dependency-download layer is reused until
+      # build.gradle.kts / settings / the wrapper change. Without it every build re-downloads all
+      # dependencies and Maven Central rate-limits the runner (HTTP 429).
+      - name: Registry login
+        run: gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
+      - uses: docker/setup-buildx-action@v3
       - name: Build and push image
-        run: |
-          gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
-          docker build -t "$IMAGE" .
-          docker push "$IMAGE"
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ env.IMAGE }}
+          cache-from: type=gha,scope=hashtaglocal-backend
+          cache-to: type=gha,scope=hashtaglocal-backend,mode=max
 
       - name: Write service environment
         # Every production setting is a secret of the GitHub Environment "production", so GitHub

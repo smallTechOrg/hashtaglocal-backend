@@ -1,5 +1,5 @@
 # Image for the Hashtag Local backend on Cloud Run.
-# Built and deployed by .github/workflows/deploy.yml.
+# Built and deployed by .github/workflows/_deploy.yml (deploy-staging / deploy-prod).
 
 # ---- build: the jar (tests are run by the workflow's test job) ----
 FROM eclipse-temurin:25-jdk AS build
