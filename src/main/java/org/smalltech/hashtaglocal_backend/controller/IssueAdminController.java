@@ -5,12 +5,16 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.smalltech.hashtaglocal_backend.entity.IssueActionEntity;
+import org.smalltech.hashtaglocal_backend.entity.MediaEntity;
 import org.smalltech.hashtaglocal_backend.model.IssueActionApprovalStatus;
+import org.smalltech.hashtaglocal_backend.model.Media;
 import org.smalltech.hashtaglocal_backend.model.NewAPIResponse;
 import org.smalltech.hashtaglocal_backend.model.UserSummaryModel;
 import org.smalltech.hashtaglocal_backend.model.response.IssueActionAdminResponseData;
 import org.smalltech.hashtaglocal_backend.model.response.IssueActionResponseData;
 import org.smalltech.hashtaglocal_backend.repository.UserRepository;
+import org.smalltech.hashtaglocal_backend.service.GCSService;
 import org.smalltech.hashtaglocal_backend.service.GetProfileService;
 import org.smalltech.hashtaglocal_backend.service.IssueActionAdminService;
 import org.springframework.http.ResponseEntity;
@@ -51,6 +55,22 @@ public class IssueAdminController {
   private final IssueActionAdminService issueActionAdminService;
   private final GetProfileService getProfileService;
   private final UserRepository userRepository;
+  private final GCSService gcsService;
+
+  /** Builds signed URLs for the media attached to this specific action, or null if none. */
+  private Media toActionMedia(IssueActionEntity action) {
+    MediaEntity media = action.getMedia();
+    if (media == null || media.getUrl() == null) {
+      return null;
+    }
+    return Media.builder()
+        .type(media.getType() != null ? media.getType().name().toLowerCase() : null)
+        .url(gcsService.generateOptimisedUrl(media.getUrl()))
+        .urlThumbnail(gcsService.generateThumbnailUrl(media.getUrl()))
+        .description(media.getDescription())
+        .createdAt(media.getCreatedAt())
+        .build();
+  }
 
   /**
    * Returns all issue actions currently awaiting admin review, ordered oldest-first.
@@ -83,6 +103,7 @@ public class IssueAdminController {
                         .action(action.getAction().name())
                         .approvalStatus(action.getApprovalStatus().name())
                         .createdAt(action.getCreatedAt())
+                        .media(toActionMedia(action))
                         .build())
             .toList();
 
@@ -171,6 +192,7 @@ public class IssueAdminController {
                             action.getApprovedByUser() != null
                                 ? action.getApprovedByUser().getUsername()
                                 : null)
+                        .media(toActionMedia(action))
                         .build())
             .toList();
 
