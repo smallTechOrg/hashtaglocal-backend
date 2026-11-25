@@ -2,6 +2,7 @@ package org.smalltech.hashtaglocal_backend.service.ai;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
@@ -49,22 +50,22 @@ class AiConfigResolverTest {
   void cachesForTheTtlThenRereads() {
     properties.setCacheTtl(Duration.ofSeconds(30));
     AiConfigResolver resolver = new AiConfigResolver(repository, cipher, properties, clock);
-    when(repository.findTopByOrderByIdDesc()).thenReturn(Optional.empty());
+    when(repository.findFirstByIsActiveTrueOrderByIdDesc()).thenReturn(Optional.empty());
 
     resolver.active();
     now = now.plusSeconds(29);
     resolver.active();
-    verify(repository, times(1)).findTopByOrderByIdDesc();
+    verify(repository, times(1)).findFirstByIsActiveTrueOrderByIdDesc();
 
     now = now.plusSeconds(2);
     resolver.active();
-    verify(repository, times(2)).findTopByOrderByIdDesc();
+    verify(repository, times(2)).findFirstByIsActiveTrueOrderByIdDesc();
   }
 
   @Test
   void invalidateForcesAFreshRead() {
     AiConfigResolver resolver = new AiConfigResolver(repository, cipher, properties, clock);
-    when(repository.findTopByOrderByIdDesc())
+    when(repository.findFirstByIsActiveTrueOrderByIdDesc())
         .thenReturn(Optional.empty())
         .thenReturn(Optional.of(row("sk-ant-new-key-1234")));
 
@@ -77,13 +78,21 @@ class AiConfigResolverTest {
   }
 
   @Test
-  void aRemovedRowAsTheNewestMeansNothingIsSaved() {
+  void anActiveRowWithoutAKeyIsAClearErrorNotASilentFallback() {
     AiConfigResolver resolver = new AiConfigResolver(repository, cipher, properties, clock);
-    AiProviderConfigEntity removed =
-        AiProviderConfigEntity.builder().id(2L).keyChanged(true).updatedBy(1L).build();
-    when(repository.findTopByOrderByIdDesc()).thenReturn(Optional.of(removed));
+    AiProviderConfigEntity noKey =
+        AiProviderConfigEntity.builder()
+            .id(2L)
+            .name("Claude")
+            .endpoint("https://api.anthropic.com/v1")
+            .model("claude-x")
+            .isActive(true)
+            .createdBy(1L)
+            .updatedBy(1L)
+            .build();
+    when(repository.findFirstByIsActiveTrueOrderByIdDesc()).thenReturn(Optional.of(noKey));
 
-    assertTrue(resolver.active().isEmpty(), "quiz generation falls back to .env");
+    assertThrows(AiProviderException.class, resolver::active);
   }
 
   private AiProviderConfigEntity row(String key) {

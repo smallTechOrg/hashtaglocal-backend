@@ -98,17 +98,12 @@ public class AiConfigResolver {
     }
   }
 
-  /**
-   * The config in effect (from cache), without decrypting anything: the newest row, unless that is
-   * a "removed" row.
-   */
+  /** The config in effect (from cache), without decrypting anything: the active row, if any. */
   public Optional<AiProviderConfigEntity> load() {
     Cached current = cached;
     Instant now = clock.instant();
     if (current == null || !now.isBefore(current.loadedAt().plus(properties.getCacheTtl()))) {
-      current =
-          new Cached(
-              repository.findTopByOrderByIdDesc().filter(AiProviderConfigEntity::isActive), now);
+      current = new Cached(repository.findFirstByIsActiveTrueOrderByIdDesc(), now);
       cached = current;
     }
     return current.config();

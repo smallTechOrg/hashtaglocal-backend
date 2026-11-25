@@ -18,15 +18,16 @@ import org.hibernate.annotations.UpdateTimestamp;
 /**
  * The AI connection that quiz generation uses, as set by an admin in the Ops Dashboard, and the log
  * of every change to it. A connection is a name the admin chooses plus an OpenAI-compatible
- * endpoint, a model and a key. Rows are only ever added: each Save adds a row with the new
- * settings, and "Remove key" adds a row with no connection. The newest row is the config in effect;
- * when it has no connection (or there are no rows), quiz generation uses the {@code ai.quiz.chain}
- * from {@code .env}.
+ * endpoint, a model and a key.
+ *
+ * <p>Every Save adds a new row with {@code isActive = true} and sets the previous one inactive, so
+ * the table keeps every version. "Remove key" sets the active row inactive. At most one row is
+ * active; when none is, quiz generation uses the {@code ai.quiz.chain} from {@code .env}.
  *
  * <p>The API key is stored only as AES-GCM ciphertext (see {@code SecretCipher}), never sent back
- * by any endpoint, and kept only on the newest row: older rows have it cleared when a newer row is
- * added, so the history keeps who changed what and when, but no old keys. {@code apiKeyLast4} stays
- * on every row so the history still shows which key was in use.
+ * by any endpoint, and kept only on the active row: it is cleared when a row is set inactive, so
+ * the history keeps who changed what and when, but no old keys. {@code apiKeyLast4} stays on every
+ * row so the history still shows which key was in use.
  */
 @Entity
 @Table(name = "ai_configs")
@@ -43,20 +44,18 @@ public class AiProviderConfigEntity {
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;
 
-  /**
-   * The admin's own name for the connection, e.g. "OpenRouter DeepSeek". Null on a "removed" row.
-   */
-  @Column(length = 100)
+  /** The admin's own name for the connection, e.g. "OpenRouter DeepSeek". */
+  @Column(nullable = false, length = 100)
   private String name;
 
   /** OpenAI-compatible base URL (…/v1) or full …/chat/completions URL. */
-  @Column(length = 500)
+  @Column(nullable = false, length = 500)
   private String endpoint;
 
-  @Column(length = 200)
+  @Column(nullable = false, length = 200)
   private String model;
 
-  /** Encrypted API key; only the newest row has one. */
+  /** Encrypted API key; only the active row has one. */
   @ToString.Exclude
   @Column(name = "api_key_ciphertext", columnDefinition = "text")
   private String apiKeyCiphertext;
@@ -64,29 +63,26 @@ public class AiProviderConfigEntity {
   @Column(name = "api_key_last4", length = 4)
   private String apiKeyLast4;
 
-  /** True when this change entered a new key (or removed it), false when it kept the old one. */
-  @Column(nullable = false)
-  private boolean keyChanged;
+  /** True for the connection in effect. At most one row is active. */
+  @Builder.Default
+  @Column(name = "is_active", nullable = false)
+  private Boolean isActive = true;
 
-  /** User id of the admin who made this change. */
+  /** User id of the admin who created this row (and entered or kept its key). */
+  @Column(nullable = false, updatable = false)
+  private Long createdBy;
+
+  /** User id of the admin who last changed this row: its creator, or whoever set it inactive. */
   @Column(nullable = false)
   private Long updatedBy;
 
-  /** When this row (this change) was added. Set by Hibernate on insert. */
+  /** When this row was added. Set by Hibernate on insert. */
   @CreationTimestamp
   @Column(nullable = false, updatable = false)
   private LocalDateTime createdAt;
 
-  /**
-   * When this row was last written. Set by Hibernate on insert and update; also moves when the key
-   * is cleared from an older row.
-   */
+  /** When this row was last changed, e.g. set inactive. Set automatically. */
   @UpdateTimestamp
   @Column(nullable = false)
   private LocalDateTime updatedAt;
-
-  /** True for a row that sets a connection; false for a "removed" row (back to .env). */
-  public boolean isActive() {
-    return endpoint != null;
-  }
 }

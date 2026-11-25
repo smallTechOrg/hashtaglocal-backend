@@ -9,17 +9,17 @@ import org.springframework.data.repository.query.Param;
 
 public interface AiProviderConfigRepository extends JpaRepository<AiProviderConfigEntity, Long> {
 
-  /** The newest row: the config in effect, unless it is a "removed" row (no provider). */
-  Optional<AiProviderConfigEntity> findTopByOrderByIdDesc();
+  /** The connection in effect: the active row, if any. */
+  Optional<AiProviderConfigEntity> findFirstByIsActiveTrueOrderByIdDesc();
 
   /**
-   * Clears the encrypted key on every row except {@code keepId}, so old keys are not kept. A bulk
-   * update skips {@code @UpdateTimestamp}, so it moves {@code updatedAt} itself.
+   * Sets the active row inactive and clears its encrypted key, recording who did it. A bulk update
+   * skips {@code @UpdateTimestamp}, so it moves {@code updatedAt} itself.
    */
   @Modifying
   @Query(
-      "UPDATE AiProviderConfigEntity c SET c.apiKeyCiphertext = NULL,"
-          + " c.updatedAt = CURRENT_TIMESTAMP"
-          + " WHERE c.id <> :keepId AND c.apiKeyCiphertext IS NOT NULL")
-  int clearKeysExcept(@Param("keepId") Long keepId);
+      "UPDATE AiProviderConfigEntity c SET c.isActive = false, c.apiKeyCiphertext = NULL,"
+          + " c.updatedBy = :by, c.updatedAt = CURRENT_TIMESTAMP"
+          + " WHERE c.isActive = true")
+  int deactivateAll(@Param("by") Long by);
 }

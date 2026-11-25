@@ -82,13 +82,22 @@ class AiProviderConfigServiceTest {
   void setUp() {
     repository = mock(AiProviderConfigRepository.class);
     // Hand out copies, as the database would, so nothing can change a cached row behind our back.
-    when(repository.findTopByOrderByIdDesc())
-        .thenAnswer(inv -> Optional.ofNullable(latest()).map(AiProviderConfigServiceTest::copy));
+    when(repository.findFirstByIsActiveTrueOrderByIdDesc())
+        .thenAnswer(
+            inv ->
+                rows.stream()
+                    .filter(AiProviderConfigEntity::getIsActive)
+                    .reduce((first, second) -> second)
+                    .map(AiProviderConfigServiceTest::copy));
     when(repository.save(any()))
         .thenAnswer(
             inv -> {
               AiProviderConfigEntity added = copy(inv.getArgument(0));
               assertNull(added.getId(), "rows are only ever added, never updated");
+              // Same rule as the unique index ai_configs_one_active.
+              assertTrue(
+                  rows.stream().noneMatch(AiProviderConfigEntity::getIsActive),
+                  "the old row is set inactive before the new active row is added");
               added.setId((long) rows.size() + 1);
               assertNull(added.getCreatedAt(), "createdAt is left to Hibernate");
               assertNull(added.getUpdatedAt(), "updatedAt is left to Hibernate");
@@ -99,19 +108,21 @@ class AiProviderConfigServiceTest {
               rows.add(added);
               return copy(added);
             });
-    when(repository.clearKeysExcept(anyLong()))
+    when(repository.deactivateAll(anyLong()))
         .thenAnswer(
             inv -> {
-              long keep = inv.getArgument(0);
-              int cleared = 0;
+              Long by = inv.getArgument(0);
+              int changed = 0;
               for (AiProviderConfigEntity r : rows) {
-                if (r.getId() != keep && r.getApiKeyCiphertext() != null) {
+                if (r.getIsActive()) {
+                  r.setIsActive(false);
                   r.setApiKeyCiphertext(null);
+                  r.setUpdatedBy(by);
                   r.setUpdatedAt(LocalDateTime.now());
-                  cleared++;
+                  changed++;
                 }
               }
-              return cleared;
+              return changed;
             });
 
     cipher = new SecretCipher(randomKey());
@@ -186,7 +197,8 @@ class AiProviderConfigServiceTest {
     assertEquals(ciphertextBefore, latest().getApiKeyCiphertext());
     assertEquals("Claude (v2 path)", latest().getName());
     assertEquals("claude-y", latest().getModel());
-    assertFalse(latest().isKeyChanged());
+    assertTrue(latest().getIsActive());
+    assertFalse(rows.get(0).getIsActive(), "the edited row is kept, inactive");
   }
 
   @Test
@@ -288,7 +300,7 @@ class AiProviderConfigServiceTest {
   // ---- one table: current connection + history ----
 
   @Test
-  void everyChangeIsARowButOnlyTheNewestKeepsAKey() {
+  void everyEditAddsARowAndOnlyTheActiveOneKeepsAKey() {
     service.save(request("Claude", CLAUDE, "claude-x", CLAUDE_KEY), ADMIN);
     service.save(request("Claude", CLAUDE, "claude-y", ""), 8L); // model only, key kept
     service.save(request("ChatGPT", OPENAI, "gpt-x", OPENAI_KEY), ADMIN); // new server and key
@@ -301,46 +313,54 @@ class AiProviderConfigServiceTest {
         List.of("claude-x", "claude-y", "gpt-x"),
         rows.stream().map(AiProviderConfigEntity::getModel).toList());
     assertEquals(
-        List.of(true, false, true),
-        rows.stream().map(AiProviderConfigEntity::isKeyChanged).toList());
+        List.of(false, false, true),
+        rows.stream().map(AiProviderConfigEntity::getIsActive).toList());
+    assertEquals(
+        List.of(ADMIN, 8L, ADMIN),
+        rows.stream().map(AiProviderConfigEntity::getCreatedBy).toList(),
+        "createdBy: who created each row (and entered or kept its key)");
+    assertEquals(
+        List.of(8L, ADMIN, ADMIN),
+        rows.stream().map(AiProviderConfigEntity::getUpdatedBy).toList(),
+        "updatedBy: whose save set the row inactive");
     assertEquals(
         List.of("AAAA", "AAAA", "BBBB"),
         rows.stream().map(AiProviderConfigEntity::getApiKeyLast4).toList());
-    assertEquals(8L, rows.get(1).getUpdatedBy());
-    assertNull(rows.get(0).getApiKeyCiphertext(), "older rows lose their key");
-    assertNull(rows.get(1).getApiKeyCiphertext(), "older rows lose their key");
+    assertNull(rows.get(0).getApiKeyCiphertext(), "inactive rows lose their key");
+    assertNull(rows.get(1).getApiKeyCiphertext(), "inactive rows lose their key");
     assertEquals(
         OPENAI_KEY,
         cipher.decrypt(
             rows.get(2).getApiKeyCiphertext(), AiProviderConfigEntity.KEY_CIPHER_CONTEXT));
-    assertEquals("ChatGPT", service.get().getName(), "the newest row is in effect");
+    assertEquals("ChatGPT", service.get().getName(), "the active row is in effect");
   }
 
   @Test
-  void removeKeyAddsARowAndLeavesNoKeyInTheDatabase() {
+  void removeKeySetsTheRowInactiveAndLeavesNoKeyInTheDatabase() {
     service.save(request("Claude", CLAUDE, "claude-x", CLAUDE_KEY), ADMIN);
 
     service.reset(9L);
 
-    assertEquals(2, rows.size());
+    assertEquals(1, rows.size(), "no new row; the connection stays as history");
     AiProviderConfigEntity removed = latest();
-    assertNull(removed.getName());
-    assertNull(removed.getEndpoint());
-    assertNull(removed.getModel());
-    assertTrue(removed.isKeyChanged());
-    assertEquals(9L, removed.getUpdatedBy());
+    assertFalse(removed.getIsActive());
+    assertEquals("Claude", removed.getName());
+    assertNull(removed.getApiKeyCiphertext());
+    assertEquals("AAAA", removed.getApiKeyLast4());
+    assertEquals(ADMIN, removed.getCreatedBy());
+    assertEquals(9L, removed.getUpdatedBy(), "who removed it");
     assertNotNull(removed.getCreatedAt());
     assertNotNull(removed.getUpdatedAt());
-    assertTrue(rows.stream().allMatch(r -> r.getApiKeyCiphertext() == null));
     assertEquals(AiProviderConfigData.Source.ENV, service.get().getSource());
 
     // The old key is gone, so saving again needs a key.
     assertThrows(
         IllegalArgumentException.class,
         () -> service.save(request("Claude", CLAUDE, "claude-x", ""), ADMIN));
-    // Removing again when nothing is saved adds nothing.
+    // Removing again when nothing is active changes nothing.
     service.reset(ADMIN);
-    assertEquals(2, rows.size());
+    assertEquals(1, rows.size());
+    assertEquals(9L, latest().getUpdatedBy());
   }
 
   // ---- runtime switching, no restart ----
@@ -475,7 +495,8 @@ class AiProviderConfigServiceTest {
         .model(e.getModel())
         .apiKeyCiphertext(e.getApiKeyCiphertext())
         .apiKeyLast4(e.getApiKeyLast4())
-        .keyChanged(e.isKeyChanged())
+        .isActive(e.getIsActive())
+        .createdBy(e.getCreatedBy())
         .updatedBy(e.getUpdatedBy())
         .createdAt(e.getCreatedAt())
         .updatedAt(e.getUpdatedAt())

@@ -65,8 +65,8 @@ public class AiProviderAdminController {
   @Operation(
       summary = "Remove the AI connection",
       description =
-          "Adds a 'removed' row and clears every stored key; quiz generation goes back to the"
-              + " .env chain.")
+          "Sets the active connection inactive and clears its key; quiz generation goes back to"
+              + " the .env chain.")
   public ResponseEntity<NewAPIResponse<AiProviderConfigData>> reset(
       @AuthenticationPrincipal Long adminUserId) {
     return ok(service.reset(adminUserId));

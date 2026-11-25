@@ -33,8 +33,9 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
  * {@code .env}), and test. A connection is a name the admin chooses plus an OpenAI-compatible
  * endpoint, a model and an API key. The key is encrypted before it is stored and is never returned.
  *
- * <p>{@code ai_configs} is both the current connection and its history: Save and Remove each add a
- * row, and the newest row is in effect. Only the newest row keeps an encrypted key.
+ * <p>{@code ai_configs} is both the current connection and its history: each Save adds a new active
+ * row and sets the previous one inactive; Remove sets the active row inactive. Only the active row
+ * keeps an encrypted key.
  */
 @Service
 @Slf4j
@@ -75,15 +76,15 @@ public class AiProviderConfigService {
     return toData(current());
   }
 
-  /** The connection in effect: the newest row, unless it is a "removed" row. Read fresh. */
+  /** The connection in effect: the active row. Read fresh, not cached. */
   private Optional<AiProviderConfigEntity> current() {
-    return repository.findTopByOrderByIdDesc().filter(AiProviderConfigEntity::isActive);
+    return repository.findFirstByIsActiveTrueOrderByIdDesc();
   }
 
   /**
-   * Validates the connection and adds it as the newest row. A blank API key keeps the saved one
-   * (same host only). Everything is validated and the key encrypted before anything is written, so
-   * a bad request never leaves a half-written config.
+   * Validates the connection, sets the current row inactive and adds the new one as the active row.
+   * A blank API key keeps the saved one (same host only). Everything is validated and the key
+   * encrypted before anything is written, so a bad request never leaves a half-written config.
    */
   @Transactional
   public AiProviderConfigData save(AiProviderConfigRequest request, Long adminUserId) {
@@ -104,42 +105,42 @@ public class AiProviderConfigService {
       ciphertext = cipher.encrypt(newKey, AiProviderConfigEntity.KEY_CIPHER_CONTEXT);
     }
 
-    boolean keyChanged = ciphertext != null;
+    boolean keyReplaced = ciphertext != null;
+    String keptCiphertext = existing.map(AiProviderConfigEntity::getApiKeyCiphertext).orElse(null);
+    String keptLast4 = existing.map(AiProviderConfigEntity::getApiKeyLast4).orElse(null);
+    // Old row first (it loses its key), so there is never more than one active row.
+    repository.deactivateAll(adminUserId);
     AiProviderConfigEntity saved =
         repository.save(
             AiProviderConfigEntity.builder()
                 .name(name)
                 .endpoint(endpoint)
                 .model(model)
-                .apiKeyCiphertext(keyChanged ? ciphertext : existing.get().getApiKeyCiphertext())
-                .apiKeyLast4(keyChanged ? last4(newKey) : existing.get().getApiKeyLast4())
-                .keyChanged(keyChanged)
+                .apiKeyCiphertext(keyReplaced ? ciphertext : keptCiphertext)
+                .apiKeyLast4(keyReplaced ? last4(newKey) : keptLast4)
+                .isActive(true)
+                .createdBy(adminUserId)
                 .updatedBy(adminUserId)
                 .build());
-    // The key now lives on the new row only; older rows keep their history but not their keys.
-    repository.clearKeysExcept(saved.getId());
     log.info(
         "AI connection '{}' saved by user {}: {} at {} (key {})",
         saved.getName(),
         adminUserId,
         saved.getModel(),
         saved.getEndpoint(),
-        keyChanged ? "replaced" : "kept");
+        keyReplaced ? "replaced" : "kept");
     invalidateAfterCommit();
     return toData(Optional.of(saved));
   }
 
   /**
-   * Adds a "removed" row (no connection, no key) and clears the key from every older row, so quiz
-   * generation goes back to the .env chain and no saved key is left in the database.
+   * Sets the active row inactive and clears its key, so quiz generation goes back to the .env chain
+   * and no saved key is left in the database. The row stays as history.
    */
   @Transactional
   public AiProviderConfigData reset(Long adminUserId) {
     if (current().isPresent()) {
-      AiProviderConfigEntity removed =
-          repository.save(
-              AiProviderConfigEntity.builder().keyChanged(true).updatedBy(adminUserId).build());
-      repository.clearKeysExcept(removed.getId());
+      repository.deactivateAll(adminUserId);
       log.info("AI connection removed by user {}; quiz generation uses .env", adminUserId);
       invalidateAfterCommit();
     }

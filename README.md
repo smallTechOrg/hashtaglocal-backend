@@ -85,17 +85,18 @@ fallback chain from `.env`, as before.
   saved. Optional: `AI_CONFIG_ALLOW_PRIVATE_ENDPOINTS` (default `false`), `AI_CONFIG_CACHE_TTL`
   (default `30s`).
 - **Migration:** `src/main/resources/db/migration/V2__ai_configs.sql` creates
-  `ai_configs`, which is both the current config and its history: every Save and every
-  **Remove key** adds a row, and the newest row is in effect. Only the newest row keeps the
-  encrypted key; older rows keep who changed what and when (and the key's last 4 characters).
+  `ai_configs`, which is both the current config and its history: every Save adds a new row with
+  `is_active = true` and sets the previous row inactive, and **Remove key** sets the active row
+  inactive. Only the active row keeps the encrypted key; inactive rows keep who created and changed
+  them and when (and the key's last 4 characters).
   Flyway runs it on start when `FLYWAY_ENABLED=true` (Cloud Run); locally, Hibernate creates the
   table, or run the file with
   `psql -d hashtaglocal -f src/main/resources/db/migration/V2__ai_configs.sql`.
 - **Switching AI:** enter a name (e.g. "Claude"), the provider's OpenAI-compatible endpoint, the
   model and the key, click **Test**, then **Save**. The next quiz generation uses it, with no
   restart (other instances pick it up within the cache TTL). Leaving the key blank keeps the saved
-  key, but only for the same endpoint host. **Remove key** adds a row with no connection and clears
-  every stored key, so quiz generation goes back to `.env`.
+  key, but only for the same endpoint host. **Remove key** sets the connection inactive and clears
+  its key, so quiz generation goes back to `.env`.
 - **Endpoints:** every connection uses the OpenAI Chat Completions format, which the major
   providers accept, e.g. Claude `https://api.anthropic.com/v1`, ChatGPT
   `https://api.openai.com/v1`, Gemini `https://generativelanguage.googleapis.com/v1beta/openai`,
