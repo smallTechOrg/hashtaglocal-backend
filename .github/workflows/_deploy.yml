@@ -1,17 +1,25 @@
-name: Deploy to Cloud Run
+name: deploy (shared)
 
-# Production only for now: run by hand (Actions -> Deploy to Cloud Run -> Run workflow) on main.
-# Staging stays on its VM until it is rolled over. Details: infra/cloud-run.md.
-# The service itself, its IAM, the load-balancer route and the Cloud Scheduler jobs are created by
+# Shared by deploy-staging.yml and deploy-prod.yml: test, build, deploy a revision with no traffic,
+# smoke-test it, then move traffic to it. Details: infra/cloud-run.md.
+# The service, its IAM, the load-balancer route and the Cloud Scheduler jobs are created by
 # smallTechOrg/infra (Terraform); this workflow only builds and rolls out revisions.
 
 on:
-  workflow_dispatch:
-
-# One deploy per branch at a time, in push order. Never cancel one half way.
-concurrency:
-  group: deploy-${{ github.ref_name }}
-  cancel-in-progress: false
+  workflow_call:
+    inputs:
+      environment:
+        description: GitHub Environment holding the settings (staging | production)
+        type: string
+        required: true
+      service:
+        description: Cloud Run service to deploy
+        type: string
+        required: true
+      deployer_sa:
+        description: Service account the deploy runs as (one per environment)
+        type: string
+        required: true
 
 permissions:
   contents: read
@@ -66,17 +74,16 @@ jobs:
 
   deploy:
     needs: test
-    if: github.ref_name == 'main'
     runs-on: ubuntu-24.04
-    # Settings and credentials are GitHub Environment secrets of "production" (masked in logs).
-    environment: production
+    # Settings and credentials are secrets of this GitHub Environment (masked in logs).
+    environment: ${{ inputs.environment }}
     permissions:
       contents: read
       id-token: write   # for the keyless Google login
     env:
-      IS_PROD: ${{ github.ref_name == 'main' }}
-      APP_ENV: ${{ github.ref_name == 'main' && 'production' || 'staging' }}
-      SERVICE: ${{ github.ref_name == 'main' && 'hashtaglocal-backend' || 'hashtaglocal-backend-staging' }}
+      IS_PROD: ${{ inputs.environment == 'production' }}
+      APP_ENV: ${{ inputs.environment }}
+      SERVICE: ${{ inputs.service }}
       # The background jobs run from Cloud Scheduler (POST /jobs/{name}), one run
       # at a time across instances (advisory lock), so more than one instance is
       # safe; each opens up to 10 database connections, so keep it small. The
@@ -100,7 +107,7 @@ jobs:
         with:
           project_id: ${{ vars.GCP_PROJECT }}
           workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ vars.GCP_DEPLOYER_SA }}
+          service_account: ${{ inputs.deployer_sa }}
 
       - uses: google-github-actions/setup-gcloud@v2
 
@@ -203,7 +210,7 @@ jobs:
           done
           # Defaults that suit the shared load balancer's routes.
           grep -q '^APP_FORWARDED_PREFIX:' "$env_file" \
-            || add APP_FORWARDED_PREFIX "$([ "$IS_PROD" = "true" ] && echo /local || echo /localstaging)"
+            || add APP_FORWARDED_PREFIX "/local"   # both api.smalltech.in/local and api-staging.smalltech.in/local
           # PORTALISSUE_REPORT_SCRAPE_URL follows PORTALISSUE_SCRAPE_URL unless set.
           if ! grep -q '^PORTALISSUE_REPORT_SCRAPE_URL:' "$env_file" && [ -n "$(var PORTALISSUE_SCRAPE_URL)" ]; then
             add PORTALISSUE_REPORT_SCRAPE_URL "$(var PORTALISSUE_SCRAPE_URL)"

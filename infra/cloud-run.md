@@ -3,8 +3,20 @@
 Replaces the manual VM deploy in [deployment.md](deployment.md). GitHub Actions builds a container,
 deploys a Cloud Run revision with no traffic, smoke-tests it, then promotes it.
 
-**Production only for now.** Run *Actions → Deploy to Cloud Run → Run workflow* on `main`. Staging stays
-on its VM (`api-staging.smalltech.in/local`) until it is rolled over.
+**Two workflows, two environments.**
+
+| Workflow | Deploys to | Runs automatically | Run by hand |
+|---|---|---|---|
+| `deploy-staging` | `hashtaglocal-backend-staging` (`api-staging.smalltech.in/local`) | every push to `staging` | from **any** branch: *Actions → deploy-staging → Run workflow*, pick the branch |
+| `deploy-prod` | `hashtaglocal-backend` (`api.smalltech.in/local`) | every push to `main` | from `main` only |
+
+Both call `_deploy.yml` (test, build, deploy with no traffic, smoke test, promote). Each has its own GCP deploy
+account. Staging's can be used from any branch but can only touch staging. Production's can only be obtained
+by runs on `main`, and GCP enforces this, so editing a workflow on a branch cannot deploy production.
+Settings are the secrets of the GitHub Environment of the same name (`staging`, `production`).
+
+**A branch created before these workflows existed** needs `main` merged in once, because a manual run uses the
+workflow file from the branch you pick.
 
 **Who owns what.**
 - [`smallTechOrg/infra`](https://github.com/smallTechOrg/infra) (Terraform) creates the service, its

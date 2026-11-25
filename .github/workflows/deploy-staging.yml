@@ -1,0 +1,28 @@
+name: deploy-staging
+
+# Deploys to hashtaglocal-backend-staging (api-staging.smalltech.in/local).
+# - Automatically on every push to the staging branch.
+# - By hand from ANY branch: Actions -> deploy-staging -> Run workflow -> pick the branch.
+# Uses its own deploy account, which can only touch staging.
+
+on:
+  push:
+    branches: [staging]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy:
+    uses: ./.github/workflows/_deploy.yml
+    with:
+      environment: staging
+      service: hashtaglocal-backend-staging
+      deployer_sa: hashtaglocal-deploy-staging@ai-agent-boilerplate0.iam.gserviceaccount.com
+    secrets: inherit
