@@ -1,11 +1,12 @@
 package org.smalltech.hashtaglocal_backend.service;
 
-import java.time.Duration;
+import com.fasterxml.jackson.databind.JsonNode;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 import org.locationtech.jts.geom.Point;
 import org.smalltech.hashtaglocal_backend.dto.ReportComplaintRequestDTO;
 import org.smalltech.hashtaglocal_backend.dto.ReportComplaintResponseDTO;
-import org.smalltech.hashtaglocal_backend.dto.ReportComplaintScrapeResponseDTO;
 import org.smalltech.hashtaglocal_backend.entity.GovPortalEntity;
 import org.smalltech.hashtaglocal_backend.entity.IssueEntity;
 import org.smalltech.hashtaglocal_backend.entity.Locality;
@@ -16,17 +17,13 @@ import org.smalltech.hashtaglocal_backend.repository.GovPortalRepository;
 import org.smalltech.hashtaglocal_backend.repository.IssueRepository;
 import org.smalltech.hashtaglocal_backend.repository.LocalityRepository;
 import org.smalltech.hashtaglocal_backend.repository.UserRepository;
+import org.smalltech.hashtaglocal_backend.service.scraper0.Scraper0Client;
+import org.smalltech.hashtaglocal_backend.service.scraper0.Scraper0Exception;
+import org.smalltech.hashtaglocal_backend.service.scraper0.Scraper0Models.WriteResult;
 import org.smalltech.hashtaglocal_backend.util.LocationUtil;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.web.client.RestTemplateBuilder;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.client.RestTemplate;
 
 @Service
 @Slf4j
@@ -38,42 +35,53 @@ public class PortalComplaintReportingService {
   private static final String PORTAL_URL =
       "https://www.smartoneblr.com/WssBBMPComplaintRequestDetails.htm";
 
-  private final RestTemplate restTemplate;
-  private final String scrapeUrl;
+  /** scraper0 v2 site and action that files a BBMP complaint. */
+  static final String SITE_ID = "smartoneblr-com";
+
+  static final String REPORT_ACTION = "report_issue";
+
+  /** {@code timeout_s} of the write; the HTTP read timeout is this plus 30 s. */
+  static final int REPORT_TIMEOUT_S = 300;
+
+  static final String MSG_RUNNING =
+      "The complaint is still being filed on the portal; try again shortly (retrying this issue"
+          + " returns the same job)";
+  static final String MSG_OUTCOME_UNKNOWN =
+      "The complaint may have been filed; check the portal before retrying";
+
+  private final Scraper0Client scraper0Client;
   private final UserRepository userRepository;
   private final IssueRepository issueRepository;
   private final LocalityRepository localityRepository;
   private final GovPortalRepository govPortalRepository;
 
   public PortalComplaintReportingService(
-      RestTemplateBuilder restTemplateBuilder,
+      Scraper0Client scraper0Client,
       UserRepository userRepository,
       IssueRepository issueRepository,
       LocalityRepository localityRepository,
-      GovPortalRepository govPortalRepository,
-      @Value(
-              "${portalissue.report.scrape-url:https://staging.api.smalltech.in/webscraperstaging/api/v1/scrape}")
-          String scrapeUrl,
-      @Value("${portalissue.report.connect-timeout-seconds:15}") long connectTimeoutSeconds,
-      @Value("${portalissue.report.read-timeout-seconds:305}") long readTimeoutSeconds) {
+      GovPortalRepository govPortalRepository) {
+    this.scraper0Client = scraper0Client;
     this.userRepository = userRepository;
     this.issueRepository = issueRepository;
     this.localityRepository = localityRepository;
     this.govPortalRepository = govPortalRepository;
-    this.scrapeUrl = scrapeUrl;
-    this.restTemplate =
-        restTemplateBuilder
-            .requestFactory(
-                () -> {
-                  SimpleClientHttpRequestFactory requestFactory =
-                      new SimpleClientHttpRequestFactory();
-                  requestFactory.setConnectTimeout(Duration.ofSeconds(connectTimeoutSeconds));
-                  requestFactory.setReadTimeout(Duration.ofSeconds(readTimeoutSeconds));
-                  return requestFactory;
-                })
-            .build();
   }
 
+  /** The scraper0 {@code Idempotency-Key} of an issue's complaint: one complaint per issue. */
+  static String idempotencyKey(Long issueId) {
+    return "hashtaglocal-issue-" + issueId;
+  }
+
+  /**
+   * Files the complaint through scraper0 ({@code POST /v2/sites/smartoneblr-com/actions/
+   * report_issue/write}, {@code Idempotency-Key: hashtaglocal-issue-{issueId}}) and stores the
+   * tracking id.
+   *
+   * <p>200 returns the tracking id. 202 (still running) is a 503 and 409 {@code outcome_unknown} a
+   * 409, each with a message for the operator; 422 {@code action_failed} is a 422 with the portal's
+   * message; any other scraper0 error is a 502.
+   */
   public ReportComplaintResponseDTO reportComplaint(
       String type, Long issueId, Long adminUserId, ReportComplaintRequestDTO request) {
     validateType(type);
@@ -86,36 +94,106 @@ public class PortalComplaintReportingService {
       throw new IllegalArgumentException("Authenticated admin user is required");
     }
 
-    if (scrapeUrl == null || scrapeUrl.isBlank()) {
+    if (!scraper0Client.isConfigured()) {
       throw new DownstreamServiceException(
           HttpStatus.INTERNAL_SERVER_ERROR,
           "CONFIGURATION",
-          "portalissue.report.scrape-url is not configured");
+          "scraper0.base-url (SCRAPER0_BASE_URL) is not configured");
     }
 
     validateBengaluruCoordinates(request);
 
-    HttpHeaders headers = new HttpHeaders();
-    headers.setContentType(MediaType.APPLICATION_JSON);
-    HttpEntity<ReportComplaintRequestDTO> entity = new HttpEntity<>(request, headers);
+    WriteResult result;
+    try {
+      result =
+          scraper0Client.write(
+              SITE_ID,
+              REPORT_ACTION,
+              reportInput(request.getContext().getAction().getData()),
+              auth(request.getContext().getAuth()),
+              idempotencyKey(issueId),
+              false,
+              REPORT_TIMEOUT_S);
+    } catch (Scraper0Exception e) {
+      throw toDownstream(e);
+    }
 
-    ReportComplaintScrapeResponseDTO response =
-        restTemplate.postForObject(scrapeUrl, entity, ReportComplaintScrapeResponseDTO.class);
+    if (!result.succeeded()) {
+      log.info("Complaint for issue {} still running (job {})", issueId, result.jobId());
+      throw new DownstreamServiceException(
+          HttpStatus.SERVICE_UNAVAILABLE, "PORTAL_PENDING", MSG_RUNNING);
+    }
 
-    if (response == null
-        || response.getData() == null
-        || response.getData().getTrackingId() == null) {
+    Long trackingId = trackingId(result.output());
+    if (trackingId == null) {
       throw new DownstreamServiceException(
           HttpStatus.BAD_GATEWAY,
           "DOWNSTREAM_ERROR",
           "Portal complaint API returned invalid response: missing tracking_id");
     }
+    if (result.replayed()) {
+      log.info("Complaint for issue {} was already filed: tracking id {}", issueId, trackingId);
+    }
 
-    persistPortalIssue(issueId, adminUserId, request, response.getData().getTrackingId());
+    persistPortalIssue(issueId, adminUserId, request, trackingId);
 
-    return ReportComplaintResponseDTO.builder()
-        .trackingId(response.getData().getTrackingId())
-        .build();
+    return ReportComplaintResponseDTO.builder().trackingId(trackingId).build();
+  }
+
+  private static Map<String, Object> reportInput(ReportComplaintRequestDTO.Data data) {
+    Map<String, Object> input = new LinkedHashMap<>();
+    input.put("category", data.getCategory());
+    input.put("sub_category", data.getSubCategory());
+    putIfPresent(input, "description", data.getDescription());
+    putIfPresent(input, "media_url", data.getMediaUrl());
+    putIfPresent(input, "latitude", data.getLatitude());
+    putIfPresent(input, "longitude", data.getLongitude());
+    return input;
+  }
+
+  private static Map<String, Object> auth(ReportComplaintRequestDTO.Auth auth) {
+    Map<String, Object> map = new LinkedHashMap<>();
+    map.put("username", auth.getUsername());
+    map.put("password", auth.getPassword());
+    return map;
+  }
+
+  private static void putIfPresent(Map<String, Object> map, String key, String value) {
+    if (value != null) {
+      map.put(key, value);
+    }
+  }
+
+  private static Long trackingId(JsonNode output) {
+    JsonNode id = output == null ? null : output.get("tracking_id");
+    if (id == null || id.isNull()) {
+      return null;
+    }
+    if (id.canConvertToLong()) {
+      return id.asLong();
+    }
+    try {
+      return Long.parseLong(id.asText().trim());
+    } catch (NumberFormatException e) {
+      return null;
+    }
+  }
+
+  private static DownstreamServiceException toDownstream(Scraper0Exception e) {
+    if (Scraper0Exception.OUTCOME_UNKNOWN.equals(e.getCode()) || e.getHttpStatus() == 409) {
+      return new DownstreamServiceException(
+          HttpStatus.CONFLICT, "OUTCOME_UNKNOWN", MSG_OUTCOME_UNKNOWN);
+    }
+    if (e.getHttpStatus() == 422) {
+      return new DownstreamServiceException(
+          HttpStatus.UNPROCESSABLE_ENTITY, "PORTAL_ERROR", e.getMessage());
+    }
+    if (Scraper0Exception.TIMEOUT.equals(e.getCode())) {
+      // The write may have reached the portal; retrying returns the stored outcome.
+      return new DownstreamServiceException(
+          HttpStatus.GATEWAY_TIMEOUT, "PORTAL_TIMEOUT", MSG_RUNNING);
+    }
+    return new DownstreamServiceException(HttpStatus.BAD_GATEWAY, "DOWNSTREAM_ERROR", e.describe());
   }
 
   private void validateType(String type) {
@@ -137,10 +215,19 @@ public class PortalComplaintReportingService {
             .findById(issueId)
             .orElseThrow(() -> new IllegalArgumentException("Issue not found: " + issueId));
 
+    // A replayed write (same idempotency key) returns the tracking id stored the first time.
+    String tracking = String.valueOf(trackingId);
+    boolean alreadyStored =
+        govPortalRepository.findByIssueEntityId(issueId).stream()
+            .anyMatch(existing -> tracking.equals(existing.getTrackingId()));
+    if (alreadyStored) {
+      return;
+    }
+
     GovPortalEntity portalIssue =
         GovPortalEntity.builder()
             .issueEntity(issue)
-            .trackingId(String.valueOf(trackingId))
+            .trackingId(tracking)
             .portal(resolvePortal(request.getContext().getPortal()))
             .url(resolvePortalUrl())
             .status(INITIAL_PORTAL_STATUS)
