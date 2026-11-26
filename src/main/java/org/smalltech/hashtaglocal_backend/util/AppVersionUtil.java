@@ -21,4 +21,31 @@ public final class AppVersionUtil {
     }
     return trimmed;
   }
+
+  /**
+   * Orders versions such as "2.4.1" by their numeric parts, so "2.10.0" is newer than "2.9.3". A
+   * missing part counts as 0 and a part's leading digits are its number ("1-beta" is 1); a part
+   * with no digits counts as -1. Strings whose numbers tie ("2.4" and "2.4.0") are ordered
+   * alphabetically, so the order is total and consistent with equals.
+   */
+  public static int compare(String a, String b) {
+    String[] pa = a.split("\\.");
+    String[] pb = b.split("\\.");
+    for (int i = 0; i < Math.max(pa.length, pb.length); i++) {
+      long na = i < pa.length ? leadingNumber(pa[i]) : 0;
+      long nb = i < pb.length ? leadingNumber(pb[i]) : 0;
+      if (na != nb) {
+        return Long.compare(na, nb);
+      }
+    }
+    return a.compareTo(b);
+  }
+
+  private static long leadingNumber(String part) {
+    int end = 0;
+    while (end < part.length() && end < 18 && Character.isDigit(part.charAt(end))) {
+      end++;
+    }
+    return end == 0 ? -1 : Long.parseLong(part.substring(0, end));
+  }
 }
