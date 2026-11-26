@@ -15,15 +15,11 @@ public class AuthRefreshService {
 
   private final UserAuthSessionRepository userAuthSessionRepository;
   private final TokenService tokenService;
-  private final AppVersionTracker appVersionTracker;
 
   public AuthRefreshService(
-      UserAuthSessionRepository userAuthSessionRepository,
-      TokenService tokenService,
-      AppVersionTracker appVersionTracker) {
+      UserAuthSessionRepository userAuthSessionRepository, TokenService tokenService) {
     this.userAuthSessionRepository = userAuthSessionRepository;
     this.tokenService = tokenService;
-    this.appVersionTracker = appVersionTracker;
   }
 
   public AuthTokenResponseData refreshTokens(
@@ -72,8 +68,6 @@ public class AuthRefreshService {
     if (cleanVersion != null && !cleanVersion.equals(session.getAppVersion())) {
       session.setAppVersion(cleanVersion);
     }
-    // Log the version for this week's metrics, on both the reuse and the rotate path below.
-    appVersionTracker.record(session);
 
     Long accessExpiry = session.getAccessTokenExpiryTs();
     if (accessExpiry != null && accessExpiry > currentEpochSeconds) {

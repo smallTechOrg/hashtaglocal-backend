@@ -6,6 +6,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import java.time.LocalDate;
 import java.time.temporal.IsoFields;
 import lombok.RequiredArgsConstructor;
+import org.smalltech.hashtaglocal_backend.dto.AppVersionsResponse;
 import org.smalltech.hashtaglocal_backend.dto.MetricDetailResponse;
 import org.smalltech.hashtaglocal_backend.dto.OpsSummaryResponse;
 import org.smalltech.hashtaglocal_backend.dto.WeeklyMetricsResponse;
@@ -63,13 +64,26 @@ public class MetricsAdminController {
       summary = "Metric drill-down",
       description =
           "Returns the individual users/issues behind a computed metric for a specific week. "
-              + "Supported metrics: NEW_USERS, ACTIVE_USERS, ISSUES_REPORTED, ISSUES_VERIFIED, QUIZ_USERS, "
-              + "OUTDATED_USERS (app 2+ releases behind the latest).")
+              + "Supported metrics: NEW_USERS, ACTIVE_USERS, ISSUES_REPORTED, ISSUES_VERIFIED, QUIZ_USERS.")
   public ResponseEntity<NewAPIResponse<MetricDetailResponse>> getMetricDetail(
       @RequestParam String metric, @RequestParam int weekYear, @RequestParam int weekNumber) {
 
     MetricDetailResponse response = metricsService.getMetricDetail(metric, weekYear, weekNumber);
     return ResponseEntity.ok(NewAPIResponse.<MetricDetailResponse>builder().data(response).build());
+  }
+
+  @GetMapping("/app-versions")
+  @Operation(
+      summary = "App versions",
+      description =
+          "Returns the app version each user is on now: a count per version (newest first) and the"
+              + " list of users. A user on several devices counts once, on the newest version."
+              + " Only users whose app has reported a version are included.")
+  public ResponseEntity<NewAPIResponse<AppVersionsResponse>> getAppVersions() {
+    return ResponseEntity.ok(
+        NewAPIResponse.<AppVersionsResponse>builder()
+            .data(metricsService.getAppVersions())
+            .build());
   }
 
   @GetMapping("/ops-summary")

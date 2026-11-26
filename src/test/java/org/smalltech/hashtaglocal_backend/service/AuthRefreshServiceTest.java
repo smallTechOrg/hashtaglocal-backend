@@ -22,8 +22,6 @@ class AuthRefreshServiceTest {
 
   @Mock private TokenService tokenService;
 
-  @Mock private AppVersionTracker appVersionTracker;
-
   private AuthRefreshService authRefreshService;
 
   private static final String REFRESH_TOKEN = "test-refresh-token";
@@ -35,8 +33,7 @@ class AuthRefreshServiceTest {
 
   @BeforeEach
   void setUp() {
-    authRefreshService =
-        new AuthRefreshService(userAuthSessionRepository, tokenService, appVersionTracker);
+    authRefreshService = new AuthRefreshService(userAuthSessionRepository, tokenService);
   }
 
   private UserAuthSessionEntity createActiveSession(
@@ -114,15 +111,6 @@ class AuthRefreshServiceTest {
     authRefreshService.refreshTokens(REFRESH_TOKEN, null, null, "1.2.3");
 
     assertEquals("1.2.3", session.getAppVersion());
-  }
-
-  @Test
-  void testRefreshTokens_LogsTheSessionForWeeklyVersionMetrics() {
-    UserAuthSessionEntity session = sessionWithActiveAccessToken();
-
-    authRefreshService.refreshTokens(REFRESH_TOKEN, null, null, "1.2.3");
-
-    verify(appVersionTracker).record(session);
   }
 
   @Test
