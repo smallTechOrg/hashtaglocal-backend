@@ -44,6 +44,9 @@ public interface EventRepository extends JpaRepository<EventEntity, Long> {
    */
   boolean existsByNameAndStartTime(String name, LocalDateTime startTime);
 
+  /** Returns {@code true} if an event with this scraper0 item id was already imported. */
+  boolean existsByExternalId(String externalId);
+
   /**
    * Returns events that have NO approval row at all. Such events are invisible to both the public
    * API (which needs APPROVED) and the ops review queue (which queries by approval status), so they

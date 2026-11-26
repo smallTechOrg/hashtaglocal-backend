@@ -1,8 +1,14 @@
 package org.smalltech.hashtaglocal_backend.service;
 
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -15,18 +21,22 @@ import org.smalltech.hashtaglocal_backend.model.EventPortalModel;
 import org.smalltech.hashtaglocal_backend.model.EventTypeModel;
 import org.smalltech.hashtaglocal_backend.repository.EventApprovalRepository;
 import org.smalltech.hashtaglocal_backend.repository.EventRepository;
+import org.smalltech.hashtaglocal_backend.service.scraper0.Scraper0Models.EventData;
+import org.smalltech.hashtaglocal_backend.service.scraper0.Scraper0Models.Item;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Handles importing events from the scrape service JSON response.
+ * Imports scraped events: the items of a scraper0 event source ({@link #importItems}) and the
+ * legacy scrape payload of {@code POST /api/v1/events/ingest} ({@link #importFromScrapeResponse}).
  *
  * <p>Key behaviours:
  *
  * <ul>
- *   <li>Events with a blank {@code name} or null {@code startTime} are silently skipped.
- *   <li>Deduplication: if an event with the same {@code name} + {@code startTime} already exists in
- *       the database it is skipped — no duplicates are inserted.
+ *   <li>Events with a blank {@code name}, no {@code startTime} or no image are skipped; the image
+ *       is copied to GCS, and every new event gets a PENDING approval row.
+ *   <li>Deduplication: a scraper0 item whose id is already in {@code external_id} is skipped, and
+ *       so is an event with the same {@code name} + {@code startTime} as an existing row.
  *   <li>Geocoding (address → lat/lng) is NOT performed here. The {@code location_id} field is left
  *       null; only the raw {@code address} string is saved. Run {@code POST /admin/events/geocode}
  *       afterwards.
@@ -54,11 +64,25 @@ public class EventImportService {
   private final EventImageService eventImageService;
   private final EventApprovalRepository eventApprovalRepository;
 
+  /** One event to import, from either input shape. */
+  private record Candidate(
+      String name,
+      String organisation,
+      EventPortalModel portal,
+      EventTypeModel type,
+      LocalDateTime startTime,
+      LocalDateTime endTime,
+      String address,
+      String link,
+      String image,
+      String externalId,
+      String sourceSiteId) {}
+
   /**
-   * Processes a list of events from the scrape service, deduplicates against the database, and
-   * bulk-saves all new events in a single transaction.
+   * Processes a list of events in the legacy scrape payload ({@code POST /api/v1/events/ingest}),
+   * deduplicates against the database, and bulk-saves all new events in a single transaction.
    *
-   * @param scrapeEvents raw event DTOs from the scrape service response
+   * @param scrapeEvents raw event DTOs in the legacy scrape response shape
    * @return the number of events actually saved (duplicates excluded)
    */
   @Transactional
@@ -66,47 +90,143 @@ public class EventImportService {
     if (scrapeEvents == null || scrapeEvents.isEmpty()) {
       return 0;
     }
+    List<Candidate> candidates = new ArrayList<>();
+    for (ScrapeEventDTO dto : scrapeEvents) {
+      if (!hasRequiredFields(dto.getName(), dto.getStartTime(), dto.getImage())) {
+        continue;
+      }
+      // fromString() returns null for portals it doesn't recognise. portal is a NOT NULL
+      // column, and the batch is bulk-inserted in one transaction, so letting a null portal
+      // through here would roll back — and silently drop — the entire import batch.
+      EventPortalModel portal = EventPortalModel.fromString(dto.getPortal());
+      if (portal == null) {
+        log.warn("Skipping event '{}' — unrecognized portal '{}'", dto.getName(), dto.getPortal());
+        continue;
+      }
+      candidates.add(
+          new Candidate(
+              dto.getName(),
+              dto.getOrganisation(),
+              portal,
+              parseEventType(dto.getType()),
+              dto.getStartTime(),
+              dto.getEndTime(),
+              dto.getAddress(),
+              dto.getLink(),
+              dto.getImage(),
+              null,
+              null));
+    }
+    return saveNew(candidates, scrapeEvents.size());
+  }
 
+  /**
+   * Imports the items a scraper0 read returned for one event source. Insert only: an item whose
+   * {@code id} is already in {@code events.external_id} is skipped (updates are left for later), as
+   * is an older row with the same name and start time.
+   *
+   * <p>The portal is the enum value of the three original sites, otherwise {@link
+   * EventPortalModel#WEB}; {@code source_site_id} keeps the site. The type is the item's {@code
+   * category}, {@code OTHER} when it is not an {@link EventTypeModel}.
+   *
+   * @return the number of events saved
+   */
+  @Transactional
+  public int importItems(String siteId, List<Item> items) {
+    if (items == null || items.isEmpty()) {
+      return 0;
+    }
+    EventPortalModel portal = EventPortalModel.fromSiteId(siteId);
+    Set<String> seenIds = new HashSet<>();
+    List<Candidate> candidates = new ArrayList<>();
+    for (Item item : items) {
+      EventData d = item.data();
+      if (d == null || item.id() == null || item.id().isBlank()) {
+        log.debug("Skipping scraper0 item without id or data from {}", siteId);
+        continue;
+      }
+      if (!seenIds.add(item.id())) {
+        continue;
+      }
+      LocalDateTime start = parseTime(d.startTime());
+      if (!hasRequiredFields(d.name(), start, d.image())) {
+        continue;
+      }
+      String link = firstNonBlank(d.link(), d.sourceUrl());
+      if (link == null) {
+        log.debug("Skipping event '{}' — no link", d.name());
+        continue;
+      }
+      String address = d.address();
+      if (address == null || address.isBlank()) {
+        if (!Boolean.TRUE.equals(d.isOnline())) {
+          log.debug("Skipping event '{}' — no address", d.name());
+          continue;
+        }
+        address = "Online";
+      }
+      if (eventRepository.existsByExternalId(item.id())) {
+        log.debug("Skipping already imported item {} ('{}')", item.id(), d.name());
+        continue;
+      }
+      candidates.add(
+          new Candidate(
+              d.name(),
+              d.organisation(),
+              portal,
+              parseEventType(d.category()),
+              start,
+              parseTime(d.endTime()),
+              address,
+              link,
+              d.image(),
+              item.id(),
+              siteId));
+    }
+    return saveNew(candidates, items.size());
+  }
+
+  private boolean hasRequiredFields(String name, LocalDateTime startTime, String image) {
+    if (name == null || name.isBlank()) {
+      log.debug("Skipping event with blank name");
+      return false;
+    }
+    if (startTime == null) {
+      log.debug("Skipping event '{}' — startTime is null", name);
+      return false;
+    }
+    if (image == null || image.isBlank()) {
+      log.debug("Skipping event '{}' — image is null or blank", name);
+      return false;
+    }
+    return true;
+  }
+
+  /**
+   * Shared tail of both imports: the legacy name + start time dedupe, the image copy to GCS, one
+   * bulk save, and a PENDING approval row per saved event.
+   */
+  private int saveNew(List<Candidate> candidates, int received) {
     List<EventEntity> toSave = new ArrayList<>();
 
-    for (ScrapeEventDTO dto : scrapeEvents) {
+    for (Candidate c : candidates) {
       try {
-        if (dto.getName() == null || dto.getName().isBlank()) {
-          log.debug("Skipping event with blank name");
-          continue;
-        }
-        if (dto.getStartTime() == null) {
-          log.debug("Skipping event '{}' — startTime is null", dto.getName());
-          continue;
-        }
-        if (dto.getImage() == null || dto.getImage().isBlank()) {
-          log.debug("Skipping event '{}' — image is null or blank", dto.getName());
-          continue;
-        }
-        // fromString() returns null for portals it doesn't recognise. portal is a NOT NULL
-        // column, and toSave is bulk-inserted in one transaction, so letting a null portal
-        // through here would roll back — and silently drop — the entire import batch.
-        if (EventPortalModel.fromString(dto.getPortal()) == null) {
-          log.warn(
-              "Skipping event '{}' — unrecognized portal '{}'", dto.getName(), dto.getPortal());
-          continue;
-        }
-        if (eventRepository.existsByNameAndStartTime(dto.getName(), dto.getStartTime())) {
-          log.debug("Skipping duplicate event '{}' at {}", dto.getName(), dto.getStartTime());
+        if (eventRepository.existsByNameAndStartTime(c.name(), c.startTime())) {
+          log.debug("Skipping duplicate event '{}' at {}", c.name(), c.startTime());
           continue;
         }
 
         // Download the CDN image, upload to GCS, and persist a MediaEntity row.
         // Skip the event if the image can't be stored — an event without a valid image is unusable.
-        MediaEntity media = eventImageService.downloadAndStore(dto.getImage());
+        MediaEntity media = eventImageService.downloadAndStore(c.image());
         if (media == null) {
-          log.debug("Skipping event '{}' — image download/upload failed", dto.getName());
+          log.debug("Skipping event '{}' — image download/upload failed", c.name());
           continue;
         }
 
-        toSave.add(toEntity(dto, media));
+        toSave.add(toEntity(c, media));
       } catch (Exception e) {
-        log.warn("Skipping event '{}' due to error: {}", dto.getName(), e.getMessage());
+        log.warn("Skipping event '{}' due to error: {}", c.name(), e.getMessage());
       }
     }
 
@@ -128,23 +248,55 @@ public class EventImportService {
     log.info(
         "Imported {} new events ({} received, {} skipped)",
         toSave.size(),
-        scrapeEvents.size(),
-        scrapeEvents.size() - toSave.size());
+        received,
+        received - toSave.size());
     return toSave.size();
   }
 
-  private EventEntity toEntity(ScrapeEventDTO dto, MediaEntity media) {
+  private EventEntity toEntity(Candidate c, MediaEntity media) {
     return EventEntity.builder()
-        .name(dto.getName())
-        .organisation(dto.getOrganisation())
-        .portal(EventPortalModel.fromString(dto.getPortal()))
-        .type(parseEventType(dto.getType()))
-        .startTime(dto.getStartTime())
-        .endTime(dto.getEndTime())
-        .address(dto.getAddress())
-        .link(stripUtmParams(dto.getLink()))
+        .name(c.name())
+        .organisation(c.organisation())
+        .portal(c.portal())
+        .type(c.type())
+        .startTime(c.startTime())
+        .endTime(c.endTime())
+        .address(c.address())
+        .link(stripUtmParams(c.link()))
         .media(media)
+        .externalId(c.externalId())
+        .sourceSiteId(c.sourceSiteId())
         .build();
+  }
+
+  /**
+   * scraper0 times are ISO-8601 UTC ({@code 2026-03-14T04:30:00.000Z}). They are stored as UTC
+   * wall-clock {@link LocalDateTime}, as the legacy import did (Jackson reads a {@code Z} time as
+   * UTC), so the name + start time dedupe matches older rows.
+   */
+  static LocalDateTime parseTime(String raw) {
+    if (raw == null || raw.isBlank()) {
+      return null;
+    }
+    String s = raw.trim();
+    try {
+      return OffsetDateTime.parse(s).withOffsetSameInstant(ZoneOffset.UTC).toLocalDateTime();
+    } catch (DateTimeParseException ignored) {
+      // No offset: take it as UTC already.
+    }
+    try {
+      return LocalDateTime.parse(s);
+    } catch (DateTimeParseException e) {
+      log.debug("Unparseable time '{}'", raw);
+      return null;
+    }
+  }
+
+  private static String firstNonBlank(String a, String b) {
+    if (a != null && !a.isBlank()) {
+      return a;
+    }
+    return b != null && !b.isBlank() ? b : null;
   }
 
   private String stripUtmParams(String link) {

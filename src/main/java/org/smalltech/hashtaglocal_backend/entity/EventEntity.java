@@ -88,6 +88,17 @@ public class EventEntity {
   private String link;
 
   /**
+   * The scraper0 item id ({@code itm_…}) of a scraped event; null for older rows and events created
+   * in the ops portal. Unique where not null (index in db/migration), so an item is imported once.
+   */
+  @Column(name = "external_id", length = 64)
+  private String externalId;
+
+  /** The scraper0 {@code site_id} the event was read from (e.g. {@code teameverest-ngo}). */
+  @Column(name = "source_site_id")
+  private String sourceSiteId;
+
+  /**
    * Flexible JSONB column for extra fields that vary per organisation or platform. Examples: {
    * "city": "Bangalore", "entry_fee": "free", "registration_required": true }
    */

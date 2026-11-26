@@ -1,22 +1,29 @@
 package org.smalltech.hashtaglocal_backend.integration;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.*;
 
-import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.smalltech.hashtaglocal_backend.dto.ScrapeEventDTO;
+import org.smalltech.hashtaglocal_backend.entity.EventSourceEntity;
 import org.smalltech.hashtaglocal_backend.entity.MediaEntity;
 import org.smalltech.hashtaglocal_backend.job.EventIngestionCronJob;
+import org.smalltech.hashtaglocal_backend.model.EventPortalModel;
 import org.smalltech.hashtaglocal_backend.model.MediaTypeModel;
+import org.smalltech.hashtaglocal_backend.repository.EventApprovalRepository;
 import org.smalltech.hashtaglocal_backend.repository.EventRepository;
+import org.smalltech.hashtaglocal_backend.repository.EventSourceRepository;
 import org.smalltech.hashtaglocal_backend.repository.MediaRepository;
 import org.smalltech.hashtaglocal_backend.service.EventGeocodingService;
 import org.smalltech.hashtaglocal_backend.service.EventImageService;
-import org.smalltech.hashtaglocal_backend.service.ScrapeApiClient;
+import org.smalltech.hashtaglocal_backend.service.scraper0.Scraper0Client;
+import org.smalltech.hashtaglocal_backend.service.scraper0.Scraper0Models.EventData;
+import org.smalltech.hashtaglocal_backend.service.scraper0.Scraper0Models.Item;
+import org.smalltech.hashtaglocal_backend.service.scraper0.Scraper0Models.ReadResult;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
@@ -28,8 +35,8 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
  * <p>Calls the cron job directly (no HTTP) to verify the full pipeline:
  *
  * <ol>
- *   <li>Fetch events from {@link ScrapeApiClient} (mocked)
- *   <li>Import new events into the database
+ *   <li>Read each enabled event source through {@link Scraper0Client} (mocked)
+ *   <li>Import new events into the database and record the run on the source
  *   <li>Geocode addresses via {@link EventGeocodingService} (mocked — no Google Maps calls)
  * </ol>
  */
@@ -40,10 +47,12 @@ class EventIngestionIntegrationTest {
 
   @Autowired private EventIngestionCronJob eventIngestionCronJob;
   @Autowired private EventRepository eventRepository;
+  @Autowired private EventApprovalRepository eventApprovalRepository;
+  @Autowired private EventSourceRepository eventSourceRepository;
   @Autowired private MediaRepository mediaRepository;
 
-  // Mocked so we control what raw events the pipeline receives
-  @MockitoBean private ScrapeApiClient scrapeApiClient;
+  // Mocked so we control what each source returns
+  @MockitoBean private Scraper0Client scraper0Client;
 
   // Mocked to avoid hitting the real Google Maps API
   @MockitoBean private EventGeocodingService eventGeocodingService;
@@ -51,10 +60,18 @@ class EventIngestionIntegrationTest {
   // Mocked to avoid hitting external image URLs and GCS
   @MockitoBean private EventImageService eventImageService;
 
+  private EventSourceEntity source;
+
   @BeforeEach
   void setUp() {
+    eventApprovalRepository.deleteAll();
     eventRepository.deleteAll();
     mediaRepository.deleteAll();
+    eventSourceRepository.deleteAll();
+    source =
+        eventSourceRepository.save(
+            EventSourceEntity.builder().name("Team Everest").siteId("teameverest-ngo").build());
+    when(scraper0Client.isConfigured()).thenReturn(true);
     when(eventGeocodingService.run())
         .thenReturn(new EventGeocodingService.GeocodingResult(0, 0, 0, 0));
     MediaEntity savedMedia =
@@ -66,37 +83,69 @@ class EventIngestionIntegrationTest {
     when(eventImageService.downloadAndStore(any())).thenReturn(savedMedia);
   }
 
-  private ScrapeEventDTO event(String name, LocalDateTime startTime) {
-    return ScrapeEventDTO.builder()
-        .name(name)
-        .organisation("Test Org")
-        .portal("Team everest")
-        .type("TREKANDPLOG")
-        .startTime(startTime)
-        .address("Lalbagh Main gate, Bengaluru")
-        .link("https://example.com/event")
-        .image("https://example.com/image.jpg")
-        .build();
+  private Item item(String id, String name, String startTime) {
+    return new Item(
+        id,
+        "2026-03-01T00:00:00Z",
+        new EventData(
+            name,
+            startTime,
+            null,
+            "Lalbagh Main gate, Bengaluru",
+            "https://example.com/event/" + id,
+            "Test Org",
+            "https://example.com/image.jpg",
+            "TREKANDPLOG",
+            null,
+            null,
+            null,
+            false,
+            null,
+            null));
+  }
+
+  private void scraperReturns(Item... items) {
+    when(scraper0Client.readItems(
+            eq("teameverest-ngo"), eq("fetch_events"), any(Map.class), anyInt()))
+        .thenReturn(
+            new ReadResult(
+                "teameverest-ngo",
+                "fetch_events",
+                1,
+                List.of(items),
+                true,
+                null,
+                null,
+                "ok",
+                null));
   }
 
   @Test
-  @DisplayName("Imports events from scrape service and persists them to the database")
+  @DisplayName("Imports items from the source, stores external_id and records the run")
   void importsEventsAndPersistsToDB() {
-    LocalDateTime t1 = LocalDateTime.of(2026, 4, 1, 9, 0);
-    LocalDateTime t2 = LocalDateTime.of(2026, 4, 2, 9, 0);
-    when(scrapeApiClient.fetchEvents())
-        .thenReturn(List.of(event("Trek and Plog", t1), event("Beach Cleanup", t2)));
+    scraperReturns(
+        item("itm_1", "Trek and Plog", "2026-04-01T03:30:00.000Z"),
+        item("itm_2", "Beach Cleanup", "2026-04-02T03:30:00.000Z"));
 
     eventIngestionCronJob.run();
 
     assertEquals(2, eventRepository.count());
+    assertEquals(2, eventApprovalRepository.count());
+    var saved = eventRepository.findAll();
+    assertTrue(saved.stream().allMatch(e -> e.getPortal() == EventPortalModel.TEAMEVEREST));
+    assertTrue(saved.stream().allMatch(e -> "teameverest-ngo".equals(e.getSourceSiteId())));
+    assertTrue(saved.stream().anyMatch(e -> "itm_1".equals(e.getExternalId())));
+    EventSourceEntity recorded = eventSourceRepository.findById(source.getId()).orElseThrow();
+    assertEquals("ok", recorded.getLastStatus());
+    assertEquals(2, recorded.getLastItemCount());
+    assertEquals(2, recorded.getLastImportedCount());
+    assertNotNull(recorded.getLastRunAt());
   }
 
   @Test
   @DisplayName("Geocode job is called exactly once per pipeline run")
   void geocodeJobIsCalledOncePerRun() {
-    when(scrapeApiClient.fetchEvents())
-        .thenReturn(List.of(event("Trek and Plog", LocalDateTime.of(2026, 4, 1, 9, 0))));
+    scraperReturns(item("itm_1", "Trek and Plog", "2026-04-01T03:30:00.000Z"));
 
     eventIngestionCronJob.run();
 
@@ -104,24 +153,23 @@ class EventIngestionIntegrationTest {
   }
 
   @Test
-  @DisplayName("Duplicate events are not re-inserted on repeated pipeline runs")
+  @DisplayName("Items already imported (same external_id) are not re-inserted on repeated runs")
   void deduplicatesOnRepeatedRuns() {
-    ScrapeEventDTO trek = event("Trek and Plog", LocalDateTime.of(2026, 4, 1, 9, 0));
-    when(scrapeApiClient.fetchEvents()).thenReturn(List.of(trek));
+    scraperReturns(item("itm_1", "Trek and Plog", "2026-04-01T03:30:00.000Z"));
 
-    // First run — persists 1 event
     eventIngestionCronJob.run();
     assertEquals(1, eventRepository.count());
 
-    // Second run — same event, must be deduplicated
     eventIngestionCronJob.run();
     assertEquals(1, eventRepository.count(), "Duplicate must not be re-inserted");
+    assertEquals(
+        0, eventSourceRepository.findById(source.getId()).orElseThrow().getLastImportedCount());
   }
 
   @Test
-  @DisplayName("No events are imported and geocode is skipped when scrape returns empty")
+  @DisplayName("No events are imported and geocode is skipped when the source returns nothing")
   void skipsImportAndGeocodeWhenScrapeReturnsEmpty() {
-    when(scrapeApiClient.fetchEvents()).thenReturn(List.of());
+    scraperReturns();
 
     eventIngestionCronJob.run();
 
@@ -130,18 +178,16 @@ class EventIngestionIntegrationTest {
   }
 
   @Test
-  @DisplayName("New events added in a subsequent run are picked up and imported")
+  @DisplayName("New items added in a subsequent run are picked up and imported")
   void picksUpNewEventsOnSubsequentRun() {
-    ScrapeEventDTO trek = event("Trek and Plog", LocalDateTime.of(2026, 4, 1, 9, 0));
-    ScrapeEventDTO beach = event("Beach Cleanup", LocalDateTime.of(2026, 4, 2, 9, 0));
+    Item trek = item("itm_1", "Trek and Plog", "2026-04-01T03:30:00.000Z");
+    Item beach = item("itm_2", "Beach Cleanup", "2026-04-02T03:30:00.000Z");
 
-    // First run: 1 event
-    when(scrapeApiClient.fetchEvents()).thenReturn(List.of(trek));
+    scraperReturns(trek);
     eventIngestionCronJob.run();
     assertEquals(1, eventRepository.count());
 
-    // Second run: same + 1 new
-    when(scrapeApiClient.fetchEvents()).thenReturn(List.of(trek, beach));
+    scraperReturns(trek, beach);
     eventIngestionCronJob.run();
     assertEquals(2, eventRepository.count(), "Only the new event should be added");
   }
