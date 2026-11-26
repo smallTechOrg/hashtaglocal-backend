@@ -80,6 +80,16 @@ public interface UserAuthSessionRepository extends JpaRepository<UserAuthSession
   /** First session ever created for a user — used to determine signup platform. */
   Optional<UserAuthSessionEntity> findFirstByUser_IdOrderByCreatedAtAsc(Long userId);
 
+  /**
+   * Sessions whose app reported a version, with the user and their locality — for the app version
+   * list on the Ops Dashboard.
+   */
+  @Query(
+      "SELECT s FROM UserAuthSessionEntity s JOIN FETCH s.user u "
+          + "LEFT JOIN FETCH u.location l LEFT JOIN FETCH l.locality "
+          + "WHERE s.appVersion IS NOT NULL")
+  List<UserAuthSessionEntity> findAllWithAppVersion();
+
   // ---- Session cap ----
 
   /** Returns active session IDs for a user, oldest first — used to enforce the per-user cap. */

@@ -27,11 +27,4 @@ public class WeeklyMetricPoint {
   private long issuesVerified;
   private double dailyAvgQuiz;
   private long uniqueQuizUsers;
-
-  // App version metrics: users whose app reported a version this week (login or token refresh).
-  // Null when there is no data for the week.
-  private String latestAppVersion;
-  private Integer onLatestVersionPct;
-  private Long outdatedUsers;
-  private Integer outdatedPct;
 }
