@@ -116,6 +116,9 @@ variables (`NAME`, with `NAME_STAGING` / `NAME_PRODUCTION` overrides); see [infr
 - **Background jobs** (event ingestion, weather bulletin, portal issues, session cleanup, feed moderation)
   run from Cloud Scheduler calling `POST /jobs/{name}`, not from in-process timers
   (`SCHEDULER_ENABLED=false` on Cloud Run). Locally the `@Scheduled` timers still run as before.
+- **Event ingestion and BBMP complaints** use the scraper0 v2 API (`SCRAPER0_BASE_URL`, `SCRAPER0_API_KEY`).
+  Ingestion reads every enabled row of `event_sources`, which admins manage under `/admin/event-sources`
+  (Ops Dashboard → Event sources). With no `SCRAPER0_BASE_URL`, both are off.
 - **Migrations** use Flyway (`src/main/resources/db/migration`, enabled with `FLYWAY_ENABLED=true`, which the
   deploy sets). See the [migration rules](src/main/resources/db/migration/README.md).
 - The older VM-based deployment is described in [infra/deployment.md](infra/deployment.md).

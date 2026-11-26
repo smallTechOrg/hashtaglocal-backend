@@ -61,7 +61,7 @@ Cloud Scheduler --(cron, OIDC token)--> POST /jobs/{name} --> the job runs insid
 
 | Scheduler job (`<service>-<name>`) | Endpoint | Cron variable (Spring cron) | Default | Off when |
 |---|---|---|---|---|
-| `event-ingestion` | `/jobs/event-ingestion` | `EVENTS_SCRAPE_CRON` | `0 */5 * * * *` | cron is `-` |
+| `event-ingestion` | `/jobs/event-ingestion` | `EVENTS_SCRAPE_CRON` | `0 */30 * * * *` | cron is `-` or `SCRAPER0_BASE_URL` empty |
 | `bulletin-weather` | `/jobs/bulletin-weather` | `BULLETIN_WEATHER_CRON` | `0 0 8 * * *` | `BULLETIN_ENABLED=false` |
 | `portal-issue-tracking` | `/jobs/portal-issue-tracking` | `PORTALISSUE_CRON` | `0 0 1 * * *` | `PORTALISSUE_ENABLED=false` |
 | `session-cleanup` | `/jobs/session-cleanup` | `AUTH_SESSION_CLEANUP_CRON` | `0 0 3 * * *` | cron is `-` |
@@ -132,7 +132,8 @@ gcloud scheduler jobs run hashtaglocal-backend-staging-session-cleanup --locatio
 
    Optional credentials (the app default is empty or off): `FIREBASE_KEY_JSON` (the whole `firebase-key.json`;
    without it push notifications are off), `GOOGLE_MAPS_API_KEY`, `GROQ_API_KEY`, `GEMINI_API_KEY`,
-   `SPRING_MAIL_PASSWORD`, `GOOGLE_OAUTH_CLIENT_SECRET`, `PORTALISSUE_AUTH_USERNAME`, `PORTALISSUE_AUTH_PASSWORD`.
+   `SPRING_MAIL_PASSWORD`, `GOOGLE_OAUTH_CLIENT_SECRET`, `PORTALISSUE_AUTH_USERNAME`, `PORTALISSUE_AUTH_PASSWORD`,
+   `SCRAPER0_API_KEY` (sent as `X-API-Key` to scraper0).
    A missing `GEMINI_API_KEY` means feed posts go to human review instead of auto-publishing.
    `AI_CONFIG_ENCRYPTION_KEY` (`openssl rand -base64 32`, a different value per environment) encrypts the
    quiz AI key saved from the Ops Dashboard; without it the dashboard cannot save a key and quiz generation
@@ -168,10 +169,9 @@ gcloud scheduler jobs run hashtaglocal-backend-staging-session-cleanup --locatio
    no variable keeps the app default. `APP_FORWARDED_PREFIX` defaults to `/local` (production) and
    `/localstaging` (staging).
 
-   `APP_SELF_BASE_URL`, `APP_FORWARDED_PREFIX`, `EVENTS_SCRAPE_URL`, `EVENTS_SCRAPE_CRON`,
-   `PORTALISSUE_ENABLED`, `PORTALISSUE_CRON`, `PORTALISSUE_SCRAPE_URL`, `PORTALISSUE_REPORT_SCRAPE_URL`
-   (defaults to `PORTALISSUE_SCRAPE_URL`), `PORTALISSUE_REPORT_CONNECT_TIMEOUT_SECONDS`,
-   `PORTALISSUE_REPORT_READ_TIMEOUT_SECONDS`, `GOOGLE_STORAGE_BUCKET_NAME`, `GOOGLE_OAUTH_CLIENT_ID`,
+   `APP_FORWARDED_PREFIX`, `SCRAPER0_BASE_URL` (scraper0 v2 API for event sources and BBMP; empty =
+   both off), `SCRAPER0_READ_TIMEOUT_S`, `SCRAPER0_FRESHNESS_HOURS`, `EVENTS_SCRAPE_CRON`,
+   `PORTALISSUE_ENABLED`, `PORTALISSUE_CRON`, `GOOGLE_STORAGE_BUCKET_NAME`, `GOOGLE_OAUTH_CLIENT_ID`,
    `GOOGLE_OAUTH_REDIRECT_URI`, `APPLE_BUNDLE_ID`, `GEONAMES_USERNAME`,
    `AUTH_ACCESS_TOKEN_EXPIRY_SECONDS`, `AUTH_REFRESH_TOKEN_EXPIRY_SECONDS`, `AUTH_SESSION_CLEANUP_CRON`,
    `ACCOUNT_DELETION_ADMIN_EMAIL`, `ACCOUNT_DELETION_FROM_EMAIL`, `SPRING_MAIL_HOST`, `SPRING_MAIL_PORT`,

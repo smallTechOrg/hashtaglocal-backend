@@ -275,9 +275,9 @@ is enforced in `FeedService.create(...)`, not the controller, so every code path
 
 ## 6. Link scraping pipeline
 
-Reuses the existing external scrape service pattern (`ScrapeApiClient`,
-`PortalIssueScrapeClient`, `events.scrape.url`) and `RestClient`/timeout config
-already in `application.yaml`.
+Reuses the existing outbound HTTP pattern (a dedicated client with its own
+timeouts, as `Scraper0Client` does for event sources and the BBMP portal) and the
+`RestClient`/timeout config already in `application.yaml`.
 
 1. On `POST /feed` with a `link_url`: normalize → `canonicalUrl` on the content
    row. If a `link_cache` row for that `canonicalUrl` already has scraped fields,

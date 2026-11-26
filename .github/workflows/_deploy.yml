@@ -163,7 +163,7 @@ jobs:
             echo "::error::Missing required secrets in the GitHub Environment (or the _${SECRET_SUFFIX} form): ${missing[*]}"
             exit 1
           fi
-          for name in SPRING_DATASOURCE_URL SPRING_DATASOURCE_USERNAME SPRING_DATASOURCE_PASSWORD GOOGLE_MAPS_API_KEY GROQ_API_KEY GEMINI_API_KEY SPRING_MAIL_PASSWORD GOOGLE_OAUTH_CLIENT_SECRET PORTALISSUE_AUTH_USERNAME PORTALISSUE_AUTH_PASSWORD AI_CONFIG_ENCRYPTION_KEY; do
+          for name in SPRING_DATASOURCE_URL SPRING_DATASOURCE_USERNAME SPRING_DATASOURCE_PASSWORD GOOGLE_MAPS_API_KEY GROQ_API_KEY GEMINI_API_KEY SPRING_MAIL_PASSWORD GOOGLE_OAUTH_CLIENT_SECRET PORTALISSUE_AUTH_USERNAME PORTALISSUE_AUTH_PASSWORD AI_CONFIG_ENCRYPTION_KEY SCRAPER0_API_KEY; do
             value="$(var "$name")"
             [ -z "$value" ] || { echo "::add-mask::$value"; add "$name" "$value"; }
           done
@@ -198,10 +198,9 @@ jobs:
           # Plain settings. A name with no variable keeps the app's own default
           # from application.yaml.
           for name in \
-            APP_SELF_BASE_URL APP_FORWARDED_PREFIX \
-            EVENTS_SCRAPE_URL EVENTS_SCRAPE_CRON \
-            PORTALISSUE_ENABLED PORTALISSUE_CRON PORTALISSUE_SCRAPE_URL PORTALISSUE_REPORT_SCRAPE_URL \
-            PORTALISSUE_REPORT_CONNECT_TIMEOUT_SECONDS PORTALISSUE_REPORT_READ_TIMEOUT_SECONDS \
+            APP_FORWARDED_PREFIX \
+            SCRAPER0_BASE_URL SCRAPER0_READ_TIMEOUT_S SCRAPER0_FRESHNESS_HOURS EVENTS_SCRAPE_CRON \
+            PORTALISSUE_ENABLED PORTALISSUE_CRON \
             GOOGLE_STORAGE_BUCKET_NAME GOOGLE_OAUTH_CLIENT_ID GOOGLE_OAUTH_REDIRECT_URI \
             APPLE_BUNDLE_ID GEONAMES_USERNAME \
             AUTH_ACCESS_TOKEN_EXPIRY_SECONDS AUTH_REFRESH_TOKEN_EXPIRY_SECONDS AUTH_SESSION_CLEANUP_CRON \
@@ -221,10 +220,6 @@ jobs:
           # Defaults that suit the shared load balancer's routes.
           grep -q '^APP_FORWARDED_PREFIX:' "$env_file" \
             || add APP_FORWARDED_PREFIX "/local"   # both api.smalltech.in/local and api-staging.smalltech.in/local
-          # PORTALISSUE_REPORT_SCRAPE_URL follows PORTALISSUE_SCRAPE_URL unless set.
-          if ! grep -q '^PORTALISSUE_REPORT_SCRAPE_URL:' "$env_file" && [ -n "$(var PORTALISSUE_SCRAPE_URL)" ]; then
-            add PORTALISSUE_REPORT_SCRAPE_URL "$(var PORTALISSUE_SCRAPE_URL)"
-          fi
 
           # Every other secret of the GitHub Environment becomes an env var of the same name, so a new
           # setting only needs adding in GitHub (Settings -> Environments -> production).
