@@ -28,7 +28,6 @@ public class GetProfileService {
   private final IssueRepository issueRepository;
   private final IssueActionRepository issueActionRepository;
   private final KarmaService karmaService;
-  private static final String DEFAULT_HASHTAG = "#local";
 
   public GetProfileService(
       UserRepository userRepository,
@@ -83,9 +82,16 @@ public class GetProfileService {
     return Optional.of(mapToProfileModel(session.getUser(), latitude, longitude));
   }
 
-  /** Map UserEntity to UserProfileModel with optional location-based hashtag resolution */
+  /**
+   * Map UserEntity to UserProfileModel with location-based hashtag resolution.
+   *
+   * <p>The hashtag is the locality at the given lat/lng; without coordinates (e.g. the app's first
+   * launch, before GPS is ready) it is the locality of the user's last saved location. When neither
+   * is known it is null. We used to send a placeholder "#local" here, but clients treated it as a
+   * real hashtag and asked for its feed, which is a 404.
+   */
   private UserProfileModel mapToProfileModel(UserEntity user, Double latitude, Double longitude) {
-    String hashtag = DEFAULT_HASHTAG;
+    String hashtag = null;
 
     // If lat/lng provided, resolve locality for hashtag and persist user's location
     if (latitude != null && longitude != null) {
@@ -104,6 +110,10 @@ public class GetProfileService {
       userRepository.save(user);
     }
 
+    if (hashtag == null) {
+      hashtag = savedLocalityHashtag(user);
+    }
+
     // Award daily login karma (idempotent)
     karmaService.tryAwardDailyLoginKarma(user);
 
@@ -116,6 +126,15 @@ public class GetProfileService {
         .hashtag(hashtag)
         .userSummary(userSummary)
         .build();
+  }
+
+  /** Hashtag of the locality the user's saved location belongs to, or null if there is none. */
+  private static String savedLocalityHashtag(UserEntity user) {
+    Location location = user.getLocation();
+    if (location == null || location.getLocality() == null) {
+      return null;
+    }
+    return location.getLocality().getHashtag();
   }
 
   /** Build user summary with issue counts and karma */
