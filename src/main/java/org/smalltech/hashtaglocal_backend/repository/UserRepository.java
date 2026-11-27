@@ -27,6 +27,10 @@ public interface UserRepository extends JpaRepository<UserEntity, Long> {
 
   // ---- Metrics ----
 
+  /** All users with their saved location's locality — the base list for app version metrics. */
+  @Query("SELECT u FROM UserEntity u LEFT JOIN FETCH u.location l LEFT JOIN FETCH l.locality")
+  List<UserEntity> findAllWithLocality();
+
   @Query("SELECT COUNT(u) FROM UserEntity u WHERE u.createdAt BETWEEN :start AND :end")
   long countNewUsersBetween(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 

@@ -140,25 +140,37 @@ public class MetricsService {
   }
 
   /**
-   * The app version each user is on now. A user signed in on several devices counts once, on the
-   * newest version among them.
+   * The app version each user is on now, for every user. A user signed in on several devices counts
+   * once, on the newest version among them. Users whose app never reported a version (apps before
+   * 1.0.10, or no session left) are listed with a null version and counted as unknown; all
+   * percentages are shares of every user, so the unknown ones count as not on the latest version.
    */
   public AppVersionsResponse getAppVersions() {
     Map<Long, List<UserAuthSessionEntity>> sessionsByUser =
-        userAuthSessionRepository.findAllWithAppVersion().stream()
+        userAuthSessionRepository.findAllWithUser().stream()
             .collect(Collectors.groupingBy(s -> s.getUser().getId()));
 
     List<AppVersionsResponse.UserVersion> users = new ArrayList<>();
-    for (List<UserAuthSessionEntity> sessions : sessionsByUser.values()) {
-      UserAuthSessionEntity newest =
+    for (UserEntity user : userRepository.findAllWithLocality()) {
+      List<UserAuthSessionEntity> sessions = sessionsByUser.getOrDefault(user.getId(), List.of());
+      // The device on the newest reported version; if none reported, the most recently used one.
+      UserAuthSessionEntity current =
           sessions.stream()
+              .filter(s -> s.getAppVersion() != null)
               .max(
                   Comparator.comparing(
                           UserAuthSessionEntity::getAppVersion, AppVersionUtil::compare)
                       .thenComparing(
                           MetricsService::lastSeen,
                           Comparator.nullsFirst(Comparator.naturalOrder())))
-              .orElseThrow();
+              .or(
+                  () ->
+                      sessions.stream()
+                          .max(
+                              Comparator.comparing(
+                                  MetricsService::lastSeen,
+                                  Comparator.nullsFirst(Comparator.naturalOrder()))))
+              .orElse(null);
       LocalDateTime lastActive =
           sessions.stream()
               .map(MetricsService::lastSeen)
@@ -167,10 +179,13 @@ public class MetricsService {
               .orElse(null);
       users.add(
           AppVersionsResponse.UserVersion.builder()
-              .username(newest.getUser().getUsername())
-              .locality(localityName(newest.getUser()))
-              .platform(newest.getPlatform() != null ? newest.getPlatform().name() : null)
-              .appVersion(newest.getAppVersion())
+              .username(user.getUsername())
+              .locality(localityName(user))
+              .platform(
+                  current != null && current.getPlatform() != null
+                      ? current.getPlatform().name()
+                      : null)
+              .appVersion(current != null ? current.getAppVersion() : null)
               .lastActive(
                   lastActive != null
                       ? lastActive.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)
@@ -185,10 +200,12 @@ public class MetricsService {
 
     Map<String, Long> countByVersion =
         users.stream()
+            .filter(u -> u.getAppVersion() != null)
             .collect(
                 Collectors.groupingBy(
                     AppVersionsResponse.UserVersion::getAppVersion, Collectors.counting()));
     long total = users.size();
+    long unknown = users.stream().filter(u -> u.getAppVersion() == null).count();
     List<AppVersionsResponse.VersionCount> versions =
         countByVersion.entrySet().stream()
             .sorted(Map.Entry.comparingByKey((a, b) -> AppVersionUtil.compare(b, a)))
@@ -204,6 +221,8 @@ public class MetricsService {
     return AppVersionsResponse.builder()
         .latestVersion(versions.isEmpty() ? null : versions.get(0).getVersion())
         .totalUsers(total)
+        .unknownUsers(unknown)
+        .unknownPercent(total == 0 ? 0 : (int) Math.round(unknown * 100.0 / total))
         .versions(versions)
         .users(users)
         .build();

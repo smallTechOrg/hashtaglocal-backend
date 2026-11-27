@@ -15,13 +15,22 @@ public class AppVersionsResponse {
   /** Highest version any user is on; null when no app has reported a version. */
   private String latestVersion;
 
-  /** Users whose app has reported a version. */
+  /** Every user, including those whose app version is unknown. */
   private long totalUsers;
 
-  /** One entry per version, newest first. */
+  /**
+   * Users whose app never reported a version: apps before 1.0.10 (which don't send one) or users
+   * with no session left. Counted in totalUsers but not in versions.
+   */
+  private long unknownUsers;
+
+  /** Whole-number share of totalUsers with an unknown version. */
+  private int unknownPercent;
+
+  /** One entry per reported version, newest first. Percentages are shares of totalUsers. */
   private List<VersionCount> versions;
 
-  /** One entry per user, most recently active first. */
+  /** One entry per user, most recently active first; appVersion is null when unknown. */
   private List<UserVersion> users;
 
   @Data
@@ -44,7 +53,7 @@ public class AppVersionsResponse {
     private String platform;
     private String appVersion;
 
-    /** ISO date-time the user's app last talked to the server. */
+    /** ISO date-time the user's app last talked to the server; null when there is no session. */
     private String lastActive;
   }
 }

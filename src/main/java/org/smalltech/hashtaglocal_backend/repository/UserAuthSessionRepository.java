@@ -81,14 +81,11 @@ public interface UserAuthSessionRepository extends JpaRepository<UserAuthSession
   Optional<UserAuthSessionEntity> findFirstByUser_IdOrderByCreatedAtAsc(Long userId);
 
   /**
-   * Sessions whose app reported a version, with the user and their locality — for the app version
-   * list on the Ops Dashboard.
+   * Every session with its user, including sessions whose app never reported a version (apps before
+   * 1.0.10) — for the app version list on the Ops Dashboard.
    */
-  @Query(
-      "SELECT s FROM UserAuthSessionEntity s JOIN FETCH s.user u "
-          + "LEFT JOIN FETCH u.location l LEFT JOIN FETCH l.locality "
-          + "WHERE s.appVersion IS NOT NULL")
-  List<UserAuthSessionEntity> findAllWithAppVersion();
+  @Query("SELECT s FROM UserAuthSessionEntity s JOIN FETCH s.user")
+  List<UserAuthSessionEntity> findAllWithUser();
 
   // ---- Session cap ----
 
