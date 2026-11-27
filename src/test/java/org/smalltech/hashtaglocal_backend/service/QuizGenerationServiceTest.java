@@ -275,6 +275,8 @@ class QuizGenerationServiceTest {
     String prompt = service.buildEvaluationPrompt(portBlair, quiz);
     assertTrue(prompt.contains("related to the locality Port Blair"));
     assertTrue(prompt.contains("Accuracy."));
+    assertTrue(prompt.contains("Not guessable."));
+    assertTrue(prompt.contains("GUESSABLE"));
     assertTrue(prompt.contains("Question: Which river flows through Port Blair?"));
     assertTrue(prompt.contains("4. None of these"));
     assertFalse(prompt.contains("Non-Duplicate"));
