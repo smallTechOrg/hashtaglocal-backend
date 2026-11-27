@@ -39,6 +39,8 @@ import org.springframework.transaction.annotation.Transactional;
  *   <li>Evaluate it with a second LLM call for quality and accuracy only (relevant, interesting,
  *       100% accurate). Duplicates are handled by the generation prompt and the code check.
  *   <li>If it passes, save it as PENDING. If not, generate again, up to MAX_ATTEMPTS times.
+ *   <li>If no quiz about the locality passed (small towns have few well-documented facts), repeat
+ *       steps 1-4 up to MAX_ATTEMPTS more times for a quiz about the locality's state as a whole.
  * </ol>
  */
 @Service
@@ -47,22 +49,62 @@ import org.springframework.transaction.annotation.Transactional;
 public class QuizGenerationService {
 
   private static final int NO_REPEAT_DAYS = 100;
+
+  /** Attempts per scope: first about the locality itself, then about its state. */
   static final int MAX_ATTEMPTS = 3;
+
+  /** Most generation attempts in one run: MAX_ATTEMPTS for each scope. */
+  static final int MAX_TOTAL_ATTEMPTS = MAX_ATTEMPTS * Scope.values().length;
+
   private static final int MAX_TOKENS = 700;
-  private static final int EVAL_MAX_TOKENS = 200;
+  private static final int EVAL_MAX_TOKENS = 250;
   private static final int OPTION_COUNT = 4;
 
   /** Matches a named placeholder such as {locality} in the prompt templates. */
   private static final Pattern PLACEHOLDER = Pattern.compile("\\{(\\w+)}");
 
-  // Placeholders: {locality}, {existingQuizzes}. {existingQuizzes} is empty when there are none.
+  /**
+   * What a quiz is about. Small towns often have few well-documented facts, and the model then
+   * makes some up, which the evaluator rejects as INACCURATE (seen for #siddipet). So when every
+   * LOCALITY attempt fails, the run falls back to the STATE the locality is in, as a whole, never
+   * another city in it. The model names the state itself; localities don't store it.
+   */
+  enum Scope {
+    LOCALITY(
+        """
+        - Ask about this place: its history, geography, culture, landmarks, or civic life, or any \
+        other topic which is interesting but related to the locality.""",
+        "Should be related to the locality {locality}"),
+    STATE(
+        """
+        - Ask about the Indian state that {locality} is in, as a whole: the state's history, \
+        geography, culture, festivals, food, language, or statewide landmarks. Name the state in \
+        the question.
+        - Do NOT ask about {locality} itself or about any other city, town or district in the \
+        state.""",
+        "Should be about the Indian state that {locality} is in, as a whole (not about"
+            + " {locality} or another city, town or district in it)");
+
+    private final String generationRules;
+    private final String relevance;
+
+    Scope(String generationRules, String relevance) {
+      this.generationRules = generationRules;
+      this.relevance = relevance;
+    }
+  }
+
+  // Placeholders: {locality}, {scopeRules}, {existingQuizzes}. {existingQuizzes} is empty when
+  // there are none.
   private static final String PROMPT_TEMPLATE =
       """
       Be a quizmaster and write one multiple-choice quiz for the community of {locality} in India.
 
       Rules:
-      - Ask about this place: its history, geography, culture, landmarks, or civic life, or any \
-      other topic which is interesting but related to the locality.
+      {scopeRules}
+      - Use only well-documented facts you are certain of. Do not claim that something is unique \
+      to, famous for, or found only in a place unless that is widely documented.
+      - Do not ask about politicians, political parties or elections.
       - Exactly four options, all distinct, exactly one correct.
       - answer_index is the 1-based position of the correct option.
       - explanation should be 1-2 highly interesting short sentences about the question and answer.
@@ -74,20 +116,20 @@ public class QuizGenerationService {
       "answer_index": 1, "explanation": "..."}
       """;
 
-  // Placeholders: {locality}, {quiz}.
+  // Placeholders: {relevance}, {locality}, {quiz}.
   private static final String EVAL_PROMPT_TEMPLATE =
       """
       Be a quiz evaluator and evaluate the quiz on these following criteria:
-      - Relevant & High Quality. Should be related to the locality {locality} and should be \
-      interesting.
+      - Relevant & High Quality. {relevance} and should be interesting.
       - Accuracy. The question and answer should be 100% accurate.
 
       This is the quiz:
       {quiz}
 
       Reply with ONLY a JSON object, no other text, in this shape:
-      {"is_evaluation_passed": true, "rejection_reason": null}
-      When it fails, rejection_reason is one of: INACCURATE, NOT_RELEVANT, LOW_QUALITY.
+      {"is_evaluation_passed": true, "rejection_reason": null, "rejection_detail": null}
+      When it fails, rejection_reason is one of: INACCURATE, NOT_RELEVANT, LOW_QUALITY, and \
+      rejection_detail is one short sentence saying what is wrong.
       """;
 
   private final AiFallbackChain aiFallbackChain;
@@ -113,9 +155,11 @@ public class QuizGenerationService {
   }
 
   /**
-   * Generates and evaluates up to MAX_ATTEMPTS quizzes, returning the first one that passes the
-   * code checks and the LLM evaluation. The generation prompt lists {@code existingQuestions} plus
-   * every question already tried in this run, so each retry asks for something new.
+   * Generates and evaluates quizzes, returning the first one that passes the code checks and the
+   * LLM evaluation: up to MAX_ATTEMPTS about the locality itself, then, if none passed, up to
+   * MAX_ATTEMPTS about its state as a whole (see {@link Scope}). The generation prompt lists {@code
+   * existingQuestions} plus every question already tried in this run, so each retry asks for
+   * something new.
    */
   Optional<GeneratedQuiz> generateCandidate(Locality locality, List<String> existingQuestions) {
     Set<String> existingKeys =
@@ -125,39 +169,52 @@ public class QuizGenerationService {
     List<String> avoid = new ArrayList<>(existingQuestions);
     String hashtag = locality.getHashtag();
 
-    for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-      Optional<GeneratedQuiz> quiz =
-          aiFallbackChain
-              .complete(buildPrompt(locality, avoid), MAX_TOKENS)
-              .flatMap(
-                  reply -> parse(reply.text()).map(q -> q.withGeneratedBy(reply.generatedBy())));
-      if (quiz.isEmpty()) {
-        log.info("Attempt {} for {}: no valid quiz", attempt, hashtag);
-        continue;
+    for (Scope scope : Scope.values()) {
+      if (scope == Scope.STATE) {
+        log.info("No locality quiz passed for {}; trying its state instead", hashtag);
       }
-      String question = quiz.get().question();
-      // Safety net: the model was told not to repeat, but an exact repeat is caught here for free.
-      if (existingKeys.contains(questionKey(question))) {
+      for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+        Optional<GeneratedQuiz> quiz =
+            aiFallbackChain
+                .complete(buildPrompt(locality, avoid, scope), MAX_TOKENS)
+                .flatMap(
+                    reply -> parse(reply.text()).map(q -> q.withGeneratedBy(reply.generatedBy())));
+        if (quiz.isEmpty()) {
+          log.info("Attempt {} ({}) for {}: no valid quiz", attempt, scope, hashtag);
+          continue;
+        }
+        String question = quiz.get().question();
+        // Safety net: the model was told not to repeat, but an exact repeat is caught for free.
+        if (existingKeys.contains(questionKey(question))) {
+          log.info(
+              "Attempt {} ({}) for {}: exact repeat of an existing question: {}",
+              attempt,
+              scope,
+              hashtag,
+              question);
+          continue;
+        }
+        Evaluation evaluation = evaluate(locality, quiz.get(), scope);
+        if (evaluation.passed()) {
+          log.info("Attempt {} ({}) for {}: quiz passed evaluation", attempt, scope, hashtag);
+          return quiz;
+        }
+        // Options, marked answer and the evaluator's reason, so a failure can be diagnosed from
+        // this one line.
         log.info(
-            "Attempt {} for {}: exact repeat of an existing question: {}",
+            "Attempt {} ({}) for {}: rejected by evaluation ({}: {}): {} | options: {} | marked"
+                + " answer: {}",
             attempt,
+            scope,
             hashtag,
-            question);
-        continue;
+            evaluation.rejectionReason(),
+            evaluation.detail(),
+            question,
+            quiz.get().options(),
+            quiz.get().answerOptionIndex());
+        // Don't let the next attempt write the same rejected question again.
+        avoid.add(question);
       }
-      Evaluation evaluation = evaluate(locality, quiz.get());
-      if (evaluation.passed()) {
-        log.info("Attempt {} for {}: quiz passed evaluation", attempt, hashtag);
-        return quiz;
-      }
-      log.info(
-          "Attempt {} for {}: rejected by evaluation ({}): {}",
-          attempt,
-          hashtag,
-          evaluation.rejectionReason(),
-          question);
-      // Don't let the next attempt write the same rejected question again.
-      avoid.add(question);
     }
     return Optional.empty();
   }
@@ -169,10 +226,10 @@ public class QuizGenerationService {
    * attempt can still run; a config failure (bad key, unknown model) is thrown, since every later
    * call would fail too.
    */
-  Evaluation evaluate(Locality locality, GeneratedQuiz quiz) {
+  Evaluation evaluate(Locality locality, GeneratedQuiz quiz, Scope scope) {
     try {
       return aiFallbackChain
-          .complete(buildEvaluationPrompt(locality, quiz), EVAL_MAX_TOKENS)
+          .complete(buildEvaluationPrompt(locality, quiz, scope), EVAL_MAX_TOKENS)
           .map(reply -> parseEvaluation(reply.text()))
           .orElse(Evaluation.failed("EVALUATOR_UNAVAILABLE"));
     } catch (AiProviderException e) {
@@ -185,8 +242,9 @@ public class QuizGenerationService {
   }
 
   /**
-   * Reads {"is_evaluation_passed": true|false, "rejection_reason": "..."}. Anything that is not a
-   * clear JSON {@code true} counts as a fail.
+   * Reads {"is_evaluation_passed": true|false, "rejection_reason": "...", "rejection_detail":
+   * "..."}. Anything that is not a clear JSON {@code true} counts as a fail. The detail is only
+   * logged, and is null when the model leaves it out.
    */
   Evaluation parseEvaluation(String reply) {
     int start = reply.indexOf('{');
@@ -198,17 +256,21 @@ public class QuizGenerationService {
       JsonNode node = objectMapper.readTree(reply.substring(start, end + 1));
       JsonNode passed = node.path("is_evaluation_passed");
       if (passed.isBoolean() && passed.booleanValue()) {
-        return new Evaluation(true, null);
+        return new Evaluation(true, null, null);
       }
       String reason = node.path("rejection_reason").asText("").trim();
-      return Evaluation.failed(reason.isBlank() || "null".equals(reason) ? "UNKNOWN" : reason);
+      String detail = node.path("rejection_detail").asText("").trim();
+      return new Evaluation(
+          false,
+          reason.isBlank() || "null".equals(reason) ? "UNKNOWN" : reason,
+          detail.isBlank() || "null".equals(detail) ? null : detail);
     } catch (JsonProcessingException e) {
       return Evaluation.failed("UNREADABLE_EVALUATION");
     }
   }
 
-  /** The prompt asking the LLM to judge one quiz on quality and accuracy. */
-  String buildEvaluationPrompt(Locality locality, GeneratedQuiz quiz) {
+  /** The prompt asking the LLM to judge one quiz on quality and accuracy, for the given scope. */
+  String buildEvaluationPrompt(Locality locality, GeneratedQuiz quiz, Scope scope) {
     List<String> o = quiz.options();
     String options =
         IntStream.range(0, o.size())
@@ -223,7 +285,11 @@ public class QuizGenerationService {
             + quiz.answerOptionIndex()
             + "\nExplanation: "
             + quiz.explanation();
-    return fill(EVAL_PROMPT_TEMPLATE, Map.of("locality", locality.getName(), "quiz", quizText));
+    // The scope text has its own {locality}; fill() is single-pass, so fill that first.
+    String relevance = fill(scope.relevance, Map.of("locality", locality.getName()));
+    return fill(
+        EVAL_PROMPT_TEMPLATE,
+        Map.of("relevance", relevance, "locality", locality.getName(), "quiz", quizText));
   }
 
   /** Parses the model's reply, ignoring any text around the JSON. Empty if a rule is broken. */
@@ -261,18 +327,28 @@ public class QuizGenerationService {
   }
 
   /**
-   * The generation prompt: the locality name and the questions to avoid (existing ones and any
-   * rejected in this run). With nothing to avoid, the section and its blank line are left out.
+   * The generation prompt: the locality name, what to ask about (the scope), and the questions to
+   * avoid (existing ones and any rejected in this run). With nothing to avoid, the section and its
+   * blank line are left out.
    */
-  String buildPrompt(Locality locality, List<String> avoidQuestions) {
+  String buildPrompt(Locality locality, List<String> avoidQuestions, Scope scope) {
     String existing =
         avoidQuestions.isEmpty()
             ? ""
             : "These are the already existing quizzes. Do NOT repeat or closely paraphrase any of"
                 + " them:\n"
                 + avoidQuestions.stream().map(q -> "- " + q).collect(Collectors.joining("\n"));
+    // The scope rules have their own {locality}; fill() is single-pass, so fill that first.
+    String scopeRules = fill(scope.generationRules, Map.of("locality", locality.getName()));
     return fill(
-            PROMPT_TEMPLATE, Map.of("locality", locality.getName(), "existingQuizzes", existing))
+            PROMPT_TEMPLATE,
+            Map.of(
+                "locality",
+                locality.getName(),
+                "scopeRules",
+                scopeRules,
+                "existingQuizzes",
+                existing))
         .replaceAll("\n{3,}", "\n\n");
   }
 
@@ -339,11 +415,12 @@ public class QuizGenerationService {
   /**
    * The evaluator's verdict on one quiz candidate. {@code rejectionReason} is null when it passed;
    * otherwise INACCURATE, NOT_RELEVANT or LOW_QUALITY from the model, or one of our own codes
-   * (EVALUATOR_UNAVAILABLE, UNREADABLE_EVALUATION, UNKNOWN).
+   * (EVALUATOR_UNAVAILABLE, UNREADABLE_EVALUATION, UNKNOWN). {@code detail} is the model's one
+   * sentence on what is wrong, or null; it is only logged.
    */
-  record Evaluation(boolean passed, String rejectionReason) {
+  record Evaluation(boolean passed, String rejectionReason, String detail) {
     static Evaluation failed(String reason) {
-      return new Evaluation(false, reason);
+      return new Evaluation(false, reason, null);
     }
   }
 
