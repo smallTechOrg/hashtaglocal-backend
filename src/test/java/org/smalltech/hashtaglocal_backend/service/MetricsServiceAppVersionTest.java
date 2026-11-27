@@ -62,7 +62,8 @@ class MetricsServiceAppVersionTest {
     UserEntity asha = user(1, "asha");
     UserEntity rahul = user(2, "rahul");
     UserEntity meera = user(3, "meera");
-    when(userAuthSessionRepository.findAllWithAppVersion())
+    when(userRepository.findAllWithLocality()).thenReturn(List.of(asha, rahul, meera));
+    when(userAuthSessionRepository.findAllWithUser())
         .thenReturn(
             List.of(
                 // Asha has an old phone on 1.0.2 and a new one on 1.0.10: she counts on 1.0.10.
@@ -75,6 +76,7 @@ class MetricsServiceAppVersionTest {
 
     assertEquals("1.0.10", r.getLatestVersion());
     assertEquals(3, r.getTotalUsers());
+    assertEquals(0, r.getUnknownUsers());
 
     assertEquals(2, r.getVersions().size());
     assertEquals("1.0.10", r.getVersions().get(0).getVersion());
@@ -94,13 +96,51 @@ class MetricsServiceAppVersionTest {
   }
 
   @Test
-  void isEmptyWhenNoAppHasReportedAVersion() {
-    when(userAuthSessionRepository.findAllWithAppVersion()).thenReturn(List.of());
+  void countsUsersWithNoReportedVersionAsUnknownInTheTotal() {
+    UserEntity asha = user(1, "asha"); // on 1.0.12
+    UserEntity old = user(2, "old"); // app before 1.0.10: session but no version
+    UserEntity gone = user(3, "gone"); // no session left at all
+    UserEntity priya = user(4, "priya"); // on 1.0.11
+    when(userRepository.findAllWithLocality()).thenReturn(List.of(asha, old, gone, priya));
+    when(userAuthSessionRepository.findAllWithUser())
+        .thenReturn(
+            List.of(
+                session(asha, "1.0.12", Platform.ANDROID, NOW.minusDays(1)),
+                session(old, null, Platform.IOS, NOW.minusDays(2)),
+                session(priya, "1.0.11", Platform.ANDROID, NOW.minusDays(3))));
+
+    AppVersionsResponse r = metricsService.getAppVersions();
+
+    assertEquals(4, r.getTotalUsers());
+    assertEquals(2, r.getUnknownUsers());
+    assertEquals(50, r.getUnknownPercent());
+    assertEquals("1.0.12", r.getLatestVersion());
+    // Shares are of all 4 users, so unknown users count as not on the latest version.
+    assertEquals(25, r.getVersions().get(0).getPercent());
+    assertEquals(2, r.getVersions().size());
+
+    assertEquals(4, r.getUsers().size());
+    AppVersionsResponse.UserVersion oldUser =
+        r.getUsers().stream().filter(u -> "old".equals(u.getUsername())).findFirst().orElseThrow();
+    assertNull(oldUser.getAppVersion());
+    assertEquals("IOS", oldUser.getPlatform());
+    // Never-seen users sort last.
+    AppVersionsResponse.UserVersion last = r.getUsers().get(3);
+    assertEquals("gone", last.getUsername());
+    assertNull(last.getAppVersion());
+    assertNull(last.getLastActive());
+  }
+
+  @Test
+  void isEmptyWhenThereAreNoUsers() {
+    when(userRepository.findAllWithLocality()).thenReturn(List.of());
+    when(userAuthSessionRepository.findAllWithUser()).thenReturn(List.of());
 
     AppVersionsResponse r = metricsService.getAppVersions();
 
     assertNull(r.getLatestVersion());
     assertEquals(0, r.getTotalUsers());
+    assertEquals(0, r.getUnknownUsers());
     assertTrue(r.getVersions().isEmpty());
     assertTrue(r.getUsers().isEmpty());
   }

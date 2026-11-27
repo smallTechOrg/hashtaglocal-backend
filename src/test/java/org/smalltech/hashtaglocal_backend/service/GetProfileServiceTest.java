@@ -124,7 +124,7 @@ class GetProfileServiceTest {
     }
 
     @Test
-    @DisplayName("Should return user profile with default hashtag when no lat/lng provided")
+    @DisplayName("Should return no hashtag when no lat/lng and no saved location")
     void testGetMyProfile_NoCoordinates_Success() {
       // Arrange
       String accessToken = "valid-token";
@@ -151,13 +151,48 @@ class GetProfileServiceTest {
       UserProfileModel profile = result.get();
       assertEquals("testuser", profile.getUsername());
       assertEquals("pic.jpg", profile.getPicture());
-      assertEquals("#local", profile.getHashtag());
+      // Not the old "#local" placeholder: clients would load a feed for it and get a 404.
+      assertNull(profile.getHashtag());
       assertNotNull(profile.getUserSummary());
       assertNotNull(profile.getUserSummary().getIssueCount());
       assertEquals(0, profile.getUserSummary().getIssueCount().getTotal());
 
       verify(userAuthSessionRepository, times(1)).findByAccessToken(accessToken);
       verify(localityRepository, never()).findContainingLocality(anyDouble(), anyDouble());
+    }
+
+    @Test
+    @DisplayName("Should use the saved location's locality when no lat/lng provided")
+    void testGetMyProfile_NoCoordinates_UsesSavedLocality() {
+      String accessToken = "valid-token";
+      long validExpiryTime = System.currentTimeMillis() / 1000 + 3600;
+
+      Locality saved = Locality.builder().id(7L).hashtag("#siddipet").name("Siddipet").build();
+      Location location = mock(Location.class);
+      when(location.getLocality()).thenReturn(saved);
+      UserEntity user =
+          UserEntity.builder()
+              .id(1L)
+              .username("testuser")
+              .profilePicture("pic.jpg")
+              .location(location)
+              .build();
+      UserAuthSessionEntity validSession =
+          UserAuthSessionEntity.builder()
+              .user(user)
+              .accessToken(accessToken)
+              .isActive(true)
+              .accessTokenExpiryTs(validExpiryTime)
+              .build();
+      when(userAuthSessionRepository.findByAccessToken(accessToken))
+          .thenReturn(Optional.of(validSession));
+
+      Optional<UserProfileModel> result = profileService.getMyProfile(accessToken, null, null);
+
+      assertTrue(result.isPresent());
+      assertEquals("#siddipet", result.get().getHashtag());
+      verify(localityRepository, never()).findContainingLocality(anyDouble(), anyDouble());
+      verify(locationService, never()).upsertUserLocation(any(), anyDouble(), anyDouble());
     }
 
     @Test
@@ -251,7 +286,7 @@ class GetProfileServiceTest {
     }
 
     @Test
-    @DisplayName("Should use default hashtag when no locality found for coordinates")
+    @DisplayName("Should return no hashtag when no locality found for coordinates")
     void testGetMyProfile_WithCoordinates_NoLocalityFound() {
       // Arrange
       String accessToken = "valid-token";
@@ -287,7 +322,7 @@ class GetProfileServiceTest {
       UserProfileModel profile = result.get();
       assertEquals("testuser", profile.getUsername());
       assertEquals("pic.jpg", profile.getPicture());
-      assertEquals("#local", profile.getHashtag());
+      assertNull(profile.getHashtag());
 
       verify(userAuthSessionRepository, times(1)).findByAccessToken(accessToken);
       verify(localityRepository, times(1)).findContainingLocality(latitude, longitude);
@@ -295,7 +330,7 @@ class GetProfileServiceTest {
     }
 
     @Test
-    @DisplayName("Should use default hashtag when locality hashtag is null")
+    @DisplayName("Should return no hashtag when locality hashtag is null")
     void testGetMyProfile_LocalityWithNullHashtag() {
       // Arrange
       String accessToken = "valid-token";
@@ -331,7 +366,7 @@ class GetProfileServiceTest {
       UserProfileModel profile = result.get();
       assertEquals("testuser", profile.getUsername());
       assertEquals("pic.jpg", profile.getPicture());
-      assertEquals("#local", profile.getHashtag());
+      assertNull(profile.getHashtag());
 
       verify(userAuthSessionRepository, times(1)).findByAccessToken(accessToken);
       verify(localityRepository, times(1)).findContainingLocality(latitude, longitude);
@@ -362,13 +397,13 @@ class GetProfileServiceTest {
       assertTrue(result.isPresent());
       UserProfileModel profile = result.get();
       assertEquals("testuser", profile.getUsername());
-      assertEquals("#local", profile.getHashtag());
+      assertNull(profile.getHashtag());
 
       verify(userAuthSessionRepository, times(1)).findByAccessToken(accessToken);
     }
 
     @Test
-    @DisplayName("Should use default hashtag when only latitude provided")
+    @DisplayName("Should return no hashtag when only latitude provided")
     void testGetMyProfile_OnlyLatitude() {
       // Arrange
       String accessToken = "valid-token";
@@ -394,14 +429,14 @@ class GetProfileServiceTest {
       // Assert
       assertTrue(result.isPresent());
       UserProfileModel profile = result.get();
-      assertEquals("#local", profile.getHashtag());
+      assertNull(profile.getHashtag());
 
       verify(userAuthSessionRepository, times(1)).findByAccessToken(accessToken);
       verify(localityRepository, never()).findContainingLocality(anyDouble(), anyDouble());
     }
 
     @Test
-    @DisplayName("Should use default hashtag when only longitude provided")
+    @DisplayName("Should return no hashtag when only longitude provided")
     void testGetMyProfile_OnlyLongitude() {
       // Arrange
       String accessToken = "valid-token";
@@ -427,7 +462,7 @@ class GetProfileServiceTest {
       // Assert
       assertTrue(result.isPresent());
       UserProfileModel profile = result.get();
-      assertEquals("#local", profile.getHashtag());
+      assertNull(profile.getHashtag());
 
       verify(userAuthSessionRepository, times(1)).findByAccessToken(accessToken);
       verify(localityRepository, never()).findContainingLocality(anyDouble(), anyDouble());

@@ -37,7 +37,8 @@ import org.springframework.transaction.annotation.Transactional;
  *   <li>Check it in code: valid JSON, four distinct options, a valid answer index, and not an exact
  *       repeat of an existing question.
  *   <li>Evaluate it with a second LLM call for quality and accuracy only (relevant, interesting,
- *       100% accurate). Duplicates are handled by the generation prompt and the code check.
+ *       100% accurate, answer not guessable from the question). Duplicates are handled by the
+ *       generation prompt and the code check.
  *   <li>If it passes, save it as PENDING. If not, generate again, up to MAX_ATTEMPTS times.
  * </ol>
  */
@@ -81,13 +82,16 @@ public class QuizGenerationService {
       - Relevant & High Quality. Should be related to the locality {locality} and should be \
       interesting.
       - Accuracy. The question and answer should be 100% accurate.
+      - Not guessable. The correct answer should not be guessable from the question alone, for \
+      example because the question contains or hints at the answer, or because the other options \
+      are obviously wrong.
 
       This is the quiz:
       {quiz}
 
       Reply with ONLY a JSON object, no other text, in this shape:
       {"is_evaluation_passed": true, "rejection_reason": null}
-      When it fails, rejection_reason is one of: INACCURATE, NOT_RELEVANT, LOW_QUALITY.
+      When it fails, rejection_reason is one of: INACCURATE, NOT_RELEVANT, LOW_QUALITY, GUESSABLE.
       """;
 
   private final AiFallbackChain aiFallbackChain;
@@ -338,8 +342,8 @@ public class QuizGenerationService {
 
   /**
    * The evaluator's verdict on one quiz candidate. {@code rejectionReason} is null when it passed;
-   * otherwise INACCURATE, NOT_RELEVANT or LOW_QUALITY from the model, or one of our own codes
-   * (EVALUATOR_UNAVAILABLE, UNREADABLE_EVALUATION, UNKNOWN).
+   * otherwise INACCURATE, NOT_RELEVANT, LOW_QUALITY or GUESSABLE from the model, or one of our own
+   * codes (EVALUATOR_UNAVAILABLE, UNREADABLE_EVALUATION, UNKNOWN).
    */
   record Evaluation(boolean passed, String rejectionReason) {
     static Evaluation failed(String reason) {
