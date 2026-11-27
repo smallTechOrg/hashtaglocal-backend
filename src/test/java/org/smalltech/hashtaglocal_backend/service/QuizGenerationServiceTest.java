@@ -29,6 +29,7 @@ import org.smalltech.hashtaglocal_backend.entity.Locality;
 import org.smalltech.hashtaglocal_backend.entity.QuizEntity;
 import org.smalltech.hashtaglocal_backend.model.QuizStatus;
 import org.smalltech.hashtaglocal_backend.repository.QuizRepository;
+import org.smalltech.hashtaglocal_backend.service.QuizGenerationService.Scope;
 import org.smalltech.hashtaglocal_backend.service.ai.AiFailure;
 import org.smalltech.hashtaglocal_backend.service.ai.AiFallbackChain;
 import org.smalltech.hashtaglocal_backend.service.ai.AiFallbackChain.AiCompletion;
@@ -124,7 +125,7 @@ class QuizGenerationServiceTest {
         .thenReturn(List.of(recentQuiz(RECENT_QUESTION)));
 
     assertFalse(service.generatePendingQuiz(portBlair).isPresent());
-    verify(aiFallbackChain, times(QuizGenerationService.MAX_ATTEMPTS))
+    verify(aiFallbackChain, times(QuizGenerationService.MAX_TOTAL_ATTEMPTS))
         .complete(startsWith(GEN), anyInt());
     verify(quizRepository, never()).save(any(QuizEntity.class));
   }
@@ -166,7 +167,7 @@ class QuizGenerationServiceTest {
     when(aiFallbackChain.complete(startsWith(EVAL), anyInt())).thenReturn(reply(BAD_VERDICT));
 
     assertFalse(service.generatePendingQuiz(portBlair).isPresent());
-    verify(aiFallbackChain, times(QuizGenerationService.MAX_ATTEMPTS))
+    verify(aiFallbackChain, times(QuizGenerationService.MAX_TOTAL_ATTEMPTS))
         .complete(startsWith(EVAL), anyInt());
     verify(quizRepository, never()).save(any(QuizEntity.class));
   }
@@ -247,7 +248,7 @@ class QuizGenerationServiceTest {
 
   @Test
   void generationPromptListsExistingQuizzesToAvoid() {
-    String prompt = service.buildPrompt(portBlair, List.of(RECENT_QUESTION));
+    String prompt = service.buildPrompt(portBlair, List.of(RECENT_QUESTION), Scope.LOCALITY);
 
     assertTrue(prompt.contains("community of Port Blair in India."));
     assertTrue(prompt.contains("Do NOT repeat or closely paraphrase any of them:"));
@@ -261,7 +262,7 @@ class QuizGenerationServiceTest {
 
   @Test
   void generationPromptWithNothingToAvoidHasNoListOrGap() {
-    String prompt = service.buildPrompt(portBlair, List.of());
+    String prompt = service.buildPrompt(portBlair, List.of(), Scope.LOCALITY);
 
     assertFalse(prompt.contains("already existing quizzes"));
     assertFalse(prompt.contains("{existingQuizzes}"));
@@ -272,7 +273,7 @@ class QuizGenerationServiceTest {
   void evaluationPromptChecksQualityAndAccuracyOnly() {
     QuizGenerationService.GeneratedQuiz quiz = service.parse(GOOD_REPLY).orElseThrow();
 
-    String prompt = service.buildEvaluationPrompt(portBlair, quiz);
+    String prompt = service.buildEvaluationPrompt(portBlair, quiz, Scope.LOCALITY);
     assertTrue(prompt.contains("related to the locality Port Blair"));
     assertTrue(prompt.contains("Accuracy."));
     assertTrue(prompt.contains("Question: Which river flows through Port Blair?"));
@@ -281,6 +282,77 @@ class QuizGenerationServiceTest {
     assertFalse(prompt.contains("DUPLICATE"));
     assertFalse(prompt.contains("existing quizzes"));
     assertFalse(prompt.contains("{quiz}"));
+  }
+
+  @Test
+  void fallsBackToTheStateWhenEveryLocalityQuizIsRejected() {
+    // Like #siddipet: every quiz about the town itself is rejected, the first state quiz passes.
+    when(aiFallbackChain.complete(startsWith(GEN), anyInt())).thenReturn(reply(GOOD_REPLY));
+    when(aiFallbackChain.complete(startsWith(EVAL), anyInt()))
+        .thenReturn(
+            reply(BAD_VERDICT), reply(BAD_VERDICT), reply(BAD_VERDICT), reply(GOOD_VERDICT));
+    when(quizRepository.save(any(QuizEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    assertTrue(service.generatePendingQuiz(portBlair).isPresent());
+    String stateRule = "Ask about the Indian state that Port Blair is in, as a whole";
+    // Three locality attempts first, then one state attempt, which passed.
+    verify(aiFallbackChain, times(QuizGenerationService.MAX_ATTEMPTS + 1))
+        .complete(startsWith(GEN), anyInt());
+    verify(aiFallbackChain, times(1)).complete(and(startsWith(GEN), contains(stateRule)), anyInt());
+    // The state quiz is judged against the state, not the town.
+    verify(aiFallbackChain, times(1))
+        .complete(
+            and(startsWith(EVAL), contains("about the Indian state that Port Blair is in")),
+            anyInt());
+  }
+
+  @Test
+  void noStateAttemptWhenALocalityQuizPasses() {
+    when(aiFallbackChain.complete(startsWith(GEN), anyInt())).thenReturn(reply(GOOD_REPLY));
+    when(aiFallbackChain.complete(startsWith(EVAL), anyInt())).thenReturn(reply(GOOD_VERDICT));
+    when(quizRepository.save(any(QuizEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    service.generatePendingQuiz(portBlair);
+
+    verify(aiFallbackChain, never())
+        .complete(and(startsWith(GEN), contains("Indian state that")), anyInt());
+  }
+
+  @Test
+  void generationPromptAsksForDocumentedFactsAndNoPolitics() {
+    for (Scope scope : Scope.values()) {
+      String prompt = service.buildPrompt(portBlair, List.of(), scope);
+      assertTrue(prompt.contains("Use only well-documented facts"));
+      assertTrue(prompt.contains("Do not claim that something is unique to"));
+      assertTrue(prompt.contains("Do not ask about politicians"));
+      assertFalse(prompt.contains("{scopeRules}"));
+      assertFalse(prompt.contains("{locality}"));
+    }
+  }
+
+  @Test
+  void statePromptAsksAboutTheWholeStateAndNoOtherCity() {
+    String prompt = service.buildPrompt(portBlair, List.of(), Scope.STATE);
+
+    assertTrue(prompt.contains("Ask about the Indian state that Port Blair is in, as a whole"));
+    assertTrue(prompt.contains("Name the state in the question."));
+    assertTrue(
+        prompt.contains(
+            "Do NOT ask about Port Blair itself or about any other city, town or district"));
+    assertFalse(prompt.contains("Ask about this place"));
+  }
+
+  @Test
+  void parseEvaluationReadsTheRejectionDetail() {
+    String verdict =
+        "{\"is_evaluation_passed\": false, \"rejection_reason\": \"INACCURATE\","
+            + " \"rejection_detail\": \"That temple is near Warangal, not Siddipet.\"}";
+
+    QuizGenerationService.Evaluation evaluation = service.parseEvaluation(verdict);
+
+    assertEquals("INACCURATE", evaluation.rejectionReason());
+    assertEquals("That temple is near Warangal, not Siddipet.", evaluation.detail());
+    assertEquals(null, service.parseEvaluation(BAD_VERDICT).detail());
   }
 
   @Test
