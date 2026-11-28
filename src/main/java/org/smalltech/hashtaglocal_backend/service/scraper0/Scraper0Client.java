@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
+import jakarta.annotation.PostConstruct;
 import java.io.IOException;
 import java.net.SocketTimeoutException;
 import java.net.URI;
@@ -82,6 +83,18 @@ public class Scraper0Client {
 
   public boolean isConfigured() {
     return properties.isConfigured();
+  }
+
+  /** Says at startup when the base URL is set without an API key (every call would be refused). */
+  @PostConstruct
+  void checkConfiguration() {
+    if (properties.hasBaseUrl() && !properties.hasApiKey()) {
+      log.error(
+          "[SCRAPER0] SCRAPER0_BASE_URL is set but SCRAPER0_API_KEY is empty: event ingestion and"
+              + " portal issues are off until the key is set");
+    } else if (!properties.hasBaseUrl()) {
+      log.info("[SCRAPER0] SCRAPER0_BASE_URL is empty: event ingestion and portal issues are off");
+    }
   }
 
   /** {@code GET /v2/sites?q=}. */
@@ -184,9 +197,13 @@ public class Scraper0Client {
   private record Response(int status, JsonNode body) {}
 
   private UriComponentsBuilder base() {
-    if (!properties.isConfigured()) {
+    if (!properties.hasBaseUrl()) {
       throw new Scraper0Exception(
           0, Scraper0Exception.NOT_CONFIGURED, "scraper0.base-url (SCRAPER0_BASE_URL) is not set");
+    }
+    if (!properties.hasApiKey()) {
+      throw new Scraper0Exception(
+          0, Scraper0Exception.NOT_CONFIGURED, "scraper0.api-key (SCRAPER0_API_KEY) is not set");
     }
     String baseUrl = properties.getBaseUrl().trim().replaceAll("/+$", "");
     return UriComponentsBuilder.fromUriString(baseUrl);
@@ -205,9 +222,7 @@ public class Scraper0Client {
     URI uri = uriBuilder.encode().build().toUri();
     HttpHeaders headers = new HttpHeaders();
     headers.setAccept(List.of(MediaType.APPLICATION_JSON));
-    if (properties.hasApiKey()) {
-      headers.set("X-API-Key", properties.getApiKey());
-    }
+    headers.set("X-API-Key", properties.getApiKey());
     if (idempotencyKey != null) {
       headers.set("Idempotency-Key", idempotencyKey);
     }

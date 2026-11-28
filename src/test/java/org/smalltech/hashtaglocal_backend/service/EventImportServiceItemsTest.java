@@ -29,6 +29,7 @@ import org.smalltech.hashtaglocal_backend.model.EventTypeModel;
 import org.smalltech.hashtaglocal_backend.model.MediaTypeModel;
 import org.smalltech.hashtaglocal_backend.repository.EventApprovalRepository;
 import org.smalltech.hashtaglocal_backend.repository.EventRepository;
+import org.smalltech.hashtaglocal_backend.service.EventImportService.ImportResult;
 import org.smalltech.hashtaglocal_backend.service.scraper0.Scraper0Models.EventData;
 import org.smalltech.hashtaglocal_backend.service.scraper0.Scraper0Models.Item;
 
@@ -65,6 +66,10 @@ class EventImportServiceItemsTest {
             });
   }
 
+  private int importedCount(String siteId, List<Item> items) {
+    return eventImportService.importItems(siteId, items).imported();
+  }
+
   private static EventData data(String name, String start, String image, String category) {
     return new EventData(
         name,
@@ -74,6 +79,7 @@ class EventImportServiceItemsTest {
         "https://site/e?utm_source=x&id=1",
         "Org",
         image,
+        null,
         category,
         "desc",
         12.97,
@@ -101,7 +107,7 @@ class EventImportServiceItemsTest {
   @Test
   @DisplayName("Maps an item to an event: external_id, source_site_id, UTC times, link, image")
   void mapsAnItem() {
-    int count = eventImportService.importItems("teameverest-ngo", List.of(item("itm_1")));
+    int count = importedCount("teameverest-ngo", List.of(item("itm_1")));
 
     assertThat(count).isEqualTo(1);
     EventEntity e = saved().get(0);
@@ -172,8 +178,7 @@ class EventImportServiceItemsTest {
   void dedupesOnExternalId() {
     when(eventRepository.existsByExternalId("itm_old")).thenReturn(true);
 
-    int count =
-        eventImportService.importItems("karmana-in", List.of(item("itm_old"), item("itm_new")));
+    int count = importedCount("karmana-in", List.of(item("itm_old"), item("itm_new")));
 
     assertThat(count).isEqualTo(1);
     assertThat(saved()).extracting(EventEntity::getExternalId).containsExactly("itm_new");
@@ -183,7 +188,7 @@ class EventImportServiceItemsTest {
   @Test
   @DisplayName("The same id twice in one read is imported once")
   void dedupesWithinTheBatch() {
-    int count = eventImportService.importItems("karmana-in", List.of(item("itm_1"), item("itm_1")));
+    int count = importedCount("karmana-in", List.of(item("itm_1"), item("itm_1")));
 
     assertThat(count).isEqualTo(1);
   }
@@ -193,7 +198,7 @@ class EventImportServiceItemsTest {
   void legacyNameAndStartDedupe() {
     when(eventRepository.existsByNameAndStartTime("Event itm_1", START_UTC)).thenReturn(true);
 
-    int count = eventImportService.importItems("teameverest-ngo", List.of(item("itm_1")));
+    int count = importedCount("teameverest-ngo", List.of(item("itm_1")));
 
     assertThat(count).isZero();
     assertThat(saved()).isEmpty();
@@ -203,7 +208,7 @@ class EventImportServiceItemsTest {
   @DisplayName("Items without an image, a name or a start time are skipped")
   void requiredFields() {
     int count =
-        eventImportService.importItems(
+        importedCount(
             "karmana-in",
             List.of(
                 item("no_image", data("A", START, null, "OTHER")),
@@ -224,9 +229,37 @@ class EventImportServiceItemsTest {
   void imageCopyFailureSkips() {
     when(eventImageService.downloadAndStore("https://img/itm_1")).thenReturn(null);
 
-    int count = eventImportService.importItems("karmana-in", List.of(item("itm_1")));
+    ImportResult result = eventImportService.importItems("karmana-in", List.of(item("itm_1")));
 
-    assertThat(count).isZero();
+    assertThat(result).isEqualTo(new ImportResult(0, 1));
+  }
+
+  @Test
+  @DisplayName("One image that fails (even by throwing) does not stop the rest of the batch")
+  void imageFailureIsPerItem() {
+    when(eventImageService.downloadAndStore("https://img/itm_gone"))
+        .thenThrow(new IllegalStateException("410 Expired Resource"));
+    when(eventImageService.downloadAndStore("https://img/itm_null")).thenReturn(null);
+
+    ImportResult result =
+        eventImportService.importItems(
+            "teameverest-ngo", List.of(item("itm_gone"), item("itm_ok"), item("itm_null")));
+
+    assertThat(result).isEqualTo(new ImportResult(1, 2));
+    assertThat(saved()).extracting(EventEntity::getExternalId).containsExactly("itm_ok");
+  }
+
+  @Test
+  @DisplayName("Items skipped for other reasons are not counted as image failures")
+  void otherSkipsAreNotImageSkips() {
+    when(eventRepository.existsByExternalId("itm_old")).thenReturn(true);
+
+    ImportResult result =
+        eventImportService.importItems(
+            "karmana-in",
+            List.of(item("itm_old"), item("no_image", data("A", START, null, "OTHER"))));
+
+    assertThat(result).isEqualTo(new ImportResult(0, 0));
   }
 
   @Test
@@ -245,6 +278,7 @@ class EventImportServiceItemsTest {
             null,
             null,
             null,
+            null,
             true,
             null,
             null);
@@ -257,6 +291,7 @@ class EventImportServiceItemsTest {
             "https://l2",
             null,
             "https://img",
+            null,
             null,
             null,
             null,
@@ -289,6 +324,7 @@ class EventImportServiceItemsTest {
             null,
             null,
             null,
+            null,
             false,
             null,
             "https://site/list");
@@ -311,8 +347,8 @@ class EventImportServiceItemsTest {
   @Test
   @DisplayName("Returns 0 for an empty read without touching the database")
   void emptyRead() {
-    assertThat(eventImportService.importItems("karmana-in", List.of())).isZero();
-    assertThat(eventImportService.importItems("karmana-in", null)).isZero();
+    assertThat(importedCount("karmana-in", List.of())).isZero();
+    assertThat(importedCount("karmana-in", null)).isZero();
     verify(eventService, never()).saveAll(anyList());
   }
 }

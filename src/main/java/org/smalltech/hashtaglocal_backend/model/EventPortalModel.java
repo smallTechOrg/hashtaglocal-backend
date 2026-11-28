@@ -38,35 +38,4 @@ public enum EventPortalModel {
       default -> WEB;
     };
   }
-
-  /**
-   * Maps a raw portal string (e.g. a filter in the public events API) to the corresponding enum
-   * value.
-   *
-   * <p>Normalisation: lower-cased, all dots/spaces/hyphens/underscores removed. Examples:
-   *
-   * <ul>
-   *   <li>"Team everest" → {@link #TEAMEVEREST}
-   *   <li>"ivolunteer" / "ivolunteer.in" → {@link #IVOLUNTEERIN}
-   *   <li>"mybharat.gov.in" → {@link #MYBHARATGOVIN}
-   *   <li>"Twitter" → {@link #TWITTER}
-   * </ul>
-   *
-   * @return the matching enum value, or {@code null} if unrecognised
-   */
-  public static EventPortalModel fromString(String raw) {
-    if (raw == null || raw.isBlank()) {
-      return null;
-    }
-    String normalized = raw.toLowerCase().replaceAll("[\\s.\\-_]+", "");
-    return switch (normalized) {
-      case "teameverest", "teameverestngo" -> TEAMEVEREST;
-      case "ivolunteer", "ivolunteerin" -> IVOLUNTEERIN;
-      case "mybharatgovin" -> MYBHARATGOVIN;
-      case "twitter" -> TWITTER;
-      case "instagram" -> INSTAGRAM;
-      case "web" -> WEB;
-      default -> null;
-    };
-  }
 }

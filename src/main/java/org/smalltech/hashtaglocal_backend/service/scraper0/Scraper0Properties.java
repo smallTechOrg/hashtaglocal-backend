@@ -7,7 +7,8 @@ import org.springframework.context.annotation.Configuration;
 
 /**
  * {@code scraper0.*}: how this backend reaches the scraper0 v2 API (event sources and the BBMP
- * portal). An empty base URL switches event ingestion and portal issues off.
+ * portal). An empty base URL switches event ingestion and portal issues off; a base URL without an
+ * API key is a configuration error and switches them off too.
  */
 @Configuration
 @ConfigurationProperties(prefix = "scraper0")
@@ -18,8 +19,8 @@ public class Scraper0Properties {
   private String baseUrl = "";
 
   /**
-   * Sent as {@code X-API-Key} ({@code SCRAPER0_API_KEY}). Empty sends no header, which only works
-   * while scraper0 still allows legacy keyless calls.
+   * Sent as {@code X-API-Key} ({@code SCRAPER0_API_KEY}). Required whenever the base URL is set:
+   * scraper0 has no keyless access.
    */
   @ToString.Exclude private String apiKey = "";
 
@@ -29,7 +30,12 @@ public class Scraper0Properties {
   /** Default {@code freshness_hours} for new event sources. */
   private int freshnessHours = 48;
 
+  /** Base URL and API key are both set: calls can be made. */
   public boolean isConfigured() {
+    return hasBaseUrl() && hasApiKey();
+  }
+
+  public boolean hasBaseUrl() {
     return baseUrl != null && !baseUrl.isBlank();
   }
 

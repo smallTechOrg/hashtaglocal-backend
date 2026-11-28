@@ -194,6 +194,7 @@ class EventSourceAdminControllerTest {
                         "Juhu",
                         "https://l",
                         "https://img",
+                        null,
                         "BEACH_CLEANUP",
                         false))));
 

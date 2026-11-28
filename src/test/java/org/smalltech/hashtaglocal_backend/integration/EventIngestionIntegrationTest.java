@@ -95,6 +95,7 @@ class EventIngestionIntegrationTest {
             "https://example.com/event/" + id,
             "Test Org",
             "https://example.com/image.jpg",
+            null,
             "TREKANDPLOG",
             null,
             null,

@@ -118,7 +118,9 @@ variables (`NAME`, with `NAME_STAGING` / `NAME_PRODUCTION` overrides); see [infr
   (`SCHEDULER_ENABLED=false` on Cloud Run). Locally the `@Scheduled` timers still run as before.
 - **Event ingestion and BBMP complaints** use the scraper0 v2 API (`SCRAPER0_BASE_URL`, `SCRAPER0_API_KEY`).
   Ingestion reads every enabled row of `event_sources`, which admins manage under `/admin/event-sources`
-  (Ops Dashboard → Event sources). With no `SCRAPER0_BASE_URL`, both are off.
+  (Ops Dashboard → Event sources). With no `SCRAPER0_BASE_URL`, both are off; `SCRAPER0_API_KEY`
+  is required with it (an error is logged at startup otherwise). scraper0 returns each event's own image link, which
+  may expire, so the import copies images to GCS straight away and notes on the source how many it could not copy.
 - **Migrations** use Flyway (`src/main/resources/db/migration`, enabled with `FLYWAY_ENABLED=true`, which the
   deploy sets). See the [migration rules](src/main/resources/db/migration/README.md).
 - The older VM-based deployment is described in [infra/deployment.md](infra/deployment.md).

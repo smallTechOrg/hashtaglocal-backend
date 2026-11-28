@@ -36,7 +36,10 @@ public final class Scraper0Models {
 
   public record Item(String id, String updatedAt, EventData data) {}
 
-  /** {@code EventData}; times are ISO-8601 UTC strings. */
+  /**
+   * {@code EventData}; times are ISO-8601 UTC strings. {@code image} is the site's own link, never
+   * a copy: when it is signed, {@code imageExpiresAt} says when it stops working.
+   */
   public record EventData(
       String name,
       String startTime,
@@ -45,6 +48,7 @@ public final class Scraper0Models {
       String link,
       String organisation,
       String image,
+      String imageExpiresAt,
       String category,
       String description,
       Double latitude,

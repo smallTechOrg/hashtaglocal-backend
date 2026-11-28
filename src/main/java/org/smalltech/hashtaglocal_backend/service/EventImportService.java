@@ -12,7 +12,6 @@ import java.util.Set;
 import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.smalltech.hashtaglocal_backend.dto.ScrapeEventDTO;
 import org.smalltech.hashtaglocal_backend.entity.EventApprovalEntity;
 import org.smalltech.hashtaglocal_backend.entity.EventEntity;
 import org.smalltech.hashtaglocal_backend.entity.MediaEntity;
@@ -27,14 +26,16 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Imports scraped events: the items of a scraper0 event source ({@link #importItems}) and the
- * legacy scrape payload of {@code POST /api/v1/events/ingest} ({@link #importFromScrapeResponse}).
+ * Imports scraped events: the items of a scraper0 event source ({@link #importItems}).
  *
  * <p>Key behaviours:
  *
  * <ul>
- *   <li>Events with a blank {@code name}, no {@code startTime} or no image are skipped; the image
- *       is copied to GCS, and every new event gets a PENDING approval row.
+ *   <li>Events with a blank {@code name}, no {@code startTime} or no image are skipped. scraper0
+ *       returns the site's own image link (never a copy), and a signed link expires ({@code
+ *       image_expires_at}), so the image is copied to GCS here, during the import. An item whose
+ *       image can't be copied is skipped and counted in {@link ImportResult#imageSkipped()}; the
+ *       rest of the batch is imported. Every new event gets a PENDING approval row.
  *   <li>Deduplication: a scraper0 item whose id is already in {@code external_id} is skipped, and
  *       so is an event with the same {@code name} + {@code startTime} as an existing row.
  *   <li>Geocoding (address → lat/lng) is NOT performed here. The {@code location_id} field is left
@@ -64,7 +65,16 @@ public class EventImportService {
   private final EventImageService eventImageService;
   private final EventApprovalRepository eventApprovalRepository;
 
-  /** One event to import, from either input shape. */
+  /**
+   * Outcome of one import: events saved, and items left out because their image could not be copied
+   * (an expired signed link, a download or upload failure). Those are picked up by a later run,
+   * when scraper0 returns a fresh link.
+   */
+  public record ImportResult(int imported, int imageSkipped) {
+    public static final ImportResult NONE = new ImportResult(0, 0);
+  }
+
+  /** One event to import. */
   private record Candidate(
       String name,
       String organisation,
@@ -79,48 +89,6 @@ public class EventImportService {
       String sourceSiteId) {}
 
   /**
-   * Processes a list of events in the legacy scrape payload ({@code POST /api/v1/events/ingest}),
-   * deduplicates against the database, and bulk-saves all new events in a single transaction.
-   *
-   * @param scrapeEvents raw event DTOs in the legacy scrape response shape
-   * @return the number of events actually saved (duplicates excluded)
-   */
-  @Transactional
-  public int importFromScrapeResponse(List<ScrapeEventDTO> scrapeEvents) {
-    if (scrapeEvents == null || scrapeEvents.isEmpty()) {
-      return 0;
-    }
-    List<Candidate> candidates = new ArrayList<>();
-    for (ScrapeEventDTO dto : scrapeEvents) {
-      if (!hasRequiredFields(dto.getName(), dto.getStartTime(), dto.getImage())) {
-        continue;
-      }
-      // fromString() returns null for portals it doesn't recognise. portal is a NOT NULL
-      // column, and the batch is bulk-inserted in one transaction, so letting a null portal
-      // through here would roll back — and silently drop — the entire import batch.
-      EventPortalModel portal = EventPortalModel.fromString(dto.getPortal());
-      if (portal == null) {
-        log.warn("Skipping event '{}' — unrecognized portal '{}'", dto.getName(), dto.getPortal());
-        continue;
-      }
-      candidates.add(
-          new Candidate(
-              dto.getName(),
-              dto.getOrganisation(),
-              portal,
-              parseEventType(dto.getType()),
-              dto.getStartTime(),
-              dto.getEndTime(),
-              dto.getAddress(),
-              dto.getLink(),
-              dto.getImage(),
-              null,
-              null));
-    }
-    return saveNew(candidates, scrapeEvents.size());
-  }
-
-  /**
    * Imports the items a scraper0 read returned for one event source. Insert only: an item whose
    * {@code id} is already in {@code events.external_id} is skipped (updates are left for later), as
    * is an older row with the same name and start time.
@@ -129,12 +97,13 @@ public class EventImportService {
    * EventPortalModel#WEB}; {@code source_site_id} keeps the site. The type is the item's {@code
    * category}, {@code OTHER} when it is not an {@link EventTypeModel}.
    *
-   * @return the number of events saved
+   * @return the number of events saved, and of items skipped because their image could not be
+   *     copied
    */
   @Transactional
-  public int importItems(String siteId, List<Item> items) {
+  public ImportResult importItems(String siteId, List<Item> items) {
     if (items == null || items.isEmpty()) {
-      return 0;
+      return ImportResult.NONE;
     }
     EventPortalModel portal = EventPortalModel.fromSiteId(siteId);
     Set<String> seenIds = new HashSet<>();
@@ -203,11 +172,12 @@ public class EventImportService {
   }
 
   /**
-   * Shared tail of both imports: the legacy name + start time dedupe, the image copy to GCS, one
-   * bulk save, and a PENDING approval row per saved event.
+   * The name + start time dedupe against older rows, the image copy to GCS, one bulk save, and a
+   * PENDING approval row per saved event.
    */
-  private int saveNew(List<Candidate> candidates, int received) {
+  private ImportResult saveNew(List<Candidate> candidates, int received) {
     List<EventEntity> toSave = new ArrayList<>();
+    int imageSkipped = 0;
 
     for (Candidate c : candidates) {
       try {
@@ -216,11 +186,11 @@ public class EventImportService {
           continue;
         }
 
-        // Download the CDN image, upload to GCS, and persist a MediaEntity row.
+        // Download the image from the site's link, upload to GCS, and persist a MediaEntity row.
         // Skip the event if the image can't be stored — an event without a valid image is unusable.
-        MediaEntity media = eventImageService.downloadAndStore(c.image());
+        MediaEntity media = copyImage(c);
         if (media == null) {
-          log.debug("Skipping event '{}' — image download/upload failed", c.name());
+          imageSkipped++;
           continue;
         }
 
@@ -246,11 +216,32 @@ public class EventImportService {
     eventApprovalRepository.saveAll(approvals);
 
     log.info(
-        "Imported {} new events ({} received, {} skipped)",
+        "Imported {} new events ({} received, {} skipped, {} of them for an image that could not be"
+            + " copied)",
         toSave.size(),
         received,
-        received - toSave.size());
-    return toSave.size();
+        received - toSave.size(),
+        imageSkipped);
+    return new ImportResult(toSave.size(), imageSkipped);
+  }
+
+  /** The stored image, or null (logged) when it could not be downloaded or uploaded. */
+  private MediaEntity copyImage(Candidate c) {
+    MediaEntity media = null;
+    String reason = "download or upload failed";
+    try {
+      media = eventImageService.downloadAndStore(c.image());
+    } catch (Exception e) {
+      reason = e.getClass().getSimpleName() + ": " + e.getMessage();
+    }
+    if (media == null) {
+      log.warn(
+          "Skipping event '{}' ({}) — image could not be copied: {}",
+          c.name(),
+          c.externalId(),
+          reason);
+    }
+    return media;
   }
 
   private EventEntity toEntity(Candidate c, MediaEntity media) {

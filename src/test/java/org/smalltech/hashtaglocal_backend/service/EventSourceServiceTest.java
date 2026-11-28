@@ -164,6 +164,7 @@ class EventSourceServiceTest {
                             "https://l",
                             null,
                             "https://img",
+                            null,
                             "OTHER",
                             null,
                             null,

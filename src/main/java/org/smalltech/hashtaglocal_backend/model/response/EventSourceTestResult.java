@@ -22,6 +22,7 @@ public record EventSourceTestResult(
       String address,
       String link,
       String image,
+      String imageExpiresAt,
       String category,
       Boolean isOnline) {}
 }

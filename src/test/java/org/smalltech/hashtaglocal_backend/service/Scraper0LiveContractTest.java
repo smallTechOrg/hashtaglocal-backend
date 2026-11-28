@@ -20,7 +20,7 @@ import org.smalltech.hashtaglocal_backend.service.scraper0.Scraper0Properties;
 /**
  * Opt-in contract check against a running scraper0 (no database needed):
  *
- * <pre>SCRAPER0_LIVE_URL=http://127.0.0.1:5001 SCRAPER0_LIVE_API_KEY=s0_… \
+ * <pre>SCRAPER0_LIVE_URL=http://127.0.0.1:5001 SCRAPER0_LIVE_API_KEY=s0_… \   (the key is required)
  *   ./gradlew test --tests '*Scraper0LiveContractTest'</pre>
  *
  * Needs the seeded {@code teameverest-ngo} action and a locked {@code karmana-in fetch_events}.
@@ -74,6 +74,14 @@ class Scraper0LiveContractTest {
         assertThat(it.data().name()).isNotBlank();
         assertThat(it.data().startTime()).isNotBlank();
         assertThat(it.data().isOnline()).isNotEqualTo(Boolean.TRUE); // include_online=false
+        // The site's own link, never a scraper0 copy; a signed link says when it expires.
+        if (it.data().image() != null) {
+          assertThat(it.data().image()).startsWith("http").doesNotContain("/v2/media/");
+        }
+        if (it.data().imageExpiresAt() != null) {
+          assertThat(java.time.Instant.parse(it.data().imageExpiresAt()))
+              .isAfter(java.time.Instant.now());
+        }
         if (it.data().category() != null) {
           assertThat(types).contains(it.data().category());
         }

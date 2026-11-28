@@ -97,7 +97,7 @@ public class EventSourceService {
                   EventData d = item.data();
                   return d == null
                       ? new EventSourceTestResult.Item(
-                          item.id(), null, null, null, null, null, null, null, null)
+                          item.id(), null, null, null, null, null, null, null, null, null)
                       : new EventSourceTestResult.Item(
                           item.id(),
                           d.name(),
@@ -106,6 +106,7 @@ public class EventSourceService {
                           d.address(),
                           d.link(),
                           d.image(),
+                          d.imageExpiresAt(),
                           d.category(),
                           d.isOnline());
                 })

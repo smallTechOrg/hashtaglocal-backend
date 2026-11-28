@@ -34,6 +34,7 @@ class PortalIssueScrapeClientTest {
   void setUp() {
     Scraper0Properties properties = new Scraper0Properties();
     properties.setBaseUrl("https://scraper0.test");
+    properties.setApiKey("s0-key");
     RestTemplate restTemplate = new RestTemplate();
     server = MockRestServiceServer.bindTo(restTemplate).build();
     ObjectMapper mapper = new ObjectMapper();

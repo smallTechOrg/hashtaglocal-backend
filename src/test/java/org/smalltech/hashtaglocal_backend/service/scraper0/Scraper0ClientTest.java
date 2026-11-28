@@ -3,7 +3,6 @@ package org.smalltech.hashtaglocal_backend.service.scraper0;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
-import static org.springframework.test.web.client.match.MockRestRequestMatchers.headerDoesNotExist;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.jsonPath;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
@@ -21,7 +20,6 @@ import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.smalltech.hashtaglocal_backend.service.scraper0.Scraper0Models.ReadResult;
-import org.smalltech.hashtaglocal_backend.service.scraper0.Scraper0Models.SiteSummary;
 import org.smalltech.hashtaglocal_backend.service.scraper0.Scraper0Models.WriteResult;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
@@ -81,7 +79,8 @@ class Scraper0ClientTest {
                     "{'data': {'site_id': 'teameverest-ngo', 'action': 'fetch_events', 'version': 1,"
                         + " 'items': [{'id': 'itm_1', 'updated_at': '2026-11-01T00:00:00Z', 'data':"
                         + " {'name': 'Beach cleanup', 'start_time': '2026-12-01T04:30:00.000Z',"
-                        + " 'image': 'https://img/x.jpg', 'category': 'BEACH_CLEANUP',"
+                        + " 'image': 'https://img/x.jpg', 'image_expires_at':"
+                        + " '2026-12-01T06:00:00.000Z', 'category': 'BEACH_CLEANUP',"
                         + " 'is_online': false, 'latitude': 12.9, 'source_url': 'https://src'}}],"
                         + " 'complete': false, 'scraped_at': '2026-11-26T00:00:00Z',"
                         + " 'refresh_job_id': 'job_9', 'health': 'ok', 'ai_error': 'quota',"
@@ -106,30 +105,24 @@ class Scraper0ClientTest {
     assertThat(item.data().isOnline()).isFalse();
     assertThat(item.data().latitude()).isEqualTo(12.9);
     assertThat(item.data().sourceUrl()).isEqualTo("https://src");
+    assertThat(item.data().image()).isEqualTo("https://img/x.jpg");
+    assertThat(item.data().imageExpiresAt()).isEqualTo("2026-12-01T06:00:00.000Z");
     assertThat(templateTimeouts).containsExactly(60);
   }
 
   @Test
-  void noApiKeyHeaderWhenNoneIsConfigured() {
-    properties.setApiKey("");
-    server
-        .expect(requestTo(BASE + "/v2/sites?q=ever"))
-        .andExpect(method(HttpMethod.GET))
-        .andExpect(headerDoesNotExist("X-API-Key"))
-        .andRespond(
-            withSuccess(
-                json(
-                    "{'data': [{'site_id': 'teameverest-ngo', 'base_url': 'https://www.teameverest.ngo',"
-                        + " 'name': 'Team Everest', 'actions': [{'name': 'fetch_events', 'kind':"
-                        + " 'read', 'status': 'locked'}]}]}"),
-                MediaType.APPLICATION_JSON));
+  void nothingIsSentWithoutAnApiKey() {
+    properties.setApiKey(" ");
 
-    List<SiteSummary> sites = client.listSites("ever");
-
+    assertThat(client.isConfigured()).isFalse();
+    assertThatThrownBy(() -> client.listSites("ever"))
+        .isInstanceOfSatisfying(
+            Scraper0Exception.class,
+            e -> {
+              assertThat(e.getCode()).isEqualTo(Scraper0Exception.NOT_CONFIGURED);
+              assertThat(e.getMessage()).contains("SCRAPER0_API_KEY");
+            });
     server.verify();
-    assertThat(sites).hasSize(1);
-    assertThat(sites.get(0).baseUrl()).isEqualTo("https://www.teameverest.ngo");
-    assertThat(sites.get(0).actions().get(0).status()).isEqualTo("locked");
   }
 
   @Test

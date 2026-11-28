@@ -61,7 +61,7 @@ Cloud Scheduler --(cron, OIDC token)--> POST /jobs/{name} --> the job runs insid
 
 | Scheduler job (`<service>-<name>`) | Endpoint | Cron variable (Spring cron) | Default | Off when |
 |---|---|---|---|---|
-| `event-ingestion` | `/jobs/event-ingestion` | `EVENTS_SCRAPE_CRON` | `0 */30 * * * *` | cron is `-` or `SCRAPER0_BASE_URL` empty |
+| `event-ingestion` | `/jobs/event-ingestion` | `EVENTS_SCRAPE_CRON` | `0 */30 * * * *` | cron is `-`, or `SCRAPER0_BASE_URL` / `SCRAPER0_API_KEY` empty |
 | `bulletin-weather` | `/jobs/bulletin-weather` | `BULLETIN_WEATHER_CRON` | `0 0 8 * * *` | `BULLETIN_ENABLED=false` |
 | `portal-issue-tracking` | `/jobs/portal-issue-tracking` | `PORTALISSUE_CRON` | `0 0 1 * * *` | `PORTALISSUE_ENABLED=false` |
 | `session-cleanup` | `/jobs/session-cleanup` | `AUTH_SESSION_CLEANUP_CRON` | `0 0 3 * * *` | cron is `-` |
@@ -133,7 +133,7 @@ gcloud scheduler jobs run hashtaglocal-backend-staging-session-cleanup --locatio
    Optional credentials (the app default is empty or off): `FIREBASE_KEY_JSON` (the whole `firebase-key.json`;
    without it push notifications are off), `GOOGLE_MAPS_API_KEY`, `GROQ_API_KEY`, `GEMINI_API_KEY`,
    `SPRING_MAIL_PASSWORD`, `GOOGLE_OAUTH_CLIENT_SECRET`, `PORTALISSUE_AUTH_USERNAME`, `PORTALISSUE_AUTH_PASSWORD`,
-   `SCRAPER0_API_KEY` (sent as `X-API-Key` to scraper0).
+   `SCRAPER0_API_KEY` (sent as `X-API-Key` to scraper0; required whenever `SCRAPER0_BASE_URL` is set).
    A missing `GEMINI_API_KEY` means feed posts go to human review instead of auto-publishing.
    `AI_CONFIG_ENCRYPTION_KEY` (`openssl rand -base64 32`, a different value per environment) encrypts the
    quiz AI key saved from the Ops Dashboard; without it the dashboard cannot save a key and quiz generation

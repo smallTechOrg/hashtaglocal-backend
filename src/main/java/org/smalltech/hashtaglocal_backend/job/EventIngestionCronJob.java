@@ -7,6 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.smalltech.hashtaglocal_backend.entity.EventSourceEntity;
 import org.smalltech.hashtaglocal_backend.service.EventGeocodingService;
 import org.smalltech.hashtaglocal_backend.service.EventImportService;
+import org.smalltech.hashtaglocal_backend.service.EventImportService.ImportResult;
 import org.smalltech.hashtaglocal_backend.service.EventSourceService;
 import org.smalltech.hashtaglocal_backend.service.scraper0.Scraper0Client;
 import org.smalltech.hashtaglocal_backend.service.scraper0.Scraper0Exception;
@@ -48,7 +49,9 @@ public class EventIngestionCronJob {
   @Scheduled(cron = "${events.scrape.cron}")
   public void run() {
     if (!scraper0Client.isConfigured()) {
-      log.warn("Event ingestion skipped: scraper0.base-url (SCRAPER0_BASE_URL) is not set");
+      log.warn(
+          "Event ingestion skipped: scraper0 is not configured (SCRAPER0_BASE_URL and"
+              + " SCRAPER0_API_KEY are both required)");
       return;
     }
     List<EventSourceEntity> sources = eventSourceService.enabledSources();
@@ -78,11 +81,13 @@ public class EventIngestionCronJob {
     try {
       ReadResult result = eventSourceService.read(source);
       itemCount = result.itemsOrEmpty().size();
-      int imported = eventImportService.importItems(source.getSiteId(), result.itemsOrEmpty());
+      ImportResult outcome =
+          eventImportService.importItems(source.getSiteId(), result.itemsOrEmpty());
+      int imported = outcome.imported();
 
       String status =
           result.complete() ? EventSourceEntity.STATUS_OK : EventSourceEntity.STATUS_PARTIAL;
-      String note = note(result);
+      String note = note(result, outcome.imageSkipped());
       eventSourceService.recordRun(source.getId(), status, note, itemCount, imported);
       log.info(
           "Event source {}: {} items, {} imported, status {}{}",
@@ -111,8 +116,14 @@ public class EventIngestionCronJob {
   }
 
   /** Warnings worth showing next to an ok/partial run, or null. */
-  private static String note(ReadResult result) {
+  private static String note(ReadResult result, int imageSkipped) {
     List<String> notes = new ArrayList<>();
+    if (imageSkipped > 0) {
+      notes.add(
+          imageSkipped
+              + (imageSkipped == 1 ? " item" : " items")
+              + " skipped: the image could not be copied (expired link or download failure)");
+    }
     if (!result.complete()) {
       notes.add("scraper0 was still refreshing at the timeout");
     }

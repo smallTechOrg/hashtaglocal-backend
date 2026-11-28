@@ -26,6 +26,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.smalltech.hashtaglocal_backend.entity.EventSourceEntity;
 import org.smalltech.hashtaglocal_backend.service.EventGeocodingService;
 import org.smalltech.hashtaglocal_backend.service.EventImportService;
+import org.smalltech.hashtaglocal_backend.service.EventImportService.ImportResult;
 import org.smalltech.hashtaglocal_backend.service.EventSourceService;
 import org.smalltech.hashtaglocal_backend.service.scraper0.Scraper0Client;
 import org.smalltech.hashtaglocal_backend.service.scraper0.Scraper0Exception;
@@ -55,6 +56,9 @@ class EventIngestionCronJobTest {
   void configured() {
     org.mockito.Mockito.lenient().when(scraper0Client.isConfigured()).thenReturn(true);
     org.mockito.Mockito.lenient()
+        .when(eventImportService.importItems(anyString(), anyList()))
+        .thenReturn(ImportResult.NONE);
+    org.mockito.Mockito.lenient()
         .when(eventGeocodingService.run())
         .thenReturn(new EventGeocodingService.GeocodingResult(0, 0, 0, 0));
   }
@@ -75,6 +79,7 @@ class EventIngestionCronJobTest {
             "https://e/" + id,
             null,
             "https://img/" + id,
+            null,
             "OTHER",
             null,
             null,
@@ -106,8 +111,10 @@ class EventIngestionCronJobTest {
     when(eventSourceService.read(everest))
         .thenReturn(result(true, everestItems.toArray(Item[]::new)));
     when(eventSourceService.read(karmana)).thenReturn(result(true, item("itm_c")));
-    when(eventImportService.importItems("teameverest-ngo", everestItems)).thenReturn(1);
-    when(eventImportService.importItems(eq("karmana-in"), anyList())).thenReturn(1);
+    when(eventImportService.importItems("teameverest-ngo", everestItems))
+        .thenReturn(new ImportResult(1, 0));
+    when(eventImportService.importItems(eq("karmana-in"), anyList()))
+        .thenReturn(new ImportResult(1, 0));
 
     cronJob.run();
 
@@ -121,7 +128,7 @@ class EventIngestionCronJobTest {
   void incompleteIsPartial() {
     when(eventSourceService.enabledSources()).thenReturn(List.of(everest));
     when(eventSourceService.read(everest)).thenReturn(result(false, item("itm_a")));
-    when(eventImportService.importItems(anyString(), anyList())).thenReturn(0);
+    when(eventImportService.importItems(anyString(), anyList())).thenReturn(new ImportResult(0, 0));
 
     cronJob.run();
 
@@ -138,7 +145,8 @@ class EventIngestionCronJobTest {
             new Scraper0Exception(
                 404, "action_not_available", "no locked version of fetch_events"));
     when(eventSourceService.read(karmana)).thenReturn(result(true, item("itm_c")));
-    when(eventImportService.importItems(eq("karmana-in"), anyList())).thenReturn(1);
+    when(eventImportService.importItems(eq("karmana-in"), anyList()))
+        .thenReturn(new ImportResult(1, 0));
 
     cronJob.run();
 
@@ -167,7 +175,7 @@ class EventIngestionCronJobTest {
   void recordFailureIsContained() {
     when(eventSourceService.enabledSources()).thenReturn(List.of(everest, karmana));
     when(eventSourceService.read(any())).thenReturn(result(true, item("itm_a")));
-    when(eventImportService.importItems(anyString(), anyList())).thenReturn(1);
+    when(eventImportService.importItems(anyString(), anyList())).thenReturn(new ImportResult(1, 0));
     doThrow(new RuntimeException("db"))
         .when(eventSourceService)
         .recordRun(eq(1L), anyString(), isNull(), anyInt(), anyInt());
@@ -205,12 +213,37 @@ class EventIngestionCronJobTest {
                 null,
                 "broken",
                 "quota"));
-    when(eventImportService.importItems(anyString(), anyList())).thenReturn(0);
+    when(eventImportService.importItems(anyString(), anyList())).thenReturn(new ImportResult(0, 0));
 
     cronJob.run();
 
     org.mockito.ArgumentCaptor<String> note = org.mockito.ArgumentCaptor.forClass(String.class);
     verify(eventSourceService).recordRun(eq(1L), eq("ok"), note.capture(), eq(1), eq(0));
     assertThat(note.getValue()).contains("broken").contains("quota");
+  }
+
+  @Test
+  @DisplayName("Items skipped because their image could not be copied are noted on the run")
+  void notesImageSkippedItems() {
+    when(eventSourceService.enabledSources()).thenReturn(List.of(everest));
+    when(eventSourceService.read(everest))
+        .thenReturn(
+            new ReadResult(
+                "s",
+                "fetch_events",
+                1,
+                List.of(item("itm_a"), item("itm_b"), item("itm_c")),
+                true,
+                null,
+                null,
+                "ok",
+                null));
+    when(eventImportService.importItems(anyString(), anyList())).thenReturn(new ImportResult(1, 2));
+
+    cronJob.run();
+
+    org.mockito.ArgumentCaptor<String> note = org.mockito.ArgumentCaptor.forClass(String.class);
+    verify(eventSourceService).recordRun(eq(1L), eq("ok"), note.capture(), eq(3), eq(1));
+    assertThat(note.getValue()).contains("2 items skipped").contains("image");
   }
 }

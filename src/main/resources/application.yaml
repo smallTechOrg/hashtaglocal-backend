@@ -145,10 +145,11 @@ auth:
     cleanup-cron: ${AUTH_SESSION_CLEANUP_CRON:0 0 3 * * *}
 
 # scraper0 v2 API (web-scraper spec/api-v2.md): event sources and the BBMP portal (report/track).
-# An empty base URL switches event ingestion and portal issues off (logged on each run).
+# An empty base URL switches event ingestion and portal issues off (logged at startup and on each run).
 scraper0:
   base-url: ${SCRAPER0_BASE_URL:}
-  # Sent as X-API-Key. Secret. Empty sends no header (only works while scraper0 allows keyless calls).
+  # Sent as X-API-Key. Secret. Required whenever base-url is set: without it event ingestion and portal
+  # issues stay off and an error is logged at startup.
   api-key: ${SCRAPER0_API_KEY:}
   # Sent as timeout_s on event reads; the HTTP read timeout is this + 30 s.
   read-timeout-s: ${SCRAPER0_READ_TIMEOUT_S:60}
