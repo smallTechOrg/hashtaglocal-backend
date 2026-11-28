@@ -243,10 +243,16 @@ ai:
     # Per-instance cache of the saved config; a save clears it on the instance that handled it.
     cache-ttl: ${AI_CONFIG_CACHE_TTL:30s}
 
-# BBMP complaints (report and track) go through scraper0 (scraper0.base-url above).
+# BBMP complaints (report and track): still the old web-scraper for now (scrape-url below).
 portalissue:
   enabled: ${PORTALISSUE_ENABLED:true}
   cron: ${PORTALISSUE_CRON:0 0 1 * * *}
+  # BBMP report/track still go through the old web-scraper (/api/v1/scrape) until the scraper0
+  # smartoneblr actions are tested. Empty = portal issues are off.
+  scrape-url: ${PORTALISSUE_SCRAPE_URL:}
+  report:
+    connect-timeout-seconds: ${PORTALISSUE_REPORT_CONNECT_TIMEOUT_SECONDS:15}
+    read-timeout-seconds: ${PORTALISSUE_REPORT_READ_TIMEOUT_SECONDS:305}
   # Portal login used by the tracking job.
   auth:
     username: ${PORTALISSUE_AUTH_USERNAME:placeholder_username}

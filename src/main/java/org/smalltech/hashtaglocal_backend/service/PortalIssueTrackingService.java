@@ -23,10 +23,6 @@ public class PortalIssueTrackingService {
   private final PortalIssueScrapeClient portalIssueScrapeClient;
 
   public void runCycle() {
-    if (!portalIssueScrapeClient.isConfigured()) {
-      log.warn("Portal issue tracking skipped: scraper0.base-url (SCRAPER0_BASE_URL) is not set");
-      return;
-    }
     Set<Long> attemptedIds = new HashSet<>();
     int processedCount = 0;
     int failedCount = 0;
