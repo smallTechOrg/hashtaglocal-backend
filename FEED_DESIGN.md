@@ -359,13 +359,14 @@ This is the read model for the admin moderation page and the audit trail.
   picks it up (`@Async` + `@Scheduled` retry sweeper for stuck rows), calls the
   classifier, writes `FeedModerationEntity`, transitions status.
 - **Classifier is behind a `FeedModerationClient` interface** so the AI provider
-  is swappable. v1 impl calls the **Gemini API over plain REST** using Spring's
-  `RestClient` (same HTTP approach already used by the scrape clients — **no
-  vendor SDK dependency**). It sends post text + link metadata + a category
-  rubric and requests a **structured JSON response** (Gemini
-  `responseMimeType: application/json` + a response schema) so the verdict parses
-  deterministically. Use a cheap model (`gemini-2.0-flash`-class). A keyword/rule
-  pre-filter can short-circuit obvious cases before spending an API call.
+  is swappable. The impl (`AiFeedModerationClient`) uses the **AI provider saved
+  in the Ops Dashboard** (through `AiFallbackChain`, the same connection quizzes
+  and bulletins use — **no vendor SDK dependency**). It sends post text + link
+  metadata + a category rubric and asks for a **JSON-only reply**; a reply that
+  does not parse fails safe to human review. (v1 called Gemini directly; that
+  client was removed when all AI moved to the Ops Dashboard provider.) A
+  keyword/rule pre-filter can short-circuit obvious cases before spending an API
+  call.
 - Media moderation in v1 is text/link only; image moderation is a later add
   (the interface leaves room for it).
 
@@ -408,15 +409,15 @@ repository/    FeedPostRepository (keyset + moderation-queue queries),
 service/       FeedService (create; role-based locality resolution),
                FeedQueryService, LinkScrapeService (+Async),
                FeedModerationService (+Async), FeedModerationClient (interface)
-               + GeminiFeedModerationClient (RestClient impl, no SDK),
+               + AiFeedModerationClient (Ops Dashboard AI provider, no SDK),
                IssueCreatedEvent listener → emits auto ISSUE_REF post
 controller/    FeedController, FeedAdminController
 model/request/ CreateFeedPostRequest (lat,lng?,hashtag?,kind,...), FeedQueryRequest (hashtag,cursor,limit)
 model/response/FeedPostData, FeedListResponseData, ModerationQueueData
 mapper/        FeedPostMapper (post+content → DTO, signs media URLs)
-config/        async executor; RestClient for scraping + Gemini (no SDK)
-build.gradle:  add jsoup (OG/oEmbed parsing). No AI SDK — Gemini via RestClient.
-application.yaml: feed.moderation.{enabled,gemini-api-key,model,endpoint},
+config/        async executor; RestClient for scraping (no SDK)
+build.gradle:  add jsoup (OG/oEmbed parsing). No AI SDK.
+application.yaml: feed.moderation.{enabled,sweeper-delay-ms},
                   feed.scrape.*, rate limits
 ```
 
@@ -440,10 +441,9 @@ application.yaml: feed.moderation.{enabled,gemini-api-key,model,endpoint},
    new `kind` + `data` shape, no migration.
 
 **Still to confirm (don't block Phase 1 start):**
-- AI moderation provider/model — **Gemini via REST** (`gemini-2.0-flash`-class,
-  structured-JSON output, no SDK) behind a swappable `FeedModerationClient`.
-  Reads `GEMINI_API_KEY` from env (wired into `application.yaml` like
-  `GOOGLE_MAPS_API_KEY`). Confirm the model choice.
+- AI moderation provider/model — the **AI provider saved in the Ops Dashboard**
+  (JSON-only reply, no SDK) behind a swappable `FeedModerationClient`.
+  `GEMINI_API_KEY` is no longer used.
 - The category taxonomy (`SPAM / HATE / NSFW / HARASSMENT / OFF_TOPIC / …`) — final
   list and which categories hard-block vs. flag-for-review.
 - Should an author be able to **edit & resubmit** an AI-blocked post, or is a block

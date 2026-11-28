@@ -58,13 +58,13 @@ public class QuizEntity {
   @Column(name = "answer_option_index", nullable = false)
   private Integer answerOptionIndex;
 
-  /** Engaging explanation shown after an attempt — Groq-generated at creation, ops-editable. */
+  /** Engaging explanation shown after an attempt — AI-generated at creation, ops-editable. */
   @Column(columnDefinition = "text")
   private String explanation;
 
   /**
-   * Which AI wrote the quiz, as provider/model (e.g. "groq/some-model"), so admins can compare
-   * quality. Null for hand-entered quizzes.
+   * Which AI wrote the quiz, as provider/model (e.g. "claude/claude-sonnet-5-5"), so admins can
+   * compare quality. Null for hand-entered quizzes.
    */
   @Column(name = "generated_by", length = 100)
   private String generatedBy;

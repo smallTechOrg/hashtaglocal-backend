@@ -12,9 +12,13 @@ import org.springframework.web.client.RestClient;
 
 /**
  * Groq chat completions (OpenAI-compatible). Limits are per organization <em>and per model</em>, so
- * switching model gives fresh quota. Separate from the bulletin's {@code GroqClient} so the two
- * never share a key's quota.
+ * switching model gives fresh quota.
+ *
+ * @deprecated All AI goes through the provider saved in the Ops Dashboard. This is only the old
+ *     {@code .env} fallback ({@code QUIZ_GROQ_KEYS}), kept until that config is removed. To use
+ *     Groq, save it in the Ops Dashboard ({@code https://api.groq.com/openai/v1}).
  */
+@Deprecated(since = "2026-11", forRemoval = true)
 @Component
 public class GroqProvider extends RestAiProvider {
 

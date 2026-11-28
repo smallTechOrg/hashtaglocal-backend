@@ -4,8 +4,9 @@ import org.smalltech.hashtaglocal_backend.model.AiCategory;
 import org.smalltech.hashtaglocal_backend.model.AiVerdict;
 
 /**
- * Pluggable AI moderation classifier. v1 implementation calls Gemini over REST; the interface keeps
- * the provider swappable. See FEED_DESIGN.md §8.
+ * Pluggable AI moderation classifier. {@link
+ * org.smalltech.hashtaglocal_backend.service.impl.AiFeedModerationClient} uses the AI provider
+ * saved in the Ops Dashboard; the interface keeps the provider swappable. See FEED_DESIGN.md §8.
  */
 public interface FeedModerationClient {
 

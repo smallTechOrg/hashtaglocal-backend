@@ -163,7 +163,7 @@ jobs:
             echo "::error::Missing required secrets in the GitHub Environment (or the _${SECRET_SUFFIX} form): ${missing[*]}"
             exit 1
           fi
-          for name in SPRING_DATASOURCE_URL SPRING_DATASOURCE_USERNAME SPRING_DATASOURCE_PASSWORD GOOGLE_MAPS_API_KEY GROQ_API_KEY GEMINI_API_KEY SPRING_MAIL_PASSWORD GOOGLE_OAUTH_CLIENT_SECRET PORTALISSUE_AUTH_USERNAME PORTALISSUE_AUTH_PASSWORD AI_CONFIG_ENCRYPTION_KEY; do
+          for name in SPRING_DATASOURCE_URL SPRING_DATASOURCE_USERNAME SPRING_DATASOURCE_PASSWORD GOOGLE_MAPS_API_KEY SPRING_MAIL_PASSWORD GOOGLE_OAUTH_CLIENT_SECRET PORTALISSUE_AUTH_USERNAME PORTALISSUE_AUTH_PASSWORD AI_CONFIG_ENCRYPTION_KEY; do
             value="$(var "$name")"
             [ -z "$value" ] || { echo "::add-mask::$value"; add "$name" "$value"; }
           done
@@ -208,12 +208,12 @@ jobs:
             ACCOUNT_DELETION_ADMIN_EMAIL ACCOUNT_DELETION_FROM_EMAIL \
             SPRING_MAIL_HOST SPRING_MAIL_PORT SPRING_MAIL_USERNAME SPRING_MAIL_SMTP_AUTH \
             SPRING_MAIL_SMTP_STARTTLS_ENABLE SPRING_MAIL_SMTP_FROM SPRING_MAIL_SMTP_LOCALHOST \
-            FEED_MODERATION_ENABLED FEED_MODERATION_MODEL FEED_MODERATION_ENDPOINT FEED_MODERATION_SWEEPER_DELAY_MS \
+            FEED_MODERATION_ENABLED FEED_MODERATION_SWEEPER_DELAY_MS \
             FEED_SCRAPE_TIMEOUT_MS FEED_SCRAPE_MAX_BODY_BYTES FEED_SCRAPE_MAX_IMAGE_BYTES \
             FEED_AUTO_ISSUE_REF_ENABLED FEED_NOTIFICATION_ENABLED \
             BULLETIN_ENABLED BULLETIN_NOTIFICATION_ENABLED BULLETIN_WEATHER_CRON \
             BULLETIN_WEATHER_PROVIDER BULLETIN_OPEN_METEO_URL \
-            GROQ_API_URL GROQ_MODEL GROQ_REQUESTS_PER_MINUTE \
+            BULLETIN_AI_REQUESTS_PER_MINUTE \
             FLYWAY_BASELINE_VERSION; do
             value="$(var "$name")"
             [ -z "$value" ] || add "$name" "$value"
@@ -264,7 +264,7 @@ jobs:
             --quiet
           )
           # Reach the database's private IP through Direct VPC egress. Only
-          # private ranges go through the VPC; Groq, Gemini and GCS go out directly.
+          # private ranges go through the VPC; the AI provider and GCS go out directly.
           if [ "$VPC_NETWORK" != "none" ]; then
             args+=(--network "$VPC_NETWORK" --subnet "$VPC_SUBNET" --vpc-egress private-ranges-only)
           fi

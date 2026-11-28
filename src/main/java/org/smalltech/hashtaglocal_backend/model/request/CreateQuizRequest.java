@@ -34,6 +34,6 @@ public class CreateQuizRequest {
   @Max(4)
   private Integer answerOptionIndex;
 
-  /** Optional ops-written explanation; when absent, Groq generates one. */
+  /** Optional ops-written explanation; when absent, the AI provider generates one. */
   private String explanation;
 }

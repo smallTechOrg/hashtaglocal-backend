@@ -12,8 +12,14 @@ import org.springframework.web.client.RestClient;
 
 /**
  * Gemini generateContent API. Free-tier quota is per Google Cloud project <em>and per model</em>,
- * so each key must come from its own project. Separate from feed moderation's Gemini key.
+ * so each key must come from its own project.
+ *
+ * @deprecated All AI goes through the provider saved in the Ops Dashboard. This is only the old
+ *     {@code .env} fallback ({@code QUIZ_GEMINI_KEYS}), kept until that config is removed. To use
+ *     Gemini, save it in the Ops Dashboard ({@code
+ *     https://generativelanguage.googleapis.com/v1beta/openai}).
  */
+@Deprecated(since = "2026-11", forRemoval = true)
 @Component
 public class GeminiProvider extends RestAiProvider {
 

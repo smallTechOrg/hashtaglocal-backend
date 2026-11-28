@@ -30,7 +30,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Generates the daily bulletin for every locality that saved users belong to: weather snapshot →
- * {@code periodic_data}, Groq summary → {@code bulletins}, then a system BULLETIN feed post so the
+ * {@code periodic_data}, AI summary → {@code bulletins}, then a system BULLETIN feed post so the
  * bulletin appears as a chat message in the locality's feed. Idempotent — a re-run skips localities
  * already covered for the day. Nothing here runs on the user request path.
  */
@@ -47,7 +47,7 @@ public class BulletinGenerationService {
   private final PeriodicDataRepository periodicDataRepository;
   private final BulletinRepository bulletinRepository;
   private final WeatherProvider weatherProvider;
-  private final GroqClient groqClient;
+  private final BulletinAiClient bulletinAiClient;
   private final FeedService feedService;
   private final QuizQueueService quizQueueService;
   private final JavaMailSender mailSender;
@@ -162,7 +162,7 @@ public class BulletinGenerationService {
       String fallbackDetail =
           fallbacks.isEmpty()
               ? ""
-              : "\n\nFallback summaries (Groq failed, so the plain weather line was used). A re-run"
+              : "\n\nFallback summaries (the AI failed, so the plain weather line was used). A re-run"
                   + " does not replace these; edit them in the ops portal:\n"
                   + String.join("\n", fallbacks);
       message.setText(
@@ -214,8 +214,8 @@ public class BulletinGenerationService {
 
     List<String> recentSummaries =
         bulletinRepository.findRecentWeatherSummaries(locality.getId(), 5);
-    GroqClient.WeatherSummary weatherSummary =
-        groqClient.generateWeatherSummary(locality.getName(), weather, recentSummaries);
+    BulletinAiClient.WeatherSummary weatherSummary =
+        bulletinAiClient.generateWeatherSummary(locality.getName(), weather, recentSummaries);
     String summaryText = weatherSummary.text();
     Map<String, Object> summary = new HashMap<>();
     summary.put("text", summaryText);

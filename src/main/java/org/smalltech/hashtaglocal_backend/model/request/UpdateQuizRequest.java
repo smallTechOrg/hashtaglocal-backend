@@ -22,6 +22,8 @@ public class UpdateQuizRequest {
   /** Direct ops edit of the explanation text. Ignored when {@code regenerateExplanation} is set. */
   private String explanation;
 
-  /** When true, Groq regenerates the explanation from the (updated) question and answer. */
+  /**
+   * When true, the AI provider regenerates the explanation from the (updated) question and answer.
+   */
   private Boolean regenerateExplanation;
 }

@@ -131,12 +131,12 @@ gcloud scheduler jobs run hashtaglocal-backend-staging-session-cleanup --locatio
    | `GCS_KEY_JSON` | the whole contents of `gcs-key.json` |
 
    Optional credentials (the app default is empty or off): `FIREBASE_KEY_JSON` (the whole `firebase-key.json`;
-   without it push notifications are off), `GOOGLE_MAPS_API_KEY`, `GROQ_API_KEY`, `GEMINI_API_KEY`,
+   without it push notifications are off), `GOOGLE_MAPS_API_KEY`,
    `SPRING_MAIL_PASSWORD`, `GOOGLE_OAUTH_CLIENT_SECRET`, `PORTALISSUE_AUTH_USERNAME`, `PORTALISSUE_AUTH_PASSWORD`.
-   A missing `GEMINI_API_KEY` means feed posts go to human review instead of auto-publishing.
+   All AI (quizzes, bulletin texts, feed moderation) uses the provider saved in the Ops Dashboard.
    `AI_CONFIG_ENCRYPTION_KEY` (`openssl rand -base64 32`, a different value per environment) encrypts the
-   quiz AI key saved from the Ops Dashboard; without it the dashboard cannot save a key and quiz generation
-   uses the `QUIZ_*` chain. Changing it makes a saved key unreadable: re-enter the key in the dashboard.
+   AI key saved from the Ops Dashboard; without it the dashboard cannot save a key and the AI falls back
+   to the deprecated `QUIZ_*` chain. With neither, feed posts go to human review instead of auto-publishing. Changing it makes a saved key unreadable: re-enter the key in the dashboard.
 
    Everything else is listed under *GitHub settings* below.
 
@@ -177,11 +177,11 @@ gcloud scheduler jobs run hashtaglocal-backend-staging-session-cleanup --locatio
    `ACCOUNT_DELETION_ADMIN_EMAIL`, `ACCOUNT_DELETION_FROM_EMAIL`, `SPRING_MAIL_HOST`, `SPRING_MAIL_PORT`,
    `SPRING_MAIL_USERNAME`, `SPRING_MAIL_SMTP_AUTH`, `SPRING_MAIL_SMTP_STARTTLS_ENABLE`,
    `SPRING_MAIL_SMTP_FROM`, `SPRING_MAIL_SMTP_LOCALHOST`, `FEED_MODERATION_ENABLED`,
-   `FEED_MODERATION_MODEL`, `FEED_MODERATION_ENDPOINT`, `FEED_MODERATION_SWEEPER_DELAY_MS`,
+   `FEED_MODERATION_SWEEPER_DELAY_MS`,
    `FEED_SCRAPE_TIMEOUT_MS`, `FEED_SCRAPE_MAX_BODY_BYTES`, `FEED_SCRAPE_MAX_IMAGE_BYTES`,
    `FEED_AUTO_ISSUE_REF_ENABLED`, `FEED_NOTIFICATION_ENABLED`, `BULLETIN_ENABLED`,
    `BULLETIN_NOTIFICATION_ENABLED`, `BULLETIN_WEATHER_CRON`, `BULLETIN_WEATHER_PROVIDER`,
-   `BULLETIN_OPEN_METEO_URL`, `GROQ_API_URL`, `GROQ_MODEL`, `GROQ_REQUESTS_PER_MINUTE`,
+   `BULLETIN_OPEN_METEO_URL`, `BULLETIN_AI_REQUESTS_PER_MINUTE`,
    `FLYWAY_BASELINE_VERSION`, `FEED_MODERATION_SWEEP_CRON`.
 
    Push notifications are **off** unless `NOTIFICATIONS_ENABLED=true` is set (master switch for

@@ -48,7 +48,7 @@ public class QuizAdminService {
   private final LocalityRepository localityRepository;
   private final UserRepository userRepository;
   private final FeedPostRepository feedPostRepository;
-  private final GroqClient groqClient;
+  private final BulletinAiClient bulletinAiClient;
 
   // ---------------------------------------------------------------- quizzes
 
@@ -77,7 +77,7 @@ public class QuizAdminService {
     String explanation =
         req.getExplanation() != null && !req.getExplanation().isBlank()
             ? req.getExplanation()
-            : groqClient.generateQuizExplanation(
+            : bulletinAiClient.generateQuizExplanation(
                 req.getQuestion(), req.getOptions().get(req.getAnswerOptionIndex() - 1));
 
     QuizEntity quiz =
@@ -119,7 +119,7 @@ public class QuizAdminService {
     if (Boolean.TRUE.equals(req.getRegenerateExplanation())) {
       List<String> options = BulletinViewMapper.optionTexts(quiz);
       quiz.setExplanation(
-          groqClient.generateQuizExplanation(
+          bulletinAiClient.generateQuizExplanation(
               quiz.getQuestion(), options.get(quiz.getAnswerOptionIndex() - 1)));
     } else if (req.getExplanation() != null) {
       quiz.setExplanation(req.getExplanation());

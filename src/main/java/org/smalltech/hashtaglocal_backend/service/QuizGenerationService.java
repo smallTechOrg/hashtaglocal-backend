@@ -26,8 +26,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Generates one quiz per locality through the AI fallback chain (Claude, then Groq, then Gemini)
- * and saves it as PENDING for admin review.
+ * Generates one quiz per locality with the AI provider saved in the Ops Dashboard (via {@link
+ * AiFallbackChain}) and saves it as PENDING for admin review.
  *
  * <p>Flow per locality:
  *

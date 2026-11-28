@@ -48,7 +48,7 @@ class BulletinGenerationServiceTest {
   @Mock private PeriodicDataRepository periodicDataRepository;
   @Mock private BulletinRepository bulletinRepository;
   @Mock private WeatherProvider weatherProvider;
-  @Mock private GroqClient groqClient;
+  @Mock private BulletinAiClient bulletinAiClient;
   @Mock private FeedService feedService;
   @Mock private QuizQueueService quizQueueService;
   @Mock private JavaMailSender mailSender;
@@ -64,7 +64,7 @@ class BulletinGenerationServiceTest {
             periodicDataRepository,
             bulletinRepository,
             weatherProvider,
-            groqClient,
+            bulletinAiClient,
             feedService,
             quizQueueService,
             mailSender);
@@ -134,7 +134,7 @@ class BulletinGenerationServiceTest {
   @Test
   void countsAndAlertsOnFallbackSummaries() {
     Locality locality =
-        stubGeneration("satara", new GroqClient.WeatherSummary("Today: 21°C.", true));
+        stubGeneration("satara", new BulletinAiClient.WeatherSummary("Today: 21°C.", true));
     when(userRepository.findDistinctUserLocalities()).thenReturn(List.of(locality));
 
     BulletinGenerationService.GenerationResult result = service.generateForAllUserLocalities();
@@ -155,7 +155,7 @@ class BulletinGenerationServiceTest {
   @Test
   void aiSummaryIsNotCountedAsFallback() {
     Locality locality =
-        stubGeneration("satara", new GroqClient.WeatherSummary("Grab a raincoat.", false));
+        stubGeneration("satara", new BulletinAiClient.WeatherSummary("Grab a raincoat.", false));
     when(userRepository.findDistinctUserLocalities()).thenReturn(List.of(locality));
 
     BulletinGenerationService.GenerationResult result = service.generateForAllUserLocalities();
@@ -165,7 +165,7 @@ class BulletinGenerationServiceTest {
     verify(mailSender, never()).send(any(SimpleMailMessage.class));
   }
 
-  private Locality stubGeneration(String hashtag, GroqClient.WeatherSummary summary) {
+  private Locality stubGeneration(String hashtag, BulletinAiClient.WeatherSummary summary) {
     Locality locality = Locality.builder().id(3L).hashtag(hashtag).name("Satara").build();
     Point point = new GeometryFactory().createPoint(new Coordinate(74.0, 17.7));
     when(periodicDataRepository.findByLocalityIdAndDateAndDataType(eq(3L), any(), eq("WEATHER")))
@@ -176,7 +176,7 @@ class BulletinGenerationServiceTest {
         .thenReturn(WeatherSnapshot.builder().source("OPEN_METEO").build());
     when(periodicDataRepository.save(any())).thenReturn(mockPeriodicData());
     when(bulletinRepository.findRecentWeatherSummaries(3L, 5)).thenReturn(List.of());
-    when(groqClient.generateWeatherSummary(eq("Satara"), any(), any())).thenReturn(summary);
+    when(bulletinAiClient.generateWeatherSummary(eq("Satara"), any(), any())).thenReturn(summary);
     when(bulletinRepository.findByLocalityIdAndDate(eq(3L), any())).thenReturn(Optional.empty());
     when(bulletinRepository.save(any()))
         .thenReturn(
