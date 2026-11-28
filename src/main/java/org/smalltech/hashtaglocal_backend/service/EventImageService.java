@@ -38,7 +38,9 @@ public class EventImageService {
    */
   public MediaEntity downloadAndStore(String imageUrl) {
     try {
-      byte[] bytes = restTemplate.getForObject(imageUrl, byte[].class);
+      // A URI, not a String: RestTemplate treats a String as a URI template and encodes it again,
+      // turning an already-encoded link's %20 into %2520 (404 on the image host).
+      byte[] bytes = restTemplate.getForObject(java.net.URI.create(imageUrl), byte[].class);
       if (bytes == null || bytes.length == 0) {
         log.warn("Image download returned empty bytes for '{}'", imageUrl);
         return null;

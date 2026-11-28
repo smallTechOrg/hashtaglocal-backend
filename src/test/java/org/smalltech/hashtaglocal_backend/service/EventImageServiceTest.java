@@ -77,7 +77,8 @@ class EventImageServiceTest {
   void detectsCorrectExtensionAndContentType(
       String imageUrl, String expectedExt, String expectedContentType, String description) {
 
-    when(restTemplate.getForObject(imageUrl, byte[].class)).thenReturn(VALID_BYTES);
+    when(restTemplate.getForObject(java.net.URI.create(imageUrl), byte[].class))
+        .thenReturn(VALID_BYTES);
     when(fileNamingPolicy.generate(expectedExt))
         .thenReturn("2026-03-17-10-00-00-000." + expectedExt);
     when(gcsService.uploadObject(anyString(), eq(VALID_BYTES), eq(expectedContentType)))
@@ -125,7 +126,7 @@ class EventImageServiceTest {
     String url = "https://cdn.example.com/image.jpg";
 
     if (throwsException) {
-      when(restTemplate.getForObject(url, byte[].class))
+      when(restTemplate.getForObject(java.net.URI.create(url), byte[].class))
           .thenThrow(
               HttpClientErrorException.NotFound.create(
                   "Not Found",
@@ -135,7 +136,7 @@ class EventImageServiceTest {
                   null,
                   null));
     } else {
-      when(restTemplate.getForObject(url, byte[].class)).thenReturn(bytes);
+      when(restTemplate.getForObject(java.net.URI.create(url), byte[].class)).thenReturn(bytes);
     }
 
     MediaEntity result = eventImageService.downloadAndStore(url);
@@ -155,7 +156,8 @@ class EventImageServiceTest {
     String imageUrl = "https://cdn.example.com/event.jpg";
     String gcsPath = "gs://bucket/events/2026-03-17-10-00-00-000.jpg";
 
-    when(restTemplate.getForObject(imageUrl, byte[].class)).thenReturn(VALID_BYTES);
+    when(restTemplate.getForObject(java.net.URI.create(imageUrl), byte[].class))
+        .thenReturn(VALID_BYTES);
     when(fileNamingPolicy.generate("jpg")).thenReturn("2026-03-17-10-00-00-000.jpg");
     when(gcsService.uploadObject(anyString(), any(), any())).thenReturn(gcsPath);
     when(mediaRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -172,7 +174,8 @@ class EventImageServiceTest {
   void objectNameHasEventsPrefix() {
     String imageUrl = "https://cdn.example.com/event.jpg";
 
-    when(restTemplate.getForObject(imageUrl, byte[].class)).thenReturn(VALID_BYTES);
+    when(restTemplate.getForObject(java.net.URI.create(imageUrl), byte[].class))
+        .thenReturn(VALID_BYTES);
     when(fileNamingPolicy.generate("jpg")).thenReturn("2026-03-17-10-00-00-000.jpg");
     when(gcsService.uploadObject(anyString(), any(), any())).thenReturn(GCS_PATH);
     when(mediaRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -195,7 +198,8 @@ class EventImageServiceTest {
   void deletesGcsObjectWhenDbSaveFails() {
     String imageUrl = "https://cdn.example.com/event.jpg";
 
-    when(restTemplate.getForObject(imageUrl, byte[].class)).thenReturn(VALID_BYTES);
+    when(restTemplate.getForObject(java.net.URI.create(imageUrl), byte[].class))
+        .thenReturn(VALID_BYTES);
     when(fileNamingPolicy.generate("jpg")).thenReturn("2026-03-17-10-00-00-000.jpg");
     when(gcsService.uploadObject(anyString(), any(), any())).thenReturn(GCS_PATH);
     when(mediaRepository.save(any())).thenThrow(new RuntimeException("DB constraint violation"));
@@ -210,7 +214,7 @@ class EventImageServiceTest {
   @DisplayName("Returns null and does not call deleteObject when download itself fails")
   void doesNotCallDeleteWhenDownloadFails() {
     String imageUrl = "https://cdn.example.com/event.jpg";
-    when(restTemplate.getForObject(imageUrl, byte[].class))
+    when(restTemplate.getForObject(java.net.URI.create(imageUrl), byte[].class))
         .thenThrow(new RuntimeException("Network error"));
 
     MediaEntity result = eventImageService.downloadAndStore(imageUrl);
@@ -218,5 +222,22 @@ class EventImageServiceTest {
     assertNull(result);
     verify(gcsService, never()).deleteObject(any());
     verifyNoInteractions(mediaRepository);
+  }
+
+  @Test
+  @DisplayName("An already-encoded link is fetched exactly as given (no %20 -> %2520)")
+  void encodedLinkIsNotEncodedAgain() {
+    String imageUrl = "https://cdn.example.org/images/Square%20logo.png/Square%20logo__300x300.png";
+    when(restTemplate.getForObject(java.net.URI.create(imageUrl), byte[].class))
+        .thenReturn(VALID_BYTES);
+    when(fileNamingPolicy.generate("png")).thenReturn("2026-11-28-10-00-00-000.png");
+    when(gcsService.uploadObject(anyString(), eq(VALID_BYTES), eq("image/png")))
+        .thenReturn(GCS_PATH);
+    when(mediaRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+    assertNotNull(eventImageService.downloadAndStore(imageUrl));
+    ArgumentCaptor<java.net.URI> uri = ArgumentCaptor.forClass(java.net.URI.class);
+    verify(restTemplate).getForObject(uri.capture(), eq(byte[].class));
+    assertEquals(imageUrl, uri.getValue().toString());
   }
 }
