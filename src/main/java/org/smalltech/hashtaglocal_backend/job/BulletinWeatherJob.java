@@ -11,7 +11,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 /**
- * Daily 8:00 AM bulletin run: weather (+ Groq summary + feed post) for every locality that saved
+ * Daily 8:00 AM bulletin run: weather (+ AI summary + feed post) for every locality that saved
  * users belong to. A locality first seen today is picked up automatically tomorrow — nothing is
  * generated on-demand when a user opens the app.
  */

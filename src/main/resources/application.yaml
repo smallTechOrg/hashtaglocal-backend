@@ -160,10 +160,8 @@ feed:
   moderation:
     # When false (e.g. local dev without a key), user posts are FLAGGED for human review
     # instead of being auto-published. Never auto-publishes without AI.
+    # The AI is the provider saved in the Ops Dashboard (see ai.config below).
     enabled: ${FEED_MODERATION_ENABLED:true}
-    gemini-api-key: ${GEMINI_API_KEY:}
-    model: ${FEED_MODERATION_MODEL:gemini-2.0-flash}
-    endpoint: ${FEED_MODERATION_ENDPOINT:https://generativelanguage.googleapis.com/v1beta/models}
     # Retry sweeper interval for posts stuck in PENDING_AI
     sweeper-delay-ms: ${FEED_MODERATION_SWEEPER_DELAY_MS:60000}
   scrape:
@@ -181,7 +179,7 @@ feed:
     # Send the push inside the publishing request (Cloud Run: no CPU after the response).
     inline: ${FEED_NOTIFICATION_INLINE:false}
 
-# City bulletin: daily weather (cron, saved-user localities only) + manual quizzes + Groq texts
+# City bulletin: daily weather (cron, saved-user localities only) + manual quizzes + AI texts
 bulletin:
   enabled: ${BULLETIN_ENABLED:true}
   notification:
@@ -196,22 +194,20 @@ bulletin:
     provider: ${BULLETIN_WEATHER_PROVIDER:open-meteo}
     open-meteo:
       url: ${BULLETIN_OPEN_METEO_URL:https://api.open-meteo.com/v1/forecast}
+  ai:
+    # Spaces the weather summary / quiz explanation calls to the AI provider, so the daily run
+    # over every locality stays under the provider's per-minute limit.
+    requests-per-minute: ${BULLETIN_AI_REQUESTS_PER_MINUTE:12}
 
-# Groq (weather summary + quiz explanation generation)
-groq:
-  api:
-    key: ${GROQ_API_KEY:}
-    url: ${GROQ_API_URL:https://api.groq.com/openai/v1/chat/completions}
-    model: ${GROQ_MODEL:qwen/qwen3.8-27b}
-    # Spaces every Groq call: ~450 tokens per request stays under the 7000 tokens/minute limit.
-    requests-per-minute: ${GROQ_REQUESTS_PER_MINUTE:12}
-
-# AI fallback chain for the #local quiz candidates (ops review them before they go out).
+# All AI (quizzes, bulletin texts, feed moderation) uses the provider an admin saves in the Ops
+# Dashboard (AI Provider page; ai.config below).
+#
+# DEPRECATED .env fallback, used only while nothing is saved in the Ops Dashboard. The groq and
+# gemini levels will be removed; set the provider in the Ops Dashboard instead.
 # Tried top to bottom: each model on every key, then the next model, then the next provider.
 # Models (best first) and keys are comma-separated. A level with no models or no keys is skipped.
 # Each key must come from a separate account/org (Gemini: separate Google Cloud project),
-# otherwise the keys share one quota. These keys are separate from GROQ_API_KEY (bulletin) and
-# GEMINI_API_KEY (feed moderation), so quiz generation cannot use up their quota.
+# otherwise the keys share one quota.
 ai:
   quiz:
     chain:
@@ -225,7 +221,7 @@ ai:
         models: ${QUIZ_GEMINI_MODELS:gemini-4-neon,gemini-3.1-flash-lite}
         keys: ${QUIZ_GEMINI_KEYS:}
   # The provider an admin saves in the Ops Dashboard (AI Provider page) replaces the chain above
-  # for quiz generation, with no restart. With nothing saved, the chain above is used.
+  # for every AI feature, with no restart. With nothing saved, the chain above is used.
   config:
     # Base64 of 32 random bytes (openssl rand -base64 32). Encrypts the saved API key (AES-GCM).
     # Secret: set it in the environment / secret manager only. Without it, keys cannot be saved.

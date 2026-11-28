@@ -17,7 +17,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 /**
- * Sends a quiz prompt to the AI.
+ * Sends a prompt to the AI. Every AI feature goes through here: quiz generation and review, the
+ * bulletin weather summary and quiz explanation ({@code BulletinAiClient}), and feed moderation
+ * ({@code AiFeedModerationClient}).
  *
  * <p><b>Ops Dashboard connection.</b> When an admin has saved an AI connection ({@link
  * AiConfigResolver}), only that OpenAI-compatible endpoint/model/key is used, through {@link
@@ -25,9 +27,10 @@ import org.springframework.stereotype.Component;
  * without a restart. A failure there is thrown as an {@link AiProviderException} instead of
  * silently falling back, so the admin sees what is wrong.
  *
- * <p><b>.env chain (fallback).</b> With no saved config, the prompt goes down the configured
- * providers until one answers. Order: the best model on every key, then the next model, then the
- * next provider.
+ * <p><b>.env chain (deprecated fallback).</b> With no saved config, the prompt goes down the
+ * configured providers until one answers. The Groq and Gemini levels are deprecated: save the
+ * provider in the Ops Dashboard instead. Order: the best model on every key, then the next model,
+ * then the next provider.
  *
  * <p>A slot that fails is put on cooldown, so later calls skip it without trying: seconds for a
  * rate limit, an hour for used-up quota, until restart for a bad key or missing model. A key-level
@@ -98,7 +101,7 @@ public class AiFallbackChain {
     this.client = client;
     this.slots = buildSlots(properties, providers);
     log.info(
-        "Quiz AI chain: {}",
+        "AI chain: {}",
         slots.isEmpty()
             ? "no providers configured"
             : slots.stream().map(Slot::label).collect(Collectors.joining(" -> ")));
@@ -134,11 +137,11 @@ public class AiFallbackChain {
     AiResult result = callConfigured(config, prompt, maxTokens);
     String label = config.label();
     if (result.isSuccess()) {
-      log.info("Quiz AI reply from {} (Ops Dashboard config)", label);
+      log.info("AI reply from {} (Ops Dashboard config)", label);
       return Optional.of(new AiCompletion(result.text(), label));
     }
     String detail = SecretRedactor.redact(result.detail(), config.apiKey());
-    log.warn("Quiz AI {} (Ops Dashboard config) failed: {} ({})", label, result.failure(), detail);
+    log.warn("AI {} (Ops Dashboard config) failed: {} ({})", label, result.failure(), detail);
     if (result.failure() == AiFailure.INVALID_RESPONSE) {
       return Optional.empty();
     }
@@ -186,18 +189,18 @@ public class AiFallbackChain {
       }
       AiResult result = slot.provider().call(slot.model(), slot.apiKey(), prompt, maxTokens);
       if (result.isSuccess()) {
-        log.info("Quiz AI reply from {}", slot.label());
+        log.info("AI reply from {}", slot.label());
         return Optional.of(
             new AiCompletion(result.text(), slot.provider().name() + "/" + slot.model()));
       }
-      log.warn("Quiz AI {} failed: {} ({})", slot.label(), result.failure(), result.detail());
+      log.warn("AI {} failed: {} ({})", slot.label(), result.failure(), result.detail());
       if (result.failure() == AiFailure.BAD_REQUEST) {
         skippedProviders.add(slot.provider().name());
       } else {
         coolDown(slot, result);
       }
     }
-    log.warn("Quiz AI: every provider failed or is cooling down");
+    log.warn("AI: every provider failed or is cooling down");
     return Optional.empty();
   }
 
@@ -219,7 +222,7 @@ public class AiFallbackChain {
     String target = result.wholeKey() ? slot.keyLabel() : slot.label();
     cooldownUntil.put(target, until);
     log.warn(
-        "Quiz AI {} cooling down {}",
+        "AI {} cooling down {}",
         target,
         until.equals(Instant.MAX) ? "until restart" : "until " + until);
   }
@@ -240,6 +243,9 @@ public class AiFallbackChain {
     return value != null && !value.isZero() && !value.isNegative() ? value : fallback;
   }
 
+  /** Providers in the .env chain that are deprecated in favour of the Ops Dashboard config. */
+  static final Set<String> DEPRECATED_PROVIDERS = Set.of("groq", "gemini");
+
   /** Slots in order: for each level, each model across all keys. Unusable levels are skipped. */
   private static List<Slot> buildSlots(QuizAiProperties properties, List<AiProvider> providers) {
     Map<String, AiProvider> byName =
@@ -248,14 +254,20 @@ public class AiFallbackChain {
     for (QuizAiProperties.Level level : properties.getChain()) {
       AiProvider provider = byName.get(level.getProvider());
       if (provider == null) {
-        log.error("Quiz AI chain: unknown provider '{}', skipped", level.getProvider());
+        log.error("AI chain: unknown provider '{}', skipped", level.getProvider());
         continue;
       }
       List<String> models = clean(level.getModels());
       List<String> keys = clean(level.getKeys());
       if (models.isEmpty() || keys.isEmpty()) {
-        log.info("Quiz AI chain: {} has no models or no keys, skipped", provider.name());
+        log.info("AI chain: {} has no models or no keys, skipped", provider.name());
         continue;
+      }
+      if (DEPRECATED_PROVIDERS.contains(provider.name())) {
+        log.warn(
+            "AI chain: the .env {} fallback is deprecated and will be removed. Save the AI"
+                + " provider in the Ops Dashboard instead.",
+            provider.name());
       }
       for (String model : models) {
         for (int i = 0; i < keys.size(); i++) {

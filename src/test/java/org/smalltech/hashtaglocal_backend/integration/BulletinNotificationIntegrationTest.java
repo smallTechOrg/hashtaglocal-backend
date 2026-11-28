@@ -42,8 +42,8 @@ import org.smalltech.hashtaglocal_backend.repository.NotificationLogRepository;
 import org.smalltech.hashtaglocal_backend.repository.UserAuthProviderRepository;
 import org.smalltech.hashtaglocal_backend.repository.UserAuthSessionRepository;
 import org.smalltech.hashtaglocal_backend.repository.UserRepository;
+import org.smalltech.hashtaglocal_backend.service.BulletinAiClient;
 import org.smalltech.hashtaglocal_backend.service.BulletinGenerationService;
-import org.smalltech.hashtaglocal_backend.service.GroqClient;
 import org.smalltech.hashtaglocal_backend.service.weather.WeatherProvider;
 import org.smalltech.hashtaglocal_backend.service.weather.WeatherSnapshot;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -55,7 +55,7 @@ import org.springframework.test.context.ActiveProfiles;
 
 /**
  * End-to-end: real generation service → real event → real async listener → real Postgres. Only the
- * outside world (FCM, weather, Groq) is mocked.
+ * outside world (FCM, weather, AI) is mocked.
  */
 @SpringBootTest(
     webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
@@ -77,14 +77,14 @@ class BulletinNotificationIntegrationTest {
 
   @MockBean private FcmSender fcmSender;
   @MockBean private WeatherProvider weatherProvider;
-  @MockBean private GroqClient groqClient;
+  @MockBean private BulletinAiClient bulletinAiClient;
 
   private Locality locality;
   private String token;
 
   @BeforeEach
   void setUp() {
-    reset(fcmSender, weatherProvider, groqClient);
+    reset(fcmSender, weatherProvider, bulletinAiClient);
 
     // create-drop does not build the partial unique index from the migration script
     jdbc.execute(
@@ -94,9 +94,9 @@ class BulletinNotificationIntegrationTest {
 
     when(weatherProvider.fetchDaily(anyDouble(), anyDouble()))
         .thenReturn(WeatherSnapshot.builder().minTemp(21.0).maxTemp(28.0).source("TEST").build());
-    when(groqClient.generateWeatherSummary(
+    when(bulletinAiClient.generateWeatherSummary(
             anyString(), org.mockito.ArgumentMatchers.any(), anyList()))
-        .thenReturn(new GroqClient.WeatherSummary(SUMMARY, false));
+        .thenReturn(new BulletinAiClient.WeatherSummary(SUMMARY, false));
     when(fcmSender.sendMulticast(anyList(), anyString(), anyString(), anyMap(), anyString()))
         .thenAnswer(
             inv -> {

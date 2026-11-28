@@ -3,12 +3,12 @@ package org.smalltech.hashtaglocal_backend.model.response;
 import lombok.Builder;
 import lombok.Data;
 
-/** Read-only view of a Groq prompt template, exposed to the ops portal. */
+/** Read-only view of an AI prompt template, exposed to the ops portal. */
 @Data
 @Builder
 public class AiPromptData {
 
-  /** Stable identifier — matches the constant name in {@code GroqClient}. */
+  /** Stable identifier — matches the constant name in {@code BulletinAiClient}. */
   private String key;
 
   /** Human-readable label shown in the ops UI. */

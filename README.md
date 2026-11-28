@@ -72,12 +72,15 @@ To run all the test cases, use this command:
 ```declarative
 ./gradlew test
 ```
-## Quiz AI connection (Ops Dashboard)
+## AI connection (Ops Dashboard)
 
-Quiz generation uses the AI connection an admin saves on the Ops Dashboard's **AI Provider** page
+All AI (quiz generation and review, the bulletin weather summary and quiz explanation, feed
+moderation) uses the AI connection an admin saves on the Ops Dashboard's **AI Provider** page
 (`/ops/ai-provider`, API `/admin/ai-provider`, ADMIN only): a name the admin chooses, an
-OpenAI-compatible endpoint, a model and an API key. With nothing saved, it uses the `QUIZ_*`
-fallback chain from `.env`, as before.
+OpenAI-compatible endpoint, a model and an API key. There is no other provider config: the old
+`GROQ_API_KEY` (bulletin) and `GEMINI_API_KEY` (feed moderation) are gone. With nothing saved, it
+uses the `QUIZ_*` fallback chain from `.env`, which is **deprecated** (its Groq and Gemini levels
+will be removed).
 
 - **Env var:** `AI_CONFIG_ENCRYPTION_KEY`, base64 of 32 random bytes (`openssl rand -base64 32`).
   The saved API key is stored only as AES-256-GCM ciphertext under this key; no endpoint ever
@@ -93,10 +96,11 @@ fallback chain from `.env`, as before.
   table, or run the file with
   `psql -d hashtaglocal -f src/main/resources/db/migration/V2__ai_configs.sql`.
 - **Switching AI:** enter a name (e.g. "Claude"), the provider's OpenAI-compatible endpoint, the
-  model and the key, click **Test**, then **Save**. The next quiz generation uses it, with no
+  model and the key, click **Test**, then **Save**. Every AI feature (quiz generation, the
+  bulletin weather summary and quiz explanation, feed moderation) uses it from the next call, with no
   restart (other instances pick it up within the cache TTL). Leaving the key blank keeps the saved
   key, but only for the same endpoint host. **Remove key** sets the connection inactive and clears
-  its key, so quiz generation goes back to `.env`.
+  its key, so the AI goes back to the deprecated `.env` chain.
 - **Endpoints:** every connection uses the OpenAI Chat Completions format, which the major
   providers accept, e.g. Claude `https://api.anthropic.com/v1`, ChatGPT
   `https://api.openai.com/v1`, Gemini `https://generativelanguage.googleapis.com/v1beta/openai`,

@@ -41,7 +41,7 @@ class QuizAdminServiceTest {
   @Mock private LocalityRepository localityRepository;
   @Mock private UserRepository userRepository;
   @Mock private FeedPostRepository feedPostRepository;
-  @Mock private GroqClient groqClient;
+  @Mock private BulletinAiClient bulletinAiClient;
 
   @InjectMocks private QuizAdminService service;
 

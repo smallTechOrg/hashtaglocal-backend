@@ -43,7 +43,7 @@ public class FeedModerationEntity {
   @Column(length = 1000)
   private String aiReason;
 
-  /** Which model/version produced the verdict (e.g. "gemini-2.0-flash"). */
+  /** Which model/version produced the verdict (e.g. "claude/claude-sonnet-5-5"). */
   @Column(length = 100)
   private String aiModel;
 
