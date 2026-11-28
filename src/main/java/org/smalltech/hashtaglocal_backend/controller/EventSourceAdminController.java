@@ -90,10 +90,15 @@ public class EventSourceAdminController {
   @PostMapping("/run")
   @Operation(
       summary = "Run event ingestion now",
-      description = "Starts a run in the background; skipped if one is already running.")
+      description =
+          "Runs ingestion for every enabled source and answers when it is done (200). 409 when a"
+              + " run is already in progress.")
   public ResponseEntity<Map<String, Object>> run() {
-    ingestionRunner.runAsync();
-    return ResponseEntity.status(HttpStatus.ACCEPTED).body(Map.of("started", true));
+    if (!ingestionRunner.runNow()) {
+      return ResponseEntity.status(HttpStatus.CONFLICT)
+          .body(Map.of("message", "An ingestion run is already in progress; try again shortly"));
+    }
+    return ResponseEntity.ok(Map.of("started", true, "finished", true));
   }
 
   @GetMapping("/scraper0-sites")

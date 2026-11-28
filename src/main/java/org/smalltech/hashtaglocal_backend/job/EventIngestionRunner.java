@@ -1,14 +1,15 @@
 package org.smalltech.hashtaglocal_backend.job;
 
+import java.sql.SQLException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 
 /**
- * Starts an event ingestion run in the background, for {@code POST /admin/event-sources/run}. The
- * run takes the same {@link JobLock} as {@code POST /jobs/event-ingestion}, so it never overlaps a
- * scheduled run.
+ * Runs event ingestion now, for {@code POST /admin/event-sources/run}, inside the caller's request.
+ * It is not run in the background: on Cloud Run with request-based billing a container gets almost
+ * no CPU once the response is sent, so background work stalls. The run takes the same {@link
+ * JobLock} as {@code POST /jobs/event-ingestion}, so it never overlaps a scheduled run.
  */
 @Component
 @RequiredArgsConstructor
@@ -20,14 +21,17 @@ public class EventIngestionRunner {
   private final JobLock jobLock;
   private final EventIngestionCronJob eventIngestionCronJob;
 
-  @Async
-  public void runAsync() {
+  /** Runs ingestion and returns when it is done. False when a run was already in progress. */
+  public boolean runNow() {
+    boolean ran;
     try {
-      if (!jobLock.runExclusive(JOB_NAME, eventIngestionCronJob::run)) {
-        log.info("[JOBS] {} already running; manual run skipped", JOB_NAME);
-      }
-    } catch (Exception e) {
-      log.error("[JOBS] manual {} failed", JOB_NAME, e);
+      ran = jobLock.runExclusive(JOB_NAME, eventIngestionCronJob::run);
+    } catch (SQLException e) {
+      throw new IllegalStateException("could not take the " + JOB_NAME + " job lock", e);
     }
+    if (!ran) {
+      log.info("[JOBS] {} already running; manual run skipped", JOB_NAME);
+    }
+    return ran;
   }
 }

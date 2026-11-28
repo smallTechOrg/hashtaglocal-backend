@@ -97,7 +97,7 @@ class EventSourceAdminControllerTest {
     mvc.perform(post("/admin/event-sources/run").header("Authorization", "Bearer user-token"))
         .andExpect(status().isForbidden());
     verify(service, never()).list();
-    verify(runner, never()).runAsync();
+    verify(runner, never()).runNow();
   }
 
   @Test
@@ -231,11 +231,21 @@ class EventSourceAdminControllerTest {
   }
 
   @Test
-  void runStartsIngestionInTheBackground() throws Exception {
+  void runIngestsWithinTheRequest() throws Exception {
+    when(runner.runNow()).thenReturn(true);
     mvc.perform(post("/admin/event-sources/run").header("Authorization", ADMIN))
-        .andExpect(status().isAccepted())
-        .andExpect(jsonPath("$.started").value(true));
-    verify(runner).runAsync();
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.started").value(true))
+        .andExpect(jsonPath("$.finished").value(true));
+    verify(runner).runNow();
+  }
+
+  @Test
+  void runWhileAnotherRunIsInProgressIsAConflict() throws Exception {
+    when(runner.runNow()).thenReturn(false);
+    mvc.perform(post("/admin/event-sources/run").header("Authorization", ADMIN))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.message").exists());
   }
 
   @Test
